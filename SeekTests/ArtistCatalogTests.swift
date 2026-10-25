@@ -12,6 +12,9 @@ struct ArtistCatalogTests {
         // "Edit" only as a word.
         #expect(CatalogRelease.kind(of: "Credit Where Due", trackCount: 10) == .album)
         #expect(CatalogRelease.cleanTitle("Escapism - EP") == "Escapism")
+        #expect(CatalogRelease.cleanTitle("Iconicy (feat. MINIKINGZ) - Single") == "Iconicy")
+        #expect(CatalogRelease.cleanTitle("Glitch [ft. Someone]") == "Glitch")
+        #expect(CatalogRelease.cleanTitle("Feat (Live)") == "Feat (Live)")
     }
 
     private func entry(_ title: String, _ kind: CatalogRelease.Kind, yearsAgo: Double) -> CatalogRelease {

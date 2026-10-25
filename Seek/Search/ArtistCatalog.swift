@@ -52,11 +52,15 @@ struct CatalogRelease: Sendable, Equatable, Codable {
         return .album
     }
 
+    /// Also without a featured artist credit ("Iconicy (feat. MINIKINGZ)"): the library and
+    /// Soulseek copies seldom have one.
     static func cleanTitle(_ name: String) -> String {
-        for suffix in [" - Single", " - EP"] where name.hasSuffix(suffix) {
-            return String(name.dropLast(suffix.count))
+        var title = name
+        for suffix in [" - Single", " - EP"] where title.hasSuffix(suffix) {
+            title = String(title.dropLast(suffix.count))
         }
-        return name
+        let featuring = title.replacing(/(?i)\s*[\(\[](feat\.?|featuring|ft\.)\s[^\)\]]*[\)\]]/, with: "")
+        return featuring.isEmpty ? title : featuring
     }
 }
 
