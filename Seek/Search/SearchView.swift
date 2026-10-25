@@ -686,10 +686,19 @@ struct ReleaseDetailView: View {
                 if let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) {
                     // The real tracklist, each song downloadable from whichever copy has it.
                     let files = release.folders.map(client.complete).flatMap(\.files)
+                    // Adding the album may take each song from a different copy than the one
+                    // listed first, so a song's download from any of the copies counts.
+                    let folderIDs = Set(release.folders.map(\.id))
+                    let downloads = client.transfers.filter {
+                        !$0.forStreaming && $0.state != .cancelled && folderIDs.contains("\($0.file.username)\u{0}\($0.file.folder)")
+                    }
                     Section {
                         ForEach(reference.tracks, id: \.self) { track in
                             let stream = queue.firstIndex { $0.reference == track }
-                            MissingTrackRow(track: track, file: MissingTracks.file(for: track, in: files), isSearching: false,
+                            MissingTrackRow(track: track,
+                                            file: MissingTracks.download(for: track, in: downloads)?.file
+                                                ?? MissingTracks.file(for: track, in: files),
+                                            isSearching: false,
                                             playing: stream.map { queue[$0].track })
                                 .contentShape(.rect)
                                 .onTapGesture {
