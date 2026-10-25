@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Seek
 
@@ -276,5 +277,36 @@ struct CopyFilterTests {
         #expect(CopyFilter.preferred(folders, quality: .cd)?.map(\.username) == ["cd"])
         #expect(CopyFilter.preferred(folders, quality: .highest)?.map(\.username) == ["cd", "hires"])
         #expect(CopyFilter.preferred([folder("mp3", ext: "mp3", bitDepth: nil, free: true)], quality: .cd) == nil)
+    }
+}
+
+@MainActor
+struct LibraryAlbumSpellingTests {
+    // Albums only list songs that are in a store.
+    private let container = try! ModelContainer(for: Track.self, configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+
+    private func track(_ title: String, album: String, artist: String, number: Int) -> Track {
+        let track = Track(path: "\(artist)/\(album)/\(number) \(title).flac")
+        container.mainContext.insert(track)
+        track.title = title
+        track.album = album
+        track.albumArtist = artist
+        track.trackNumber = number
+        return track
+    }
+
+    @Test func spellingsOfOneAlbumAreOneAlbum() {
+        let tracks = [
+            track("Letterman", album: "I Want to Disappear", artist: "The Story So Far", number: 3),
+            track("Keep You Around", album: "I Want To Disappear", artist: "The Story So Far", number: 7),
+            track("White Shores", album: "I Want To Disappear", artist: "The Story So Far", number: 9),
+            track("Big Blind", album: "I Want To Disappear", artist: "Story So Far, The", number: 5),
+            track("Proper Dose", album: "Proper Dose", artist: "The Story So Far", number: 1),
+        ]
+        let albums = LibraryGrouping.albums(tracks)
+        #expect(albums.count == 2)
+        let album = albums.first { $0.title.localizedCaseInsensitiveContains("disappear") }
+        #expect(album?.tracks.map(\.trackNumber) == [3, 5, 7, 9])
+        #expect(album?.key == AlbumKey(artist: "The Story So Far", title: "I Want To Disappear"))
     }
 }

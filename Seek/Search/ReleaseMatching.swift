@@ -152,6 +152,9 @@ enum ReleaseText {
         return result
     }
 
+    /// An artist's name as compared: tidied (`canonicalArtist`) and folded, remembered.
+    static func artistMatchName(_ text: String) -> String { foldedName(text) }
+
     private static func foldedName(_ text: String) -> String {
         if let cached = nameCache.object(forKey: text as NSString) { return cached as String }
         let value = fold(canonicalArtist(text))

@@ -130,9 +130,15 @@ final class LibraryStore {
         LibraryMemo.value("allAlbums", version: "\(tracksVersion)-\(contentChanges)") { LibraryGrouping.albums(allTracks) }
     }
 
+    /// Each album under every spelling its songs use, so a song's own spelling finds it too.
     var albumsByKey: [AlbumKey: Album] {
         LibraryMemo.value("albumsByKey", version: "\(tracksVersion)-\(contentChanges)") {
-            Dictionary(albums.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+            var byKey: [AlbumKey: Album] = [:]
+            for album in albums {
+                byKey[album.key] = album
+                for track in album.tracks where byKey[track.albumKey] == nil { byKey[track.albumKey] = album }
+            }
+            return byKey
         }
     }
     @ObservationIgnored private var saveObserver: NSObjectProtocol?
