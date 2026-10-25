@@ -1038,9 +1038,13 @@ struct ReleaseAccessory: View {
                 buying = StorePurchase(result: store, price: bandcamp.isSignedIn ? paid : nil)
             }
         case .none:
-            // Keeps the three buttons balanced while sources are found.
+            // Keeps the three buttons balanced while sources are found. A spinner, not a ring:
+            // nothing is downloading yet.
             if isPreparing {
-                RoundProgress(progress: nil)
+                ProgressView()
+                    .frame(width: 50, height: 50)
+                    .background(.fill.secondary, in: .circle)
+                    .accessibilityLabel("Finding copies")
             } else {
                 RoundButton(systemImage: "plus", label: "Nothing to add") {}
                     .opacity(0.4)
