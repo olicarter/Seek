@@ -679,6 +679,8 @@ struct ArtistDetailView: View {
     @Environment(Player.self) private var player
     @Environment(\.dismiss) private var dismiss
     @State private var deleting: PendingDelete?
+    /// Everything they've released, from Apple Music, to show what the library doesn't have.
+    @State private var catalog: [CatalogRelease] = []
 
     /// Their albums, and their songs on other people's (e.g. compilations), but not the rest of those.
     static func tracks(of name: String, in tracks: [Track]) -> [Track] {
@@ -692,12 +694,22 @@ struct ArtistDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 PlayShuffleButtons(tracks: albums.flatMap(\.tracks))
                 AlbumGrid(albums: albums)
+                let missing = Self.missing(from: catalog, owned: albums)
+                ForEach(CatalogSection.allCases, id: \.self) { section in
+                    let releases = missing.filter { section.kinds.contains($0.kind) }
+                    if !releases.isEmpty {
+                        Text(section.rawValue).font(.title3.bold())
+                            .padding(.top, 8)
+                        CatalogGrid(releases: releases)
+                    }
+                }
             }
             .padding()
             DiscoveryRow(subject: .artist(name))
                 .padding(.vertical)
         }
         .navigationTitle(name)
+        .task(id: name) { catalog = await ArtistCatalog.releases(for: name) }
         .toolbar {
             Menu("More", systemImage: "ellipsis") {
                 DownloadMenuItems(tracks: artistTracks)
@@ -711,6 +723,65 @@ struct ArtistDetailView: View {
             .tint(.primary)
         }
         .deleteConfirmation($deleting) { dismiss() }
+    }
+}
+
+extension ArtistDetailView {
+    /// The headings the rest of an artist's catalogue goes under, as in Apple Music.
+    enum CatalogSection: String, CaseIterable {
+        case albums = "Albums"
+        case singles = "Singles & EPs"
+        case other = "Remixes & Mixes"
+
+        var kinds: [CatalogRelease.Kind] {
+            switch self {
+            case .albums: [.album]
+            case .singles: [.ep, .single]
+            case .other: [.other]
+            }
+        }
+    }
+
+    /// Releases the library doesn't have, newest first, each once (Apple lists clean and explicit
+    /// versions separately).
+    static func missing(from catalog: [CatalogRelease], owned: [Album]) -> [CatalogRelease] {
+        var seen = Set<String>()
+        return catalog
+            .sorted { $0.released > $1.released }
+            .filter { release in
+                !owned.contains { ReleaseText.titlesMatch($0.title, release.title) }
+                    && seen.insert(ReleaseText.fold(release.title)).inserted
+            }
+    }
+}
+
+/// Releases that aren't in the library, opening their album page to listen or add them.
+private struct CatalogGrid: View {
+    let releases: [CatalogRelease]
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
+            ForEach(releases, id: \.title) { release in
+                NavigationLink(value: ExternalAlbum(artist: release.artist, title: release.title, artworkURL: release.artworkURL)) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Color.secondary.opacity(0.15)
+                            .aspectRatio(1, contentMode: .fit)
+                            .overlay { RemoteImage(url: release.artworkURL) { Color.clear } }
+                            .clipShape(.rect(cornerRadius: 8))
+                        Text(release.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                        Text(verbatim: "\(release.year)").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button("Search Soulseek and Bandcamp", systemImage: "magnifyingglass") {
+                        router.search("\(release.artist) \(release.title)")
+                    }
+                }
+            }
+        }
     }
 }
 
