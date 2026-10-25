@@ -363,7 +363,8 @@ final class DiscoveryService {
             for (index, suggestion) in suggestions.enumerated() where suggestion.artworkURL == nil {
                 group.addTask {
                     if let url = await bandcampArtwork(for: suggestion) { return (index, url) }
-                    return (index, await iTunesArtwork(for: suggestion))
+                    if let url = await iTunesArtwork(for: suggestion) { return (index, url) }
+                    return (index, await catalogArtwork(for: suggestion))
                 }
             }
             var result = suggestions
@@ -403,6 +404,18 @@ final class DiscoveryService {
         return (match?["artworkUrl100"] as? String)
             .map { $0.replacingOccurrences(of: "100x100bb", with: "600x600bb") }
             .flatMap(URL.init(string:))
+    }
+
+    /// The artist's own catalogue in Apple Music, for albums iTunes search misses: punctuation
+    /// throws it ("Panic! at the Disco A Fever You Can't Sweat Out" finds R. Kelly and Glee).
+    static func catalogArtwork(for suggestion: Suggestion) async -> URL? {
+        let releases = await ArtistCatalog.releases(for: suggestion.artist)
+        guard let title = suggestion.title else {
+            return releases.filter { $0.kind == .album }.max { $0.released < $1.released }?.artworkURL
+        }
+        let wanted = ReleaseText.fold(title)
+        return (releases.first { ReleaseText.fold($0.title) == wanted }
+            ?? releases.first { ReleaseText.titlesMatch($0.title, title) })?.artworkURL
     }
 
     // MARK: - Filling in missing covers
