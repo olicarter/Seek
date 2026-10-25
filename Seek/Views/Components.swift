@@ -86,6 +86,11 @@ enum ArtworkImages {
         generation += 1
         cache.removeAllObjects()
     }
+
+    /// Just these, when only they can have changed.
+    static func forget(_ keys: [String]) {
+        for key in keys { cache.removeObject(forKey: "\(generation)|\(key)" as NSString) }
+    }
 }
 
 /// Values worked out from the whole library (album groups, what's owned), remembered until the

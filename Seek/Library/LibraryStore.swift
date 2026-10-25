@@ -60,6 +60,9 @@ final class LibraryStore {
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private var query: NSMetadataQuery?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    /// The files as last reconciled with the library, to skip reconciling when only upload or
+    /// download progress changed.
+    @ObservationIgnored private var reconciledFiles: [String: FileState]?
     @ObservationIgnored private var reading: Set<String> = []
     /// Told about each album as downloads are added to it, e.g. to fetch suggestions early.
     @ObservationIgnored var onAlbumImported: ((AlbumKey) -> Void)?
@@ -536,7 +539,10 @@ final class LibraryStore {
         } else {
             try? context.save()
         }
-        contentChanged(artwork: true)
+        // Only this song's album and label covers can have changed: clearing every cover made
+        // each song arriving redraw all artwork on screen.
+        contentChanged()
+        ArtworkImages.forget(["album|\(track.albumKey.artist)|\(track.albumKey.title)", "label|\(track.label)", path])
         scheduleInfoSync()
         if !track.isDeleted, track.modelContext != nil { onAlbumImported?(track.albumKey) }
         return path
@@ -687,13 +693,24 @@ final class LibraryStore {
         query.operationQueue = queue
         let center = NotificationCenter.default
         let unchecked = UncheckedQuery(query: query)
-        for name in [Notification.Name.NSMetadataQueryDidFinishGathering, .NSMetadataQueryDidUpdate] {
-            observers.append(center.addObserver(forName: name, object: query, queue: queue) { [weak self] _ in
-                let gatheredAt = Date.now
-                let files = Self.gather(unchecked.query, root: root)
-                Task { @MainActor in self?.apply(files, gatheredAt: gatheredAt) }
-            })
+        let read: @Sendable () -> Void = { [weak self] in
+            let gatheredAt = Date.now
+            let files = Self.gather(unchecked.query, root: root)
+            Task { @MainActor in self?.apply(files, gatheredAt: gatheredAt) }
         }
+        observers.append(center.addObserver(forName: .NSMetadataQueryDidFinishGathering, object: query, queue: queue) { _ in read() })
+        // Updates come several times a second while files upload: read at most once a second.
+        let pending = PendingRead()
+        observers.append(center.addObserver(forName: .NSMetadataQueryDidUpdate, object: query, queue: queue) { _ in
+            guard !pending.scheduled else { return }
+            pending.scheduled = true
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1) {
+                queue.addOperation {
+                    pending.scheduled = false
+                    read()
+                }
+            }
+        })
         self.query = query
         queue.addOperation { query.start() }
     }
@@ -752,7 +769,12 @@ final class LibraryStore {
         // Only publish real changes, so views don't redraw on every query update.
         if cloud != cloudOnly { cloudOnly = cloud }
         if progress != downloadProgress { downloadProgress = progress }
-        reconcile(with: found, gatheredAt: gatheredAt)
+        // While songs upload, the index updates several times a second with nothing but their
+        // progress; going through the whole library each time made scrolling stutter.
+        if found != reconciledFiles {
+            reconcile(with: found, gatheredAt: gatheredAt)
+            reconciledFiles = found
+        }
         // Forget files that went away or are already off this device.
         let stale = pendingEvictions.filter { found[$0].map { !$0.isLocal } ?? true }
         if !stale.isEmpty { pendingEvictions.subtract(stale) }
@@ -781,6 +803,7 @@ final class LibraryStore {
 
     /// Removes uploaded files from this device, leaving them in iCloud. Ones playing wait a minute.
     private func evict(_ paths: [String]) {
+        guard !paths.isEmpty else { return }
         let tracks = (try? context.fetch(FetchDescriptor<Track>())) ?? []
         let kept = Set(tracks.filter(\.keepOffline).map(\.path))
         var busy = false
@@ -858,7 +881,7 @@ final class LibraryStore {
         reconcile(with: found)
     }
 
-    struct FileState {
+    struct FileState: Equatable {
         let isLocal: Bool
         let modified: Date?
     }
@@ -1096,4 +1119,9 @@ final class LibraryStore {
 /// NSMetadataQuery isn't Sendable, but it's only touched on its own operation queue here.
 private struct UncheckedQuery: @unchecked Sendable {
     let query: NSMetadataQuery
+}
+
+/// Whether a read of the iCloud index is already on its way. Only touched on the query's queue.
+private final class PendingRead: @unchecked Sendable {
+    var scheduled = false
 }
