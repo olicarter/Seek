@@ -1,0 +1,346 @@
+import AVFoundation
+import MediaPlayer
+import Observation
+import UIKit
+
+@MainActor
+@Observable
+final class Player {
+    enum RepeatMode: CaseIterable {
+        case off, all, one
+
+        var next: RepeatMode {
+            switch self {
+            case .off: .all
+            case .all: .one
+            case .one: .off
+            }
+        }
+    }
+
+    private(set) var queue: [Track] = []
+    private(set) var index = 0
+    private(set) var isPlaying = false
+    private(set) var isLoading = false
+    private(set) var currentTime: Double = 0
+    private(set) var duration: Double = 0
+    private(set) var shuffle = false
+    var repeatMode: RepeatMode = .off
+
+    var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
+
+    /// Where playback is right now, read straight from the player (not the twice-a-second
+    /// `currentTime`), for the playing bars.
+    var playbackTime: Double {
+        let time = player.currentTime().seconds
+        return time.isFinite ? time : 0
+    }
+    var upNext: ArraySlice<Track> { queue.indices.contains(index) ? queue[(index + 1)...] : [] }
+
+    @ObservationIgnored private let library: LibraryStore
+    /// The music's levels as it plays, for the bars beside the playing song.
+    @ObservationIgnored let levels = AudioLevels()
+    /// Fetches songs that aren't in the library. Set by the app.
+    @ObservationIgnored var streamer: StreamService?
+
+    /// How much of the current song has arrived, while a streamed song is being fetched.
+    var fetchProgress: Double? {
+        guard isLoading, let track = current, track.isStreamed else { return nil }
+        return streamer?.progress[track.path]
+    }
+    @ObservationIgnored private let player = AVPlayer()
+    @ObservationIgnored private var originalQueue: [Track] = []
+    @ObservationIgnored private var timeObserver: Any?
+    @ObservationIgnored private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var isSeeking = false
+
+    init(library: LibraryStore) {
+        self.library = library
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
+            MainActor.assumeIsolated {
+                // While the next song is being fetched, the old one's position would show.
+                guard let self, !self.isSeeking, !self.isLoading else { return }
+                self.currentTime = time.seconds
+            }
+        }
+        setUpRemoteCommands()
+    }
+
+    // MARK: - Queue
+
+    func play(_ tracks: [Track], startingAt start: Int = 0) {
+        guard tracks.indices.contains(start) else { return }
+        originalQueue = tracks
+        if shuffle {
+            var rest = tracks
+            let first = rest.remove(at: start)
+            queue = [first] + rest.shuffled()
+            index = 0
+        } else {
+            queue = tracks
+            index = start
+        }
+        load(autoplay: true)
+    }
+
+    func playShuffled(_ tracks: [Track]) {
+        guard !tracks.isEmpty else { return }
+        shuffle = true
+        play(tracks, startingAt: Int.random(in: tracks.indices))
+    }
+
+    func playNext(_ track: Track) {
+        if queue.isEmpty { return play([track]) }
+        queue.insert(track, at: index + 1)
+        originalQueue.append(track)
+    }
+
+    func addToQueue(_ track: Track) {
+        if queue.isEmpty { return play([track]) }
+        queue.append(track)
+        originalQueue.append(track)
+    }
+
+    func jump(to track: Track) {
+        guard let position = queue.firstIndex(where: { $0 === track }) else { return }
+        index = position
+        load(autoplay: true)
+    }
+
+    func removeFromQueue(at offsets: IndexSet) {
+        let absolute = IndexSet(offsets.map { $0 + index + 1 })
+        queue.remove(atOffsets: absolute)
+    }
+
+    func moveInQueue(from source: IndexSet, to destination: Int) {
+        var rest = Array(upNext)
+        rest.move(fromOffsets: source, toOffset: destination)
+        queue = Array(queue[...index]) + rest
+    }
+
+    func toggleShuffle() {
+        shuffle.toggle()
+        guard let current else { return }
+        if shuffle {
+            queue = [current] + queue.enumerated().filter { $0.offset != index }.map(\.element).shuffled()
+            index = 0
+        } else {
+            queue = originalQueue
+            index = queue.firstIndex(where: { $0 === current }) ?? 0
+        }
+    }
+
+    // MARK: - Transport
+
+    func togglePlayPause() {
+        isPlaying ? pause() : resume()
+    }
+
+    func resume() {
+        guard current != nil else { return }
+        activateSession()
+        if player.currentItem == nil { return load(autoplay: true) }
+        player.play()
+        isPlaying = true
+        updateNowPlaying()
+    }
+
+    func pause() {
+        player.pause()
+        isPlaying = false
+        updateNowPlaying()
+    }
+
+    func next() {
+        guard !queue.isEmpty else { return }
+        if index + 1 < queue.count {
+            index += 1
+        } else if repeatMode == .all {
+            index = 0
+        } else {
+            pause()
+            seek(to: 0)
+            return
+        }
+        load(autoplay: true)
+    }
+
+    func previous() {
+        if currentTime > 3 || index == 0 {
+            seek(to: 0)
+        } else {
+            index -= 1
+            load(autoplay: isPlaying)
+        }
+    }
+
+    func seek(to seconds: Double) {
+        isSeeking = true
+        currentTime = seconds
+        player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) { [weak self] _ in
+            Task { @MainActor in
+                self?.isSeeking = false
+                self?.updateNowPlaying()
+            }
+        }
+    }
+
+    private func load(autoplay: Bool) {
+        guard let track = current else { return }
+        loadTask?.cancel()
+        player.pause()
+        // Let go of the previous song straight away, so nothing of it lingers while this one loads.
+        player.replaceCurrentItem(with: nil)
+        currentTime = 0
+        duration = track.duration
+        isLoading = true
+        isPlaying = autoplay
+        updateNowPlaying()
+
+        // Fetch the next song while this one plays, so they follow on without a wait.
+        if let next = upNext.first, next.isStreamed { streamer?.prefetch(next) }
+        if track.isStreamed, track.artwork == nil, let art = track.stream?.artworkURL {
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: art) {
+                    track.artwork = data
+                    if current === track { updateNowPlaying() }
+                }
+            }
+        }
+
+        loadTask = Task {
+            let resolved = await playableItem(for: track)
+            guard !Task.isCancelled, current === track else { return }
+            isLoading = false
+            guard let item = resolved else {
+                isPlaying = false
+                return
+            }
+            levels.reset()
+            await levels.attach(to: item)
+            guard !Task.isCancelled, current === track else { return }
+            if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
+            endObserver = NotificationCenter.default.addObserver(
+                forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.itemFinished() }
+            }
+            player.replaceCurrentItem(with: item)
+            if let loaded = try? await item.asset.load(.duration), loaded.isNumeric {
+                duration = loaded.seconds
+            }
+            if autoplay {
+                activateSession()
+                player.play()
+            }
+            updateNowPlaying()
+        }
+    }
+
+    /// A library song's file (fetched from iCloud if needed), or a streamed song: played while
+    /// it downloads where the format allows, otherwise once it's all here.
+    private func playableItem(for track: Track) async -> AVPlayerItem? {
+        guard track.isStreamed else {
+            guard let url = library.url(for: track), await library.ensureLocal(url) else { return nil }
+            return AVPlayerItem(url: url)
+        }
+        switch await streamer?.fetch(track) {
+        case .file(let url), .remote(let url):
+            return AVPlayerItem(url: url)
+        case .progressive(let loader, let file):
+            let asset = AVURLAsset(url: loader.playerURL)
+            asset.resourceLoader.setDelegate(loader, queue: loader.queue)
+            if (try? await asset.load(.isPlayable)) == true {
+                return AVPlayerItem(asset: asset)
+            }
+            Log.debug("player: \(file.fileExtension) can't play while downloading; waiting for the whole file")
+            return await streamer?.waitForFile(file).map(AVPlayerItem.init(url:))
+        case nil:
+            return nil
+        }
+    }
+
+    private func itemFinished() {
+        if repeatMode == .one {
+            seek(to: 0)
+            player.play()
+        } else {
+            next()
+        }
+    }
+
+    private func activateSession() {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    // MARK: - System integration
+
+    private func setUpRemoteCommands() {
+        let center = MPRemoteCommandCenter.shared()
+        center.playCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.resume() }
+            return .success
+        }
+        center.pauseCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.pause() }
+            return .success
+        }
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.togglePlayPause() }
+            return .success
+        }
+        center.nextTrackCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.next() }
+            return .success
+        }
+        center.previousTrackCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated { self?.previous() }
+            return .success
+        }
+        // The lock screen's and Control Center's favourite button.
+        center.likeCommand.localizedTitle = "Favourite"
+        center.likeCommand.localizedShortTitle = "Favourite"
+        center.likeCommand.addTarget { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let track = self.current else { return }
+                self.library.toggleFavorite(track)
+                self.updateFavoriteCommand()
+            }
+            return .success
+        }
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            MainActor.assumeIsolated { self?.seek(to: event.positionTime) }
+            return .success
+        }
+    }
+
+    /// Shows the lock screen's favourite button as on or off for the current song.
+    func updateFavoriteCommand() {
+        let command = MPRemoteCommandCenter.shared().likeCommand
+        command.isEnabled = current != nil
+        command.isActive = current.map(library.isFavorite) ?? false
+    }
+
+    private func updateNowPlaying() {
+        updateFavoriteCommand()
+        guard let track = current else {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            return
+        }
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: track.title,
+            MPMediaItemPropertyArtist: track.displayArtist,
+            MPMediaItemPropertyAlbumTitle: track.displayAlbum,
+            MPMediaItemPropertyPlaybackDuration: duration,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+        ]
+        if let data = track.artwork, let image = UIImage(data: data) {
+            info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}

@@ -1,0 +1,73 @@
+name: Seek
+options:
+  bundleIdPrefix: dev.olicarter
+  deploymentTarget:
+    iOS: "26.1"
+  createIntermediateGroups: true
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation
+    from: 0.9.19
+settings:
+  base:
+    DEVELOPMENT_TEAM: MPCJ63V5P5
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Seek:
+    type: application
+    platform: iOS
+    sources: [Seek]
+    dependencies:
+      - package: ZIPFoundation
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek
+        TARGETED_DEVICE_FAMILY: "1,2,6"
+        SUPPORTS_MACCATALYST: YES
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: Seek/Info.plist
+      properties:
+        CFBundleDisplayName: Seek
+        UILaunchScreen: {}
+        UIBackgroundModes: [audio, remote-notification]
+        UISupportedInterfaceOrientations:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad:
+          [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        ITSAppUsesNonExemptEncryption: false
+        NSLocalNetworkUsageDescription: Seek listens for incoming Soulseek peer connections.
+        NSUbiquitousContainers:
+          iCloud.dev.olicarter.seek:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Seek
+            NSUbiquitousContainerSupportedFolderLevels: Any
+    entitlements:
+      path: Seek/Seek.entitlements
+      properties:
+        aps-environment: development
+        com.apple.developer.icloud-container-identifiers: [iCloud.dev.olicarter.seek]
+        com.apple.developer.ubiquity-container-identifiers: [iCloud.dev.olicarter.seek]
+        com.apple.developer.icloud-services: [CloudDocuments, CloudKit]
+  SeekTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [SeekTests]
+    dependencies:
+      - target: Seek
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tests
+schemes:
+  Seek:
+    build:
+      targets:
+        Seek: all
+    test:
+      targets: [SeekTests]
