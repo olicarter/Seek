@@ -130,6 +130,13 @@ final class LibraryStore {
         LibraryMemo.value("allAlbums", version: "\(tracksVersion)-\(contentChanges)") { LibraryGrouping.albums(allTracks) }
     }
 
+    /// The library's albums by identity, for asking whether a release or suggestion is here.
+    var index: LibraryIndex {
+        LibraryMemo.value("libraryIndex", version: "\(tracksVersion)-\(contentChanges)") {
+            LibraryIndex(albums: Array(albumsByKey.keys))
+        }
+    }
+
     /// Each album under every spelling its songs use, so a song's own spelling finds it too.
     var albumsByKey: [AlbumKey: Album] {
         LibraryMemo.value("albumsByKey", version: "\(tracksVersion)-\(contentChanges)") {

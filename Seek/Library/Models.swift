@@ -230,7 +230,7 @@ enum LibraryGrouping {
     /// copies had "I Want To Disappear" from one and "I Want to Disappear" from another, and
     /// showed as two albums. Each is named as most of its songs spell it.
     static func albums(_ tracks: [Track]) -> [Album] {
-        Dictionary(grouping: tracks, by: { sameAlbum($0.albumKey) })
+        Dictionary(grouping: tracks, by: { AlbumIdentity.releaseKey($0.albumKey) })
             .map { _, songs in
                 let spellings = Dictionary(grouping: songs, by: \.albumKey)
                 let key = spellings.max { a, b in a.value.count < b.value.count || a.value.count == b.value.count && a.key.title > b.key.title }!.key
@@ -239,11 +239,6 @@ enum LibraryGrouping {
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    /// What two spellings of an album have in common: case, punctuation and accents aside, and the
-    /// artist as written either way ("Story So Far, The").
-    static func sameAlbum(_ key: AlbumKey) -> String {
-        "\(ReleaseText.artistMatchName(key.artist))|\(ReleaseText.fold(key.title))"
-    }
 
     static func artists(_ tracks: [Track]) -> [String] {
         Set(tracks.map { $0.albumKey.artist })

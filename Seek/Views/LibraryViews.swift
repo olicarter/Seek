@@ -594,8 +594,8 @@ extension AlbumDetailView {
     /// A download for this album: filed under it when added from its page, otherwise from a folder
     /// named for it (and not for a remaster or live recording of it).
     private static func isFor(_ album: Album, _ transfer: Transfer) -> Bool {
-        if let target = transfer.album { return LibraryGrouping.sameAlbum(target) == LibraryGrouping.sameAlbum(album.key) }
-        return AlbumReferences.folder(transfer.file.folder, holds: album.title)
+        if let target = transfer.album { return AlbumIdentity.releaseKey(target) == AlbumIdentity.releaseKey(album.key) }
+        return AlbumIdentity.folder(transfer.file.folder, holds: album.title)
     }
 
     @ViewBuilder func bandcampMenuItem(_ release: BandcampAPI.StoreResult) -> some View {
@@ -777,13 +777,12 @@ extension ArtistDetailView {
     /// versions separately). Only the very release in the library is left out: its deluxe
     /// edition, or an EP sharing its name, is a release of its own and is listed.
     static func missing(from catalog: [CatalogRelease], owned: [Album]) -> [CatalogRelease] {
-        // Apple's titles as they are (edition names kept); the library's without file tags.
-        let have = Set(owned.map { ReleaseText.fold(ReleaseText.cleanTitle($0.title)) })
+        let have = Set(owned.map { AlbumIdentity.title($0.title).releaseKey })
         var seen = Set<String>()
         return catalog
             .sorted { $0.released > $1.released }
             .filter { release in
-                let name = ReleaseText.fold(release.title)
+                let name = AlbumIdentity.title(release.title).releaseKey
                 return !have.contains(name) && seen.insert(name).inserted
             }
     }

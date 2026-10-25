@@ -50,7 +50,8 @@ final class AlbumReferences {
         // v4: Apple's catalogue before Bandcamp, where anyone can upload an album's name.
         // v5: the album itself before an EP or single sharing its name.
         // v6: remasters, remixes and live albums keep their own tracklists.
-        URL.applicationSupportDirectory.appending(path: "album-references-v6.json")
+        // v7: kept by AlbumIdentity's recording key.
+        URL.applicationSupportDirectory.appending(path: "album-references-v7.json")
     }
 
     init() {
@@ -60,33 +61,10 @@ final class AlbumReferences {
         }
     }
 
-    /// Edition notes are left out, so a deluxe edition shares the standard one's tracklist,
-    /// except ones that make it a different recording: a remaster borrowed the original's
-    /// tracklist ("Disdain" for "Disdain (Remixed/Remastered)") and its songs never matched.
+    /// Kept by recording (`AlbumIdentity`): a deluxe edition shares the standard one's tracklist,
+    /// a remaster or live album has its own.
     static func key(_ album: AlbumKey) -> String {
-        let clean = ReleaseText.fold(ReleaseText.cleanTitle(album.title))
-        let kept = Set(clean.split(separator: " "))
-        let recording = ReleaseText.fold(album.title).split(separator: " ")
-            .filter { !kept.contains($0) && recordingWords.contains(String($0)) }
-        return "\(ReleaseText.fold(album.artist))|\(([clean] + recording.map(String.init)).joined(separator: " "))"
-    }
-
-    static let recordingWords: Set<String> = [
-        "remaster", "remastered", "remix", "remixed", "live", "acoustic", "instrumental", "instrumentals",
-        "demo", "demos", "reimagined", "rerecorded", "redux",
-    ]
-
-    /// Whether a Soulseek folder holds this album rather than another recording of it: one
-    /// named for a remaster isn't the original's ("Copacetic (Remixed-Remastered)" for Copacetic).
-    static func folder(_ folder: String, holds title: String) -> Bool {
-        let name = ReleaseText.fold(title)
-        let clean = ReleaseText.fold(ReleaseText.cleanTitle(title))
-        guard !clean.isEmpty else { return false }
-        let folded = ReleaseText.fold(folder)
-        guard folded.contains(clean) else { return false }
-        let titleWords = Set(name.split(separator: " ").map(String.init))
-        let folderWords = Set(folded.split(separator: " ").map(String.init))
-        return recordingWords.subtracting(titleWords).isDisjoint(with: folderWords)
+        AlbumIdentity.recordingKey(album)
     }
 
     func cached(_ album: AlbumKey) -> AlbumReference? {
@@ -207,8 +185,7 @@ final class AlbumReferences {
         func isShort(_ edition: [String: Any]) -> Bool { name(edition).hasSuffix(" - EP") || name(edition).hasSuffix(" - Single") }
         let albums = editions.filter { !isShort($0) }
         let pool = albums.isEmpty ? editions : albums
-        let wanted = ReleaseText.fold(title)
-        let exact = pool.filter { ReleaseText.fold(CatalogRelease.cleanTitle(name($0))) == wanted }
+        let exact = pool.filter { AlbumIdentity.sameRelease(CatalogRelease.cleanTitle(name($0)), title) }
         if let edition = standardEdition(exact, atLeast: count), (edition["trackCount"] as? Int ?? 0) >= count {
             return edition
         }

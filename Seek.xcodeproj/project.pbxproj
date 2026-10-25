@@ -22,6 +22,7 @@
 		2D1495536025936552A8A08F /* BandcampClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 481C1720E44BCCE238F83E5F /* BandcampClient.swift */; };
 		2DA8BE9EE1B79EC2AC9BE6F2 /* Credentials.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3672CE712E02D29420084726 /* Credentials.swift */; };
 		3394F20943425224B65AA31A /* ProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE807197E4721D5F4995B299 /* ProgressRing.swift */; };
+		353D6B3F963BB9B0699D1FBC /* AlbumIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D52EF5EB3B46628A165BDD6 /* AlbumIdentityTests.swift */; };
 		38065AF2E36F4E9CCA59AD09 /* SearchDump.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69F0648EA94E744E6B03B99 /* SearchDump.swift */; };
 		396242192ADB1E2FFE74CF2E /* SameRip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75C8A82DC797528466349191 /* SameRip.swift */; };
 		3B11EEFFDC713698BB3C4930 /* BandcampLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F762D45BC9C6BE4947CB0E1 /* BandcampLoginView.swift */; };
@@ -50,6 +51,7 @@
 		7BB0A6B5FA1D69D3D4B33C7D /* ReleaseMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7643ED3950B6BAC3E1083BA7 /* ReleaseMatchingTests.swift */; };
 		7D0EB2219DDC7C707FCC2A7A /* tone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E1A2F117CAF713E2654F0ACA /* tone.mp3 */; };
 		7FF0A4E8F725CBA2AE49BB0C /* ArtistCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77D4CE9A07C1084D08B3F891 /* ArtistCatalogTests.swift */; };
+		8094B21FF4DD9A8EC7A9FA2C /* AlbumIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1806CB20428CB8F0C54E01FE /* AlbumIdentity.swift */; };
 		80B832ADD9D497578B42A3BC /* LibraryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60742B64DE6D28D20140F0BE /* LibraryViews.swift */; };
 		829DBB029B43343DD9A65902 /* ArtistCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DAF2D52610AB13C9CFB8952 /* ArtistCatalog.swift */; };
 		885A638268763B5C768BB21C /* Wire.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9269557F674AD9A319152C9 /* Wire.swift */; };
@@ -100,6 +102,7 @@
 		0F762D45BC9C6BE4947CB0E1 /* BandcampLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampLoginView.swift; sourceTree = "<group>"; };
 		157E83F17879FA8FE3992628 /* TrackInfoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackInfoTests.swift; sourceTree = "<group>"; };
 		163D1994128F9FA7736C4D9F /* SameRipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SameRipTests.swift; sourceTree = "<group>"; };
+		1806CB20428CB8F0C54E01FE /* AlbumIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumIdentity.swift; sourceTree = "<group>"; };
 		1A95BF5B3169F7A287A4B5F9 /* DiscoveryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViews.swift; sourceTree = "<group>"; };
 		1BC7E174CF0AADD502F93E12 /* SeekTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SeekTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C654364489C8D9D4C375CE5 /* RemoteImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteImage.swift; sourceTree = "<group>"; };
@@ -125,6 +128,7 @@
 		481C1720E44BCCE238F83E5F /* BandcampClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampClient.swift; sourceTree = "<group>"; };
 		48482135E9A3FFBE80AC32BF /* ReleaseMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseMatching.swift; sourceTree = "<group>"; };
 		4A8B32F2D88ECB4B38C7B5CB /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		4D52EF5EB3B46628A165BDD6 /* AlbumIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumIdentityTests.swift; sourceTree = "<group>"; };
 		4D5CC2DCE45E51F6022FF8DE /* search-playboi-carti.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "search-playboi-carti.json"; sourceTree = "<group>"; };
 		51769C4A62C28841B6D7E81A /* BandcampAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampAPI.swift; sourceTree = "<group>"; };
 		52B8607FB89916F603D8762B /* AlbumReferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumReferences.swift; sourceTree = "<group>"; };
@@ -219,6 +223,7 @@
 		4E0E55E496B136F955892010 /* SeekTests */ = {
 			isa = PBXGroup;
 			children = (
+				4D52EF5EB3B46628A165BDD6 /* AlbumIdentityTests.swift */,
 				43016CFBDD94A9A66A0651F8 /* AlbumReferenceTests.swift */,
 				7756E0651A70996486396F8B /* ArrivingTrackTests.swift */,
 				77D4CE9A07C1084D08B3F891 /* ArtistCatalogTests.swift */,
@@ -299,6 +304,7 @@
 		D2663039EC00FD2C198D2F86 /* Search */ = {
 			isa = PBXGroup;
 			children = (
+				1806CB20428CB8F0C54E01FE /* AlbumIdentity.swift */,
 				1DAF2D52610AB13C9CFB8952 /* ArtistCatalog.swift */,
 				E9F6A3A21F66280E16B1B47D /* CopyFinder.swift */,
 				3740EE9CE56A2B039E64BBA0 /* ExternalAlbumView.swift */,
@@ -472,6 +478,7 @@
 			files = (
 				99983F2E894CD7C2AC49BCF7 /* AlbumAbout.swift in Sources */,
 				C876F8754B2D061B7F90B227 /* AlbumHeader.swift in Sources */,
+				8094B21FF4DD9A8EC7A9FA2C /* AlbumIdentity.swift in Sources */,
 				1F6D0D1B6568BAA96495EC1C /* AlbumReferences.swift in Sources */,
 				5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */,
 				829DBB029B43343DD9A65902 /* ArtistCatalog.swift in Sources */,
@@ -529,6 +536,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				353D6B3F963BB9B0699D1FBC /* AlbumIdentityTests.swift in Sources */,
 				D8EF7E30D9FE024C9001C810 /* AlbumReferenceTests.swift in Sources */,
 				CF3499F7AE5850F824BA970D /* ArrivingTrackTests.swift in Sources */,
 				7FF0A4E8F725CBA2AE49BB0C /* ArtistCatalogTests.swift in Sources */,

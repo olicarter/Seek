@@ -40,7 +40,9 @@ enum ReleaseText {
             // Only numbers and punctuation, like "[24-44,1]" or "(16/48)", describe the copy.
             let isTag = inside.isEmpty || !raw.contains(where: \.isLetter)
                 || inside.firstMatch(of: /^(19|20)\d\d$/) != nil
-                || hasTag(inside)
+                // Not when it names another recording: "(Remixed & Remastered)" is a different
+                // album from the original, whatever tag words it shares with an edition note.
+                || hasTag(inside) && !inside.split(separator: " ").contains(where: { AlbumIdentity.recordingMarkers[String($0)] != nil })
                 || inside.firstMatch(of: /^[a-z]{2,6} ?\d{2,5}$/) != nil
                 // A barcode or catalogue id: "{AWGE ∕ Interscope Records, 0602458440843}".
                 || inside.firstMatch(of: /\d{8,}/) != nil
@@ -95,8 +97,12 @@ enum ReleaseText {
     /// The same title, or the same with only edition words added ("Glitch (Deluxe Edition)",
     /// "Souvlaki 2005 Remaster"). Other extra words make a different release: "Closer: The
     /// CVLT Nation Sessions" is a tribute album, not Closer.
+    /// Another recording never matches ("Copacetic (Remixed/Remastered)" isn't Copacetic): see
+    /// `AlbumIdentity`.
     static func titlesMatch(_ a: String, _ b: String) -> Bool {
-        let (x, y) = (normalizedTitle(a), normalizedTitle(b))
+        let (ta, tb) = (AlbumIdentity.title(a), AlbumIdentity.title(b))
+        guard ta.recording == tb.recording else { return false }
+        let (x, y) = (ta.core, tb.core)
         guard !x.isEmpty, !y.isEmpty else { return false }
         if x == y { return true }
         let (short, long) = x.count < y.count ? (x, y) : (y, x)
@@ -123,17 +129,9 @@ enum ReleaseText {
 
     // Grouping compares every folder with every release found so far, thousands of times over
     // the same few hundred names, so each name is cleaned once and remembered.
-    private static let titleCache = NSCache<NSString, NSString>()
     private static let nameCache = NSCache<NSString, NSString>()
     private static let creditCache = NSCache<NSString, NSSet>()
 
-    /// The title as compared: tags dropped, folded.
-    static func normalizedTitle(_ text: String) -> String {
-        if let cached = titleCache.object(forKey: text as NSString) { return cached as String }
-        let value = fold(cleanTitle(text))
-        titleCache.setObject(value as NSString, forKey: text as NSString)
-        return value
-    }
 
     /// An artist's name as people write it: without notes in brackets at the end ("The Story So
     /// Far (CA)", "… (pop punk band from Walnut Creek, CA, 2007–present)"), and "Story So Far,
@@ -366,7 +364,7 @@ enum ReleaseGrouper {
         // one by one (edition words, credits, labels).
         var exact: [String: Int] = [:]
         func key(_ artist: String, _ title: String) -> String {
-            "\(ReleaseText.normalizedTitle(title))|\(ReleaseText.fold(artist))"
+            "\(AlbumIdentity.title(title).recordingKey)|\(ReleaseText.artistMatchName(artist))"
         }
         func add(_ release: SearchRelease) {
             if exact[key(release.artist, release.title)] == nil { exact[key(release.artist, release.title)] = releases.count }
@@ -421,7 +419,7 @@ enum ReleaseGrouper {
 
             let artist = parsed.artist.map(ReleaseText.canonicalArtist) ?? ""
             let match = artist.isEmpty
-                ? releases.firstIndex { ReleaseText.fold(ReleaseText.cleanTitle($0.title)) == ReleaseText.fold(parsed.title) && parsed.title.count >= 6 }
+                ? releases.firstIndex { AlbumIdentity.sameRecording($0.title, parsed.title) && parsed.title.count >= 6 }
                 : index(artist: artist, title: parsed.title, seller: nil)
             if let i = match {
                 releases[i].folders.append(folder)
@@ -443,7 +441,7 @@ enum ReleaseGrouper {
         for i in releases.indices {
             let candidates = catalog.indices.filter { catalog[$0].matches(releases[i]) }
             // The exact title first: "Album (Deluxe)" is the deluxe entry, not the standard one.
-            let exact = candidates.first { ReleaseText.fold(ReleaseText.cleanTitle(catalog[$0].title)) == ReleaseText.fold(ReleaseText.cleanTitle(releases[i].title)) }
+            let exact = candidates.first { AlbumIdentity.sameRelease(catalog[$0].title, releases[i].title) }
             guard let c = exact ?? candidates.first else { continue }
             matchedCatalog.insert(c)
             // A single Bandcamp track named like an album ("whole lotta red", a fan upload) isn't
@@ -595,29 +593,28 @@ enum ReleaseGrouper {
 
 /// The library's albums, cleaned up once for quick matching against search results.
 struct LibraryIndex: Sendable {
-    private let byTitle: [String: [(key: AlbumKey, artist: String)]]
+    private let byRecording: [String: [AlbumKey]]
 
     init(albums: [AlbumKey]) {
-        var byTitle: [String: [(AlbumKey, String)]] = [:]
-        for key in albums {
-            byTitle[ReleaseText.fold(ReleaseText.cleanTitle(key.title)), default: []].append((key, key.artist))
-        }
-        self.byTitle = byTitle
+        var byRecording: [String: [AlbumKey]] = [:]
+        for key in albums { byRecording[AlbumIdentity.title(key.title).recordingKey, default: []].append(key) }
+        self.byRecording = byRecording
     }
 
-    /// `named`: the release's title names exactly which release it is (an album page opened from
-    /// Apple's catalogue or a suggestion), so an edition in it counts as with the catalogue.
+    /// The library's album for a release. `named`: the release's title names exactly which
+    /// release it is (Apple's catalogue, a suggestion), so its edition must be the library's
+    /// too; a Soulseek folder's title may have lost its edition, so one without matches any.
     func album(for release: SearchRelease, named: Bool = false) -> AlbumKey? {
-        let candidates = byTitle[ReleaseText.fold(ReleaseText.cleanTitle(release.title))] ?? []
-        // A release Apple names as an edition ("Copacetic (Remixed/Remastered)") is only the
-        // library's album when that names the edition too: owning the original isn't owning it.
-        let full = ReleaseText.fold(release.title)
-        let edition = (release.catalog != nil || named) && full != ReleaseText.fold(ReleaseText.cleanTitle(release.title))
-            ? Set(full.split(separator: " ")) : nil
+        album(artist: release.artist, title: release.title, seller: release.seller, named: named || release.catalog != nil)
+    }
+
+    func album(artist: String, title: String, seller: String? = nil, named: Bool) -> AlbumKey? {
+        let candidates = byRecording[AlbumIdentity.title(title).recordingKey] ?? []
         return candidates.first { candidate in
-            if let edition, !edition.isSubset(of: Set(ReleaseText.fold(candidate.key.title).split(separator: " "))) { return false }
-            return ReleaseText.artistsMatch(candidate.artist, release.artist)
-                || release.seller.map { ReleaseText.artistsMatch(candidate.artist, $0) } == true
-        }?.key
+            let edition = named ? AlbumIdentity.sameRelease(candidate.title, title)
+                : AlbumIdentity.sameReleaseLoosely(candidate.title, title)
+            return edition && (ReleaseText.artistsMatch(candidate.artist, artist)
+                || seller.map { ReleaseText.artistsMatch(candidate.artist, $0) } == true)
+        }
     }
 }

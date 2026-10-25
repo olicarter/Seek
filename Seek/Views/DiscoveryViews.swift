@@ -87,21 +87,14 @@ struct DiscoveryRow: View {
 
     /// Where the suggestion already is in the library, if it is.
     private func owned(_ suggestion: DiscoveryService.Suggestion) -> DiscoveryCard.Destination? {
-        let index = LibraryMemo.value("ownedIndex", version: library.contentVersion(trackCount: tracks.count)) {
-            var albums: [String: AlbumKey] = [:]
-            var artists: [String: String] = [:]
-            for track in tracks {
-                let key = track.albumKey
-                albums["\(key.artist.lowercased())|\(track.album.lowercased())"] = key
-                artists[key.artist.lowercased()] = key.artist
-            }
-            return (albums: albums, artists: artists)
+        // Claude names an album as people do, often without its edition: any edition counts.
+        if let title = suggestion.title {
+            return library.index.album(artist: suggestion.artist, title: title, named: false).map { .album($0) }
         }
-        let artist = suggestion.artist.lowercased()
-        if let title = suggestion.title?.lowercased() {
-            return index.albums["\(artist)|\(title)"].map { .album($0) }
+        let artists = LibraryMemo.value("ownedArtists", version: library.contentVersion(trackCount: tracks.count)) {
+            Dictionary(library.albums.map { (ReleaseText.artistMatchName($0.artist), $0.artist) }, uniquingKeysWith: { first, _ in first })
         }
-        return index.artists[artist].map { .artist(ArtistKey(name: $0)) }
+        return artists[ReleaseText.artistMatchName(suggestion.artist)].map { .artist(ArtistKey(name: $0)) }
     }
 }
 
@@ -198,16 +191,13 @@ struct DiscoveryCard: View {
 /// in the library yet. Uses the cache only, so it never asks Claude by itself.
 struct DiscoverHomeRow: View {
     @Query(sort: \Discovery.createdAt, order: .reverse) private var entries: [Discovery]
-    private var tracks: [Track] { library.allTracks }
     @Environment(LibraryStore.self) private var library
     @Environment(DiscoveryService.self) private var discovery
 
     var body: some View {
-        let owned = LibraryMemo.value("ownedAlbums", version: library.contentVersion(trackCount: tracks.count)) {
-            Set(tracks.map { "\($0.albumKey.artist.lowercased())|\($0.album.lowercased())" })
-        }
-        let suggestions = Self.albums(from: entries).filter {
-            !owned.contains("\($0.artist.lowercased())|\(($0.title ?? "").lowercased())")
+        let index = library.index
+        let suggestions = Self.albums(from: entries).filter { suggestion in
+            suggestion.title.map { index.album(artist: suggestion.artist, title: $0, named: false) == nil } ?? true
         }
         if !suggestions.isEmpty {
             Section("Discover") {

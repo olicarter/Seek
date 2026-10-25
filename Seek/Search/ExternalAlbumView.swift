@@ -32,7 +32,7 @@ struct ExternalAlbumView: View {
 
     var body: some View {
         let release = self.release
-        let ownedNow = LibraryIndex(albums: Array(library.albumsByKey.keys)).album(for: release, named: true)
+        let ownedNow = library.index.album(for: release, named: true)
         Group {
             if let owned = openedOwned ?? ownedNow {
                 AlbumDetailView(key: owned)

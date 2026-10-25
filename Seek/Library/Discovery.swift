@@ -413,8 +413,7 @@ final class DiscoveryService {
         guard let title = suggestion.title else {
             return releases.filter { $0.kind == .album }.max { $0.released < $1.released }?.artworkURL
         }
-        let wanted = ReleaseText.fold(title)
-        return (releases.first { ReleaseText.fold($0.title) == wanted }
+        return (releases.first { AlbumIdentity.sameRelease($0.title, title) }
             ?? releases.first { ReleaseText.titlesMatch($0.title, title) })?.artworkURL
     }
 
