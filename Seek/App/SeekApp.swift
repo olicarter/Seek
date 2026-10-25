@@ -62,6 +62,7 @@ struct SeekApp: App {
                     }
                     library.onAlbumImported = { [discovery] album in discovery.albumAdded(album) }
                     library.isInUse = { [player] path in player.current?.path == path }
+                    library.onAlbumsDeleted = { [client] folders in client.cancelDownloads(into: folders) }
                     player.streamer = streamer
                     client.cacheStream = { [streamer] transfer, url in try streamer.store(transfer, from: url) }
                     client.cachedFile = { [streamer] file in streamer.cachedURL(for: file) }

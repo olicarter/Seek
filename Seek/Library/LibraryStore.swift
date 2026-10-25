@@ -52,6 +52,9 @@ final class LibraryStore {
     @ObservationIgnored var isInUse: ((String) -> Bool)?
     /// Told when the set of songs or their files change, e.g. to update what's shared.
     @ObservationIgnored var onLibraryChanged: (() -> Void)?
+    /// Told the folders of albums just deleted outright, so downloads still on their way into
+    /// them stop instead of bringing the album back.
+    @ObservationIgnored var onAlbumsDeleted: ((Set<String>) -> Void)?
     var cloudOnlyCount: Int { cloudOnly.count }
 
     @ObservationIgnored private let context: ModelContext
@@ -650,6 +653,12 @@ final class LibraryStore {
         }
         try? context.save()
         refreshFavorites()
+        // Whole albums gone (no songs left in their folders): their downloads go too. Removing
+        // one song leaves the rest of its album downloading.
+        let folders = Set(paths.map { ($0 as NSString).deletingLastPathComponent })
+        let remaining = Set(((try? context.fetch(FetchDescriptor<Track>())) ?? []).map { ($0.path as NSString).deletingLastPathComponent })
+        let emptied = folders.subtracting(remaining)
+        if !emptied.isEmpty { onAlbumsDeleted?(emptied) }
     }
 
     // MARK: - Indexing

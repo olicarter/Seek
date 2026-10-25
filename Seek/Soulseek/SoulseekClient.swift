@@ -840,7 +840,7 @@ final class SoulseekClient {
                 for move in moves {
                     // Still waiting? (It may have come back and finished meanwhile.)
                     guard transfers.contains(where: { $0 === move.old }), move.old.state != .completed,
-                          move.old.state != .downloading else { continue }
+                          move.old.state != .downloading, move.old.state != .cancelled else { continue }
                     self.move(move.old, to: move.new)
                 }
                 return
@@ -987,6 +987,17 @@ final class SoulseekClient {
         try? FileManager.default.removeItem(at: transfer.partialURL)
         if let path = transfer.plannedPath { releaseReserved?(path, true) }
         updateBackgroundWork()
+    }
+
+    /// Stops every download headed for these library folders, including ones waiting to try
+    /// again or being moved to another copy, which would otherwise bring a deleted album back.
+    func cancelDownloads(into folders: Set<String>) {
+        for transfer in transfers where !transfer.forStreaming && transfer.state != .completed {
+            guard let path = transfer.plannedPath, folders.contains((path as NSString).deletingLastPathComponent) else { continue }
+            SoulseekEvents.record("cancelling \(transfer.file.name): its album was deleted")
+            transfer.retryAt = nil
+            remove(transfer)
+        }
     }
 
     func remove(_ transfer: Transfer) {
