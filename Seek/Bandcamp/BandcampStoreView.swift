@@ -463,7 +463,7 @@ struct BandcampStoreRow: View {
             }
             Spacer(minLength: 8)
             if let item = bandcamp.owned(result), let download = bandcamp.download(for: item), download.state.isActive {
-                ProgressRing(progress: download.state == .downloading ? download.progress : nil)
+                ProgressRing(progress: download.ringProgress)
             } else if bandcamp.owned(result) != nil {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary)
             } else if let onBuy, bandcamp.isSignedIn, let price = bandcamp.prices[result.id], price.amount > 0 {

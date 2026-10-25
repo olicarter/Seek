@@ -899,7 +899,7 @@ struct PendingSongRow: View {
             .foregroundStyle(.secondary)
             Spacer()
             if let transfer, transfer.state.isActive {
-                ProgressRing(progress: transfer.state == .downloading ? transfer.progress : nil)
+                ProgressRing(progress: transfer.ringProgress)
             } else if let transfer, case .failed = transfer.state {
                 Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
                     .accessibilityLabel(transfer.state.label)
@@ -965,7 +965,7 @@ struct MissingTrackRow: View {
             Spacer()
             Group {
                 if let file, let transfer = client.transfers.first(where: { $0.file.id == file.id && !$0.forStreaming }), transfer.state.isActive {
-                    ProgressRing(progress: transfer.state == .downloading ? transfer.progress : nil)
+                    ProgressRing(progress: transfer.ringProgress)
                 } else if let file, client.isDownloading(file) {
                     Image(systemName: "checkmark.circle")
                 } else if let file {

@@ -34,6 +34,14 @@ final class BandcampDownload: Identifiable {
     let item: BandcampItem
     var state: State = .preparing
     var progress: Double = 0
+    /// What a progress ring shows; full while the album goes into the library.
+    var ringProgress: Double? {
+        switch state {
+        case .downloading: progress
+        case .importing: 1
+        default: nil
+        }
+    }
     /// Tries so far after failing, and when it'll be tried again by itself.
     @ObservationIgnored var retries = 0
     var retryAt: Date?

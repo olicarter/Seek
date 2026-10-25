@@ -335,7 +335,7 @@ struct ReleaseAction {
         if let inLibrary {
             kind = .inLibrary(inLibrary)
         } else if let item = release.owned, let download = bandcamp.download(for: item), download.state.isActive {
-            kind = .downloadingBandcamp(download.state == .downloading ? download.progress : nil)
+            kind = .downloadingBandcamp(download.ringProgress)
         } else if let item = release.owned, item.redownloadURL != nil {
             // Already bought: the official files, at no cost, beat any Soulseek copy.
             kind = .downloadBandcamp(item)
@@ -353,8 +353,11 @@ struct ReleaseAction {
     /// Progress of any of the release's Soulseek folders being downloaded.
     static func soulseekProgress(_ release: SearchRelease, client: SoulseekClient) -> Double? {
         guard !release.fileIDs.isEmpty else { return nil }
-        let transfers = client.transfers.filter { $0.state.isActive && !$0.forStreaming && release.fileIDs.contains($0.file.id) }
-        guard !transfers.isEmpty else { return nil }
+        // Finished songs still count, so the ring doesn't fall back each time one completes.
+        let transfers = client.transfers.filter {
+            ($0.state.isActive || $0.state == .completed) && !$0.forStreaming && release.fileIDs.contains($0.file.id)
+        }
+        guard transfers.contains(where: \.state.isActive) else { return nil }
         let size = transfers.reduce(0) { $0 + $1.size }
         return size > 0 ? Double(transfers.reduce(0) { $0 + $1.bytesReceived }) / Double(size) : 0
     }
@@ -788,7 +791,7 @@ struct ReleaseDetailView: View {
                 Label("In your Bandcamp collection", systemImage: "bag.fill")
                 Spacer()
                 if let download = bandcamp.download(for: item), download.state.isActive {
-                    ProgressRing(progress: download.state == .downloading ? download.progress : nil)
+                    ProgressRing(progress: download.ringProgress)
                 } else if item.redownloadURL != nil {
                     Button("Add to Library") {
                         if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }

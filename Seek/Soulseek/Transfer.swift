@@ -82,6 +82,16 @@ final class Transfer: Identifiable {
     var path: String { file.path }
     var progress: Double { size > 0 ? Double(bytesReceived) / Double(size) : 0 }
 
+    /// What a progress ring shows: nothing yet while waiting, then the download, staying full
+    /// while the song goes into the library rather than dropping back to empty.
+    var ringProgress: Double? {
+        switch state {
+        case .downloading: progress
+        case .importing: 1
+        default: nil
+        }
+    }
+
     /// In Application Support rather than Caches, so the system doesn't clear a half-finished
     /// download before it resumes.
     var partialURL: URL {
