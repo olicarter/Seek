@@ -14,13 +14,6 @@ struct RootView: View {
     @Environment(DiscoveryService.self) private var discovery
     @State private var showingNowPlaying = false
 
-    private func nowPlaying(compact: Bool) -> Binding<Bool> {
-        Binding(
-            get: { showingNowPlaying && (sizeClass == .compact) == compact },
-            set: { showingNowPlaying = $0 }
-        )
-    }
-
     var body: some View {
         @Bindable var router = router
         TabView(selection: $router.selection) {
@@ -71,9 +64,8 @@ struct RootView: View {
                 .onTapGesture { showingNowPlaying = true }
         }
         .newPlaylistPrompt()
-        // A sheet on iPhone; full screen on iPad and Mac, as in Apple Music.
-        .sheet(isPresented: nowPlaying(compact: true)) { NowPlayingView() }
-        .fullScreenCover(isPresented: nowPlaying(compact: false)) { NowPlayingView() }
+        // Full screen everywhere, as in Apple Music; Now Playing handles the swipe down itself.
+        .fullScreenCover(isPresented: $showingNowPlaying) { NowPlayingView() }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background:

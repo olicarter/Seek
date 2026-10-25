@@ -1,4 +1,5 @@
 import AVKit
+import Combine
 import MediaPlayer
 import SwiftUI
 
@@ -45,6 +46,9 @@ struct NowPlayingView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Namespace private var artworkSpace
     @State private var showingQueue = false
+    /// How far the player has been pulled down to close it.
+    @State private var dragOffset: CGFloat = 0
+    @State private var height: CGFloat = 900
     /// Sheets can't show the app-wide prompt, so Now Playing has its own.
     @State private var newPlaylist = NewPlaylistPrompt()
 
@@ -55,12 +59,42 @@ struct NowPlayingView: View {
         .foregroundStyle(.white)
         .tint(.white)
         .environment(\.colorScheme, .dark)
-        // The system grabber picks up the app's accent colour; draw a neutral one instead.
-        .presentationDragIndicator(.hidden)
-        .presentationBackground { NowPlayingBackground(artwork: player.current?.artwork) }
-        .presentationSizing(.page)
+        .background { NowPlayingBackground(artwork: player.current?.artwork) }
+        // Full screen like Apple Music, but it follows the finger down and the app shows behind.
+        .mask {
+            RoundedRectangle(cornerRadius: dragOffset > 0 ? 44 : 0, style: .continuous)
+                .ignoresSafeArea()
+        }
+        .offset(y: dragOffset)
+        .gesture(dismissDrag, isEnabled: !showingQueue)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationBackground(.clear)
         .newPlaylistPrompt()
         .environment(newPlaylist)
+    }
+
+    /// Pulling down anywhere outside the scrubber and volume closes the player.
+    private var dismissDrag: some Gesture {
+        DragGesture(minimumDistance: 16, coordinateSpace: .global)
+            .onChanged { value in
+                let down = value.translation.height
+                guard dragOffset > 0 || (down > 0 && down > abs(value.translation.width)) else { return }
+                dragOffset = max(down, 0)
+            }
+            .onEnded { value in
+                guard dragOffset > 0 else { return }
+                if dragOffset > 140 || value.predictedEndTranslation.height > 420 {
+                    withAnimation(.easeOut(duration: 0.22)) {
+                        dragOffset = height + 100
+                    } completion: {
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) { dismiss() }
+                    }
+                } else {
+                    withAnimation(.spring(duration: 0.35)) { dragOffset = 0 }
+                }
+            }
     }
 
     // MARK: - iPhone
@@ -70,24 +104,27 @@ struct NowPlayingView: View {
             if showingQueue {
                 compactHeader
                     .padding(.top, 28)
+                    .contentShape(.rect)
+                    .gesture(dismissDrag)
                 QueueList()
             } else {
                 Spacer(minLength: 24)
-                ArtworkView(data: player.current?.artwork, cornerRadius: 12)
+                ArtworkView(data: player.current?.artwork, cornerRadius: 10)
                     .matchedGeometryEffect(id: "artwork", in: artworkSpace)
-                    .frame(maxWidth: 520)
+                    .frame(maxWidth: 420)
                     .shadow(color: .black.opacity(0.35), radius: 24, y: 12)
-                    .scaleEffect(player.isPlaying ? 1 : 0.82)
+                    .padding(.horizontal, 22)
+                    .scaleEffect(player.isPlaying ? 1 : 0.86)
                     .animation(.spring(duration: 0.5, bounce: 0.25), value: player.isPlaying)
                 Spacer(minLength: 24)
                 titleRow
             }
 
             PlayerScrubBar()
-            .padding(.top, 20)
+            .padding(.top, 24)
 
             transportControls
-                .padding(.vertical, 24)
+                .padding(.vertical, 28)
 
             volumeRow
 
@@ -95,7 +132,7 @@ struct NowPlayingView: View {
                 .padding(.top, 24)
                 .padding(.bottom, 8)
         }
-        .padding(.horizontal, 28)
+        .padding(.horizontal, 32)
         .overlay(alignment: .top) {
             Capsule()
                 .fill(.white.opacity(0.35))
@@ -143,7 +180,6 @@ struct NowPlayingView: View {
             .padding(.horizontal, 56)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background { NowPlayingBackground(artwork: player.current?.artwork) }
         .overlay(alignment: .topLeading) {
             Button { dismiss() } label: {
                 Image(systemName: "chevron.down")
@@ -156,20 +192,12 @@ struct NowPlayingView: View {
             .accessibilityLabel("Close")
             .padding(24)
         }
-        // A full-screen cover has no sheet swipe; dragging down closes it the same way.
-        .gesture(
-            DragGesture(minimumDistance: 40).onEnded { value in
-                if value.translation.height > 140, abs(value.translation.width) < value.translation.height {
-                    dismiss()
-                }
-            }
-        )
     }
 
     // MARK: - Pieces
 
     private var titleRow: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 10) {
             Menu { trackActions } label: { titleText(size: .title2) }
                 .buttonStyle(.plain)
                 .disabled(player.current == nil)
@@ -186,10 +214,10 @@ struct NowPlayingView: View {
             player.updateFavoriteCommand()
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
-                .font(.body.weight(.bold))
+                .font(.title2)
                 .foregroundStyle(isFavorite ? Color.pink : Color.white)
-                .frame(width: 32, height: 32)
-                .background(.white.opacity(0.15), in: .circle)
+                .frame(width: 40, height: 40)
+                .contentShape(.rect)
                 .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
@@ -229,9 +257,9 @@ struct NowPlayingView: View {
     private var moreButton: some View {
         Menu { trackActions } label: {
             Image(systemName: "ellipsis")
-                .font(.body.weight(.bold))
-                .frame(width: 32, height: 32)
-                .background(.white.opacity(0.15), in: .circle)
+                .font(.title2.weight(.semibold))
+                .frame(width: 40, height: 40)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .disabled(player.current == nil)
@@ -262,18 +290,18 @@ struct NowPlayingView: View {
         HStack {
             Spacer()
             Button { player.previous() } label: {
-                Image(systemName: "backward.fill").font(.system(size: 34))
+                Image(systemName: "backward.fill").font(.system(size: 30))
             }
             Spacer()
             Button { player.togglePlayPause() } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 52))
-                    .frame(width: 64, height: 64)
+                    .font(.system(size: 44))
+                    .frame(width: 60, height: 60)
                     .contentTransition(.symbolEffect(.replace))
             }
             Spacer()
             Button { player.next() } label: {
-                Image(systemName: "forward.fill").font(.system(size: 34))
+                Image(systemName: "forward.fill").font(.system(size: 30))
             }
             Spacer()
         }
@@ -281,14 +309,7 @@ struct NowPlayingView: View {
     }
 
     private var volumeRow: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "speaker.fill")
-            SystemVolumeSlider()
-                .frame(height: 34)
-            Image(systemName: "speaker.wave.3.fill")
-        }
-        .font(.caption)
-        .foregroundStyle(.white.opacity(0.6))
+        VolumeSlider()
     }
 
     private var bottomRow: some View {
@@ -414,25 +435,74 @@ private struct ScrubBar: View {
     }
 }
 
-/// The system volume slider (the only way an app can change output volume), restyled.
-private struct SystemVolumeSlider: UIViewRepresentable {
-    func makeUIView(context: Context) -> MPVolumeView {
-        let view = MPVolumeView(frame: .zero)
-        view.setVolumeThumbImage(Self.thumb, for: .normal)
-        return view
-    }
+/// System volume as a bar like the scrubber's, with the speaker icons centred beside it.
+/// Only `MPVolumeView`'s slider can change output volume, so a hidden one does the setting.
+private struct VolumeSlider: View {
+    @State private var volume = Double(AVAudioSession.sharedInstance().outputVolume)
+    @State private var dragStart: Double?
+    @State private var volumeView = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 4, height: 4))
 
-    func updateUIView(_ view: MPVolumeView, context: Context) {
-        if let slider = view.subviews.compactMap({ $0 as? UISlider }).first {
-            slider.minimumTrackTintColor = .white.withAlphaComponent(0.75)
-            slider.maximumTrackTintColor = .white.withAlphaComponent(0.2)
+    var body: some View {
+        let isDragging = dragStart != nil
+        HStack(spacing: 12) {
+            Image(systemName: "speaker.fill")
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.2))
+                    Capsule()
+                        .fill(.white.opacity(isDragging ? 1 : 0.7))
+                        .frame(width: geometry.size.width * volume)
+                }
+                .frame(height: isDragging ? 12 : 7)
+                .frame(maxHeight: .infinity)
+                .contentShape(.rect)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let start = dragStart ?? volume
+                            dragStart = start
+                            set(min(max(start + value.translation.width / geometry.size.width, 0), 1))
+                        }
+                        .onEnded { _ in dragStart = nil }
+                )
+            }
+            .frame(height: 24)
+            .animation(.spring(duration: 0.3), value: isDragging)
+            Image(systemName: "speaker.wave.3.fill")
+        }
+        .font(.caption)
+        .foregroundStyle(.white.opacity(isDragging ? 0.9 : 0.6))
+        .background { HiddenVolumeView(view: volumeView) }
+        .onReceive(AVAudioSession.sharedInstance().publisher(for: \.outputVolume)) { value in
+            if dragStart == nil { volume = Double(value) }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Volume")
+        .accessibilityValue(volume.formatted(.percent.precision(.fractionLength(0))))
+        .accessibilityAdjustableAction { direction in
+            set(min(max(volume + (direction == .increment ? 0.0625 : -0.0625), 0), 1))
         }
     }
 
-    private static let thumb = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 12)).image { context in
-        UIColor.white.setFill()
-        context.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: 12, height: 12))
+    private func set(_ value: Double) {
+        volume = value
+        volumeView.subviews.compactMap { $0 as? UISlider }.first?.value = Float(value)
     }
+}
+
+/// Keeps the volume view in the window (it only works there, and it hides the system volume HUD).
+private struct HiddenVolumeView: UIViewRepresentable {
+    let view: MPVolumeView
+
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        view.alpha = 0.01
+        view.isUserInteractionEnabled = false
+        container.addSubview(view)
+        return container
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 private struct AirPlayButton: UIViewRepresentable {
