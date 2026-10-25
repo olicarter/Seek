@@ -762,14 +762,17 @@ extension ArtistDetailView {
     }
 
     /// Releases the library doesn't have, newest first, each once (Apple lists clean and explicit
-    /// versions separately).
+    /// versions separately). Only the very release in the library is left out: its deluxe
+    /// edition, or an EP sharing its name, is a release of its own and is listed.
     static func missing(from catalog: [CatalogRelease], owned: [Album]) -> [CatalogRelease] {
+        // Apple's titles as they are (edition names kept); the library's without file tags.
+        let have = Set(owned.map { ReleaseText.fold(ReleaseText.cleanTitle($0.title)) })
         var seen = Set<String>()
         return catalog
             .sorted { $0.released > $1.released }
             .filter { release in
-                !owned.contains { ReleaseText.titlesMatch($0.title, release.title) }
-                    && seen.insert(ReleaseText.fold(release.title)).inserted
+                let name = ReleaseText.fold(release.title)
+                return !have.contains(name) && seen.insert(name).inserted
             }
     }
 }

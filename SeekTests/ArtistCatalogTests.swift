@@ -238,3 +238,28 @@ struct RescueMatchingTests {
         #expect(SoulseekClient.counterparts(of: stalled, in: other)[stalled[0].id]?.name == "04 - Different Spelling.flac")
     }
 }
+
+@MainActor
+struct ArtistPageCatalogTests {
+    private func release(_ title: String, year: Int) -> CatalogRelease {
+        CatalogRelease(artist: "Fall Out Boy", title: CatalogRelease.cleanTitle(title), kind: CatalogRelease.kind(of: title, trackCount: 13),
+                       released: Calendar.current.date(from: DateComponents(year: year))!, trackCount: 13)
+    }
+
+    @Test func listsEveryEditionButTheOneInTheLibrary() {
+        let catalog = [
+            release("From Under the Cork Tree", year: 2005),
+            release("From Under the Cork Tree (Limited \"Black Clouds and Underdogs\" Edition) - EP", year: 2006),
+            release("From Under The Cork Tree (20th Anniversary Deluxe)", year: 2025),
+            release("Infinity On High", year: 2007),
+            release("Infinity On High", year: 2007),
+        ]
+        let owned = [Album(key: AlbumKey(artist: "Fall Out Boy", title: "From Under the Cork Tree"), tracks: [])]
+        let titles = ArtistDetailView.missing(from: catalog, owned: owned).map(\.title)
+        #expect(titles == [
+            "From Under The Cork Tree (20th Anniversary Deluxe)",
+            "Infinity On High",
+            "From Under the Cork Tree (Limited \"Black Clouds and Underdogs\" Edition)",
+        ])
+    }
+}
