@@ -154,6 +154,11 @@ struct ExpandableText: View {
                 }
             }
             .contentShape(.rect)
-            .onTapGesture { withAnimation { expanded.toggle() } }
+            // Straight away, not animated (the list row resizing too made it slow and jumpy).
+            .onTapGesture {
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { expanded.toggle() }
+            }
     }
 }
