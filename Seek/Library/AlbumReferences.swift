@@ -49,7 +49,8 @@ final class AlbumReferences {
         // v3: stricter title matching (tribute albums no longer count as the original).
         // v4: Apple's catalogue before Bandcamp, where anyone can upload an album's name.
         // v5: the album itself before an EP or single sharing its name.
-        URL.applicationSupportDirectory.appending(path: "album-references-v5.json")
+        // v6: remasters, remixes and live albums keep their own tracklists.
+        URL.applicationSupportDirectory.appending(path: "album-references-v6.json")
     }
 
     init() {
@@ -59,9 +60,21 @@ final class AlbumReferences {
         }
     }
 
+    /// Edition notes are left out, so a deluxe edition shares the standard one's tracklist,
+    /// except ones that make it a different recording: a remaster borrowed the original's
+    /// tracklist ("Disdain" for "Disdain (Remixed/Remastered)") and its songs never matched.
     static func key(_ album: AlbumKey) -> String {
-        "\(ReleaseText.fold(album.artist))|\(ReleaseText.fold(ReleaseText.cleanTitle(album.title)))"
+        let clean = ReleaseText.fold(ReleaseText.cleanTitle(album.title))
+        let kept = Set(clean.split(separator: " "))
+        let recording = ReleaseText.fold(album.title).split(separator: " ")
+            .filter { !kept.contains($0) && recordingWords.contains(String($0)) }
+        return "\(ReleaseText.fold(album.artist))|\(([clean] + recording.map(String.init)).joined(separator: " "))"
     }
+
+    private static let recordingWords: Set<String> = [
+        "remaster", "remastered", "remix", "remixed", "live", "acoustic", "instrumental", "instrumentals",
+        "demo", "demos", "reimagined", "rerecorded", "redux",
+    ]
 
     func cached(_ album: AlbumKey) -> AlbumReference? {
         references[Self.key(album)]
@@ -289,8 +302,10 @@ enum MissingTracks {
     }
 
     /// "20 - The Eternal.flac" → 20.
+    /// "Artist - Album - 02 Song.flac" → 2 as well.
     static func leadingNumber(_ name: String) -> Int? {
-        name.firstMatch(of: /^\s*(\d{1,3})(?!\d)/).flatMap { Int($0.output.1) }
+        if let number = name.firstMatch(of: /^\s*(\d{1,3})(?!\d)/).flatMap({ Int($0.output.1) }) { return number }
+        return name.matches(of: /\s[-–—]\s+(\d{1,3})(?=[\s.\-_])/).last.flatMap { Int($0.output.1) }
     }
 }
 

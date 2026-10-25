@@ -858,6 +858,13 @@ struct ReleaseDetailView: View {
     static func trackName(_ fileName: String) -> String {
         let stem = (fileName as NSString).deletingPathExtension
         var parts = stem.split(separator: /\s+[-–—]\s+/).map(String.init)
+        // "Artist - Album - 02 - Song" or "Artist - Album - 02 Song": the song comes after its number.
+        if let index = parts.lastIndex(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }), index > 0, index < parts.count - 1 {
+            return parts[(index + 1)...].joined(separator: " - ")
+        }
+        if parts.count > 2, let last = parts.last, last.firstMatch(of: /^\d{1,3}[\s.\-_]+\D/) != nil {
+            return last.replacing(/^\d{1,3}[\s.\-_]+/, with: "")
+        }
         if let first = parts.first, first.allSatisfy(\.isNumber), parts.count > 1 { parts.removeFirst() }
         if parts.count > 1 { parts.removeFirst() }
         let name = parts.joined(separator: " - ")
