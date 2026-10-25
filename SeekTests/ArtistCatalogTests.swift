@@ -263,3 +263,35 @@ struct ArtistPageCatalogTests {
         ])
     }
 }
+
+struct RemasterTests {
+    private func folder(_ path: String, user: String) -> RemoteFolder {
+        RemoteFolder(username: user, path: path,
+                     files: (1...11).map { RemoteFile(username: user, path: "\(path)\\\(String(format: "%02d", $0)) Song.flac", size: 1000) },
+                     hasFreeSlot: true, averageSpeed: 100, queueLength: 0)
+    }
+
+    @Test func aRemasterIsItsOwnReleaseOnceTheCatalogueKnowsIt() {
+        let folders = [
+            folder("Music\\Knuckle Puck\\Copacetic (2015)", user: "a"),
+            folder("Music\\Knuckle Puck\\Copacetic (Remixed & Remastered) (2025)", user: "b"),
+            folder("Music\\Knuckle Puck - Copacetic (Remixed-Remastered) [2025] FLAC", user: "c"),
+        ]
+        let date = { (year: Int) in Calendar.current.date(from: DateComponents(year: year))! }
+        let remaster = "Copacetic (Remixed/Remastered)"
+        let catalog = [
+            CatalogRelease(artist: "Knuckle Puck", title: "Copacetic", kind: .album, released: date(2015), trackCount: 11),
+            CatalogRelease(artist: "Knuckle Puck", title: CatalogRelease.cleanTitle(remaster),
+                           kind: CatalogRelease.kind(of: remaster, trackCount: 11), released: date(2025), trackCount: 11),
+        ]
+        let releases = ReleaseGrouper.group(query: "copacetic", owned: [], store: [], folders: folders, catalog: catalog).releases
+        #expect(releases.first { $0.title == "Copacetic" }?.folders.map(\.username) == ["a"])
+        #expect(Set(releases.first { $0.title == remaster }?.folders.map(\.username) ?? []) == ["b", "c"])
+    }
+
+    @Test func onlyReleasesWithEveryWordSearchedForCount() {
+        #expect(ArtistCatalog.mentions("copacetic", artist: "Knuckle Puck", title: "Copacetic (Remixed/Remastered)"))
+        #expect(ArtistCatalog.mentions("knuckle puck copacetic", artist: "Knuckle Puck", title: "Copacetic"))
+        #expect(!ArtistCatalog.mentions("copacetic", artist: "Knuckle Puck", title: "20/20"))
+    }
+}

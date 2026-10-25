@@ -79,6 +79,25 @@ enum ArtistCatalog {
         return found
     }
 
+    /// A search's artists' releases that it names, for a search that isn't an artist's name
+    /// ("copacetic"): the artists come from what the search found. They tell editions apart:
+    /// without them a remaster's copies ("Copacetic (Remixed & Remastered)") read as the
+    /// original with an edition note and joined it, so the remaster never showed.
+    static func releases(named query: String, by artists: [String]) async -> [CatalogRelease] {
+        var found: [CatalogRelease] = []
+        for artist in artists {
+            found += await releases(for: artist).filter { mentions(query, artist: $0.artist, title: $0.title) }
+        }
+        return found
+    }
+
+    /// Whether a release has every word searched for, in its artist or title.
+    nonisolated static func mentions(_ query: String, artist: String, title: String) -> Bool {
+        let named = Set(ReleaseText.fold("\(artist) \(title)").split(separator: " "))
+        let words = ReleaseText.fold(query).split(separator: " ")
+        return !words.isEmpty && words.allSatisfy(named.contains)
+    }
+
     nonisolated private static func fetch(_ query: String) async -> [CatalogRelease] {
         var search = URLComponents(string: "https://itunes.apple.com/search")!
         search.queryItems = [

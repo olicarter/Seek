@@ -154,6 +154,15 @@ struct SearchView: View {
                     catalogFound = releases
                     storeLoadedFor = submitted
                 }
+                // Not an artist's name: the catalogues of the artists found, for the releases named.
+                .task(id: resultArtists) {
+                    guard storeLoadedFor == submitted, !submitted.isEmpty, !resultArtists.isEmpty,
+                          catalogFound.allSatisfy({ !ReleaseText.artistsMatch($0.artist, submitted) }) else { return }
+                    let named = await ArtistCatalog.releases(named: submitted, by: resultArtists)
+                    guard !Task.isCancelled, !named.isEmpty else { return }
+                    let known = Set(catalogFound.map { "\($0.artist)|\($0.title)|\($0.released)" })
+                    catalogFound += named.filter { !known.contains("\($0.artist)|\($0.title)|\($0.released)") }
+                }
                 .modifier(regroupTriggers)
                 .task(id: tracks.count) {
                     guard indexedTrackCount != tracks.count else { return }
@@ -201,6 +210,16 @@ struct SearchView: View {
             hintCount: resolver.hints.count, losslessOnly: losslessOnly, freeSlotsOnly: freeSlotsOnly, quality: quality,
             purchaseCount: bandcamp.items.count, fetchedFolders: client.folderContents.count, regroup: regroup
         )
+    }
+
+    /// The artists of the top few releases found, whose catalogues can tell their editions apart.
+    private var resultArtists: [String] {
+        var artists: [String] = []
+        for release in results.result.releases where !release.folders.isEmpty && release.artist != "Unknown Artist" {
+            if !artists.contains(where: { ReleaseText.artistsMatch($0, release.artist) }) { artists.append(release.artist) }
+            if artists.count == 3 { break }
+        }
+        return artists
     }
 
     private func regroup(_ timing: SearchResults.Timing = .now) {
