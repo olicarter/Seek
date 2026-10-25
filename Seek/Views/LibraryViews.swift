@@ -579,23 +579,23 @@ extension AlbumDetailView {
 
     /// This album's Soulseek downloads, from whichever copies, going or done or failed.
     private func albumDownloads(_ album: Album) -> [Transfer] {
-        let title = ReleaseText.fold(ReleaseText.cleanTitle(album.title))
-        guard !title.isEmpty else { return [] }
         // A finished download whose song was since deleted doesn't count.
-        return client.transfers.filter {
+        client.transfers.filter {
             !$0.forStreaming && $0.state != .cancelled && ($0.state != .completed || client.isDone($0))
-                && ReleaseText.fold($0.file.folder).contains(title)
+                && Self.isFor(album, $0)
         }
     }
 
     /// Songs for this album still arriving from Soulseek: judge its quality once they're in.
     private func isBeingAdded(_ album: Album) -> Bool {
-        let title = ReleaseText.fold(ReleaseText.cleanTitle(album.title))
-        guard !title.isEmpty else { return false }
-        return client.transfers.contains { transfer in
-            transfer.state.isActive && !transfer.forStreaming
-                && ReleaseText.fold(transfer.file.folder).contains(title)
-        }
+        client.transfers.contains { $0.state.isActive && !$0.forStreaming && Self.isFor(album, $0) }
+    }
+
+    /// A download for this album: filed under it when added from its page, otherwise from a folder
+    /// named for it (and not for a remaster or live recording of it).
+    private static func isFor(_ album: Album, _ transfer: Transfer) -> Bool {
+        if let target = transfer.album { return LibraryGrouping.sameAlbum(target) == LibraryGrouping.sameAlbum(album.key) }
+        return AlbumReferences.folder(transfer.file.folder, holds: album.title)
     }
 
     @ViewBuilder func bandcampMenuItem(_ release: BandcampAPI.StoreResult) -> some View {

@@ -91,4 +91,19 @@ struct ReservedPathTests {
         #expect(track.hasTags)
         #expect(track.duration > 0)
     }
+
+    @Test func songsAddedAsPartOfAnAlbumAreFiledUnderIt() async throws {
+        let fixture = try #require(Bundle(for: Bundle_.self).url(forResource: "tone", withExtension: "flac"))
+        let copy = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).flac")
+        try FileManager.default.copyItem(at: fixture, to: copy)
+        let album = AlbumKey(artist: "Knuckle Puck", title: "Copacetic (Remixed/Remastered)")
+        let path = try await library.importFile(at: copy, folders: ["Knuckle Puck", "Copacetic"], name: "02 Disdain.flac", album: album)
+        let track = try #require(try container.mainContext.fetch(FetchDescriptor<Track>()).first { $0.path == path })
+        #expect(track.albumKey == album)
+        // Written into the file too, so other devices read the same.
+        let url = try #require(library.url(forPath: path))
+        let tags = await MetadataReader.read(url)
+        #expect(tags.album == album.title)
+        #expect(tags.albumArtist == album.artist)
+    }
 }

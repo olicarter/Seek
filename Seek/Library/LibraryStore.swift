@@ -499,10 +499,10 @@ final class LibraryStore {
     /// Moves a finished Soulseek download into Music/<Artist>/<Album>/ and indexes it.
     /// Returns the file's path in the library.
     @discardableResult
-    func importDownload(at source: URL, remotePath: String, plannedPath: String? = nil) async throws -> String {
+    func importDownload(at source: URL, remotePath: String, plannedPath: String? = nil, album: AlbumKey? = nil) async throws -> String {
         let components = remotePath.split(separator: "\\").map(String.init)
         return try await importFile(at: source, folders: Array(components.dropLast().suffix(2)), name: components.last,
-                                    plannedPath: plannedPath)
+                                    plannedPath: plannedPath, album: album)
     }
 
     // MARK: - Reserved paths
@@ -591,7 +591,9 @@ final class LibraryStore {
     /// `plannedPath` reserved for it is used when still free; otherwise the nearest free path,
     /// with favourites and playlist entries made for the planned one following the song there.
     @discardableResult
-    func importFile(at source: URL, folders: [String], name: String? = nil, plannedPath: String? = nil) async throws -> String {
+    /// `album`: the album the song was added as part of, which it's filed under whatever its
+    /// tags say (written into FLAC files, so other devices read the same).
+    func importFile(at source: URL, folders: [String], name: String? = nil, plannedPath: String? = nil, album: AlbumKey? = nil) async throws -> String {
         guard let root else { throw CocoaError(.fileNoSuchFile) }
         let sanitizedFolders = folders.map(Self.sanitize)
         let fileName = Self.sanitize(name ?? source.lastPathComponent)
@@ -606,7 +608,16 @@ final class LibraryStore {
 
         // Tags are read before the file moves in, so the song appears complete: added bare, it
         // showed for a moment as its file name at the bottom of the album.
-        let metadata = await Task.detached { await MetadataReader.read(source) }.value
+        var metadata = await Task.detached { await MetadataReader.read(source) }.value
+        if let album, metadata.album != album.title || metadata.albumArtist != album.artist {
+            metadata.album = album.title
+            metadata.albumArtist = album.artist
+            if source.pathExtension.lowercased() == "flac" {
+                try? await Task.detached {
+                    try FLACTags.update(source, setting: ["ALBUM": album.title, "ALBUMARTIST": album.artist])
+                }.value
+            }
+        }
         // The iCloud index may see the file before this finishes; it leaves it to the import.
         importing.insert(path)
         defer { importing.remove(path) }

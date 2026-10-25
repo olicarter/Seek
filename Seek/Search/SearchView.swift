@@ -707,7 +707,7 @@ struct ReleaseDetailView: View {
                 } accessory: {
                     ReleaseAccessory(release: release, inLibrary: inLibrary, buying: $buying,
                                      isPreparing: soulseekStatus == .searching,
-                                     listedSongs: listedSongs(release))
+                                     listedSongs: listedSongs(release), listedAlbum: listedAlbum(release))
                 }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -848,6 +848,12 @@ struct ReleaseDetailView: View {
     }
 
     /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
+    /// With a tracklist, the album as it names it: what songs added from this page are filed under.
+    func listedAlbum(_ release: SearchRelease) -> AlbumKey? {
+        guard let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) else { return nil }
+        return AlbumKey(artist: reference.artist, title: CatalogRelease.cleanTitle(reference.title))
+    }
+
     /// With a tracklist, the file each listed song's row would download, as the rows pick them.
     func listedSongs(_ release: SearchRelease) -> [RemoteFile]? {
         guard let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) else { return nil }
@@ -1034,6 +1040,8 @@ struct ReleaseAccessory: View {
     /// The songs the page lists, each from the copy its row shows: what adding the album gets,
     /// rather than everything in the folder (bonus tracks, other editions' extras).
     var listedSongs: [RemoteFile]? = nil
+    /// The album those songs are filed under, whatever each copy's tags call it.
+    var listedAlbum: AlbumKey? = nil
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
 
@@ -1064,7 +1072,7 @@ struct ReleaseAccessory: View {
                 if let listedSongs, !listedSongs.isEmpty {
                     for folder in release.folders {
                         let songs = listedSongs.filter { $0.username == folder.username && $0.folder == folder.path }
-                        if !songs.isEmpty { client.download(songs, in: folder) }
+                        if !songs.isEmpty { client.download(songs, in: folder, album: listedAlbum) }
                     }
                 } else {
                     client.download(folder)

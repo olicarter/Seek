@@ -36,3 +36,14 @@ struct RemasterFileNameTests {
         #expect(AlbumReferences.key(AlbumKey(artist: "Knuckle Puck", title: "Copacetic (Deluxe Edition)")) == original)
     }
 }
+
+@MainActor
+struct RecordingFolderTests {
+    @Test func aRemastersFolderIsntTheOriginals() {
+        let remaster = "Music\\Knuckle Puck\\Copacetic (Remixed-Remastered) [2025]"
+        #expect(!AlbumReferences.folder(remaster, holds: "Copacetic"))
+        #expect(AlbumReferences.folder(remaster, holds: "Copacetic (Remixed/Remastered)"))
+        #expect(AlbumReferences.folder("Music\\Knuckle Puck\\Copacetic (2015) [FLAC]", holds: "Copacetic"))
+        #expect(!AlbumReferences.folder("Music\\Knuckle Puck\\20 20", holds: "Copacetic"))
+    }
+}

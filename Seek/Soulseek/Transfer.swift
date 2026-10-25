@@ -65,6 +65,10 @@ final class Transfer: Identifiable {
     var retryAt: Date?
     /// When the user put it in their queue, to notice one that isn't moving.
     @ObservationIgnored var queuedSince: Date?
+    /// The album it was added as part of, when that's known for sure (named by Apple). Songs of
+    /// one album can come from several copies whose tags spell it differently ("Copacetic" in
+    /// a remaster's), so each is filed under this name instead.
+    var album: AlbumKey?
     /// A library download that's also being played: it leaves a copy in the stream cache for the
     /// player before moving into the library.
     @ObservationIgnored var alsoStreaming = false
@@ -113,11 +117,13 @@ struct SavedTransfer: Codable {
     var reason: String?
     var plannedPath: String?
     var replacesExisting: Bool?
+    var album: AlbumKey?
 
     @MainActor
     init(_ transfer: Transfer) {
         id = transfer.id
         file = transfer.file
+        album = transfer.album
         plannedPath = transfer.plannedPath
         replacesExisting = transfer.replacesExisting ? true : nil
         switch transfer.state {
@@ -131,6 +137,7 @@ struct SavedTransfer: Codable {
     @MainActor
     func restore() -> Transfer {
         let transfer = Transfer(file: file, id: id)
+        transfer.album = album
         transfer.plannedPath = plannedPath
         transfer.replacesExisting = replacesExisting ?? false
         switch outcome {

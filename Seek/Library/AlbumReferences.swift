@@ -71,10 +71,23 @@ final class AlbumReferences {
         return "\(ReleaseText.fold(album.artist))|\(([clean] + recording.map(String.init)).joined(separator: " "))"
     }
 
-    private static let recordingWords: Set<String> = [
+    static let recordingWords: Set<String> = [
         "remaster", "remastered", "remix", "remixed", "live", "acoustic", "instrumental", "instrumentals",
         "demo", "demos", "reimagined", "rerecorded", "redux",
     ]
+
+    /// Whether a Soulseek folder holds this album rather than another recording of it: one
+    /// named for a remaster isn't the original's ("Copacetic (Remixed-Remastered)" for Copacetic).
+    static func folder(_ folder: String, holds title: String) -> Bool {
+        let name = ReleaseText.fold(title)
+        let clean = ReleaseText.fold(ReleaseText.cleanTitle(title))
+        guard !clean.isEmpty else { return false }
+        let folded = ReleaseText.fold(folder)
+        guard folded.contains(clean) else { return false }
+        let titleWords = Set(name.split(separator: " ").map(String.init))
+        let folderWords = Set(folded.split(separator: " ").map(String.init))
+        return recordingWords.subtracting(titleWords).isDisjoint(with: folderWords)
+    }
 
     func cached(_ album: AlbumKey) -> AlbumReference? {
         references[Self.key(album)]

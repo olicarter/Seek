@@ -516,8 +516,10 @@ final class SoulseekClient {
     }
 
     /// Downloads just these songs from a folder: an album's listed tracks, not its extras.
-    func download(_ files: [RemoteFile], in folder: RemoteFolder) {
-        for file in files { download(file) }
+    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil) {
+        for file in files {
+            if let transfer = download(file), let album, transfer.state != .completed { transfer.album = album }
+        }
         var chosen = folder
         chosen.files = files
         share(chosen)
@@ -898,6 +900,7 @@ final class SoulseekClient {
     @discardableResult
     private func move(_ old: Transfer, to file: RemoteFile) -> Transfer {
         let replacement = Transfer(file: file)
+        replacement.album = old.album
         replacement.plannedPath = old.plannedPath
         replacement.replacesExisting = old.replacesExisting
         old.plannedPath = nil

@@ -50,7 +50,8 @@ struct SeekApp: App {
                     }
                     await library.start()
                     client.importDownload = { [library] transfer, url in
-                        try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath)
+                        try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
+                                                         album: transfer.album)
                     }
                     client.reservePath = { [library] transfer in library.reservePath(forRemotePath: transfer.path) }
                     client.keepReserved = { [library] path in library.keepReserved(path) }
