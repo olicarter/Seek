@@ -313,11 +313,10 @@ struct NowPlayingView: View {
     }
 
     private var bottomRow: some View {
-        HStack {
+        HStack(alignment: .top) {
             Color.clear.frame(width: 44, height: 44)
             Spacer()
-            AirPlayButton()
-                .frame(width: 44, height: 44)
+            OutputRouteButton()
             Spacer()
             Button {
                 withAnimation(.spring(duration: 0.45)) { showingQueue.toggle() }
@@ -505,11 +504,61 @@ private struct HiddenVolumeView: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
+/// AirPlay, as in Apple Music: the plain AirPlay icon on this device's speaker; otherwise the
+/// output's own icon with where it's playing underneath, like "iPhone → Kitchen".
+private struct OutputRouteButton: View {
+    @State private var outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.title3.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .overlay { AirPlayButton() }
+            if let caption {
+                Text(caption)
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { _ in
+            outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(caption ?? "AirPlay")
+    }
+
+    private var isLocal: Bool {
+        outputs.allSatisfy { [.builtInSpeaker, .builtInReceiver].contains($0.portType) }
+    }
+
+    private var caption: String? {
+        guard !isLocal else { return nil }
+        let names = outputs.map(\.portName).formatted(.list(type: .and))
+        return "\(UIDevice.current.model) → \(names)"
+    }
+
+    private var symbol: String {
+        guard !isLocal, let output = outputs.first else { return "airplay.audio" }
+        switch output.portType {
+        case .airPlay: return outputs.count > 1 ? "hifispeaker.2.fill" : "hifispeaker.fill"
+        case .bluetoothA2DP, .bluetoothLE, .bluetoothHFP:
+            return output.portName.localizedCaseInsensitiveContains("airpods") ? "airpods" : "headphones"
+        case .headphones, .usbAudio: return "headphones"
+        case .carAudio: return "car.fill"
+        case .HDMI: return "tv"
+        default: return "speaker.wave.2.fill"
+        }
+    }
+}
+
+/// The system route picker, invisible over our own icon so it still opens the AirPlay menu.
 private struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
-        picker.tintColor = .white.withAlphaComponent(0.75)
-        picker.activeTintColor = .white
+        picker.tintColor = .clear
+        picker.activeTintColor = .clear
         picker.prioritizesVideoDevices = false
         return picker
     }
