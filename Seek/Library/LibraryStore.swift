@@ -814,6 +814,22 @@ final class LibraryStore {
         UserDefaults.standard.set(true, forKey: Self.markedLocalKey)
     }
 
+    /// Songs here whose album is kept downloaded are kept too, however they arrived: added again
+    /// after the index was slow to list them, or added on another device. Songs whose download
+    /// was removed are on their way out of this device, so they're left alone.
+    private func keepWithAlbum(_ files: [String: FileState], tracks: [String: Track]) {
+        guard usesICloud else { return }
+        var keptFolders = Set<String>()
+        for (path, track) in tracks where track.keepOffline {
+            keptFolders.insert((path as NSString).deletingLastPathComponent)
+        }
+        for (path, file) in files where file.isLocal && !pendingEvictions.contains(path) {
+            guard let track = tracks[path], !track.keepOffline,
+                  keptFolders.contains((path as NSString).deletingLastPathComponent) else { continue }
+            track.keepOffline = true
+        }
+    }
+
     /// Bytes this device holds for music kept for offline listening.
     var downloadedBytes: Int64 {
         let tracks = (try? context.fetch(FetchDescriptor<Track>(predicate: #Predicate { $0.keepOffline }))) ?? []
@@ -848,8 +864,9 @@ final class LibraryStore {
         for track in tracks {
             // A song added after the files were read isn't missing, just not in this read yet.
             // Removing it would bring it back moments later as a new song, losing its details
-            // (e.g. being kept downloaded).
-            let unseen = awaitingIndex[track.path].map { Date.now.timeIntervalSince($0) < 600 } ?? false
+            // (e.g. being kept downloaded). With a big album uploading, the index can take well
+            // over ten minutes to list a new file, so it waits however long that takes.
+            let unseen = awaitingIndex[track.path] != nil
             let missing = files[track.path] == nil && track.dateAdded < gatheredAt && !unseen
             if missing || byPath[track.path] != nil {
                 context.delete(track)
@@ -862,6 +879,7 @@ final class LibraryStore {
             byPath[path] = insertTrack(path)
         }
         markLocalAsDownloaded(files, tracks: byPath)
+        keepWithAlbum(files, tracks: byPath)
         for (path, file) in files {
             guard let track = byPath[path] else { continue }
             let changed = file.modified.map { modified in
