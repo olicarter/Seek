@@ -105,7 +105,7 @@ struct DiscoveryRow: View {
     }
 }
 
-/// One suggestion: cover art, name and Claude's reason. Opens the library page when it's already
+/// One suggestion: cover art, name and (on the page it was suggested for) Claude's reason. Opens the library page when it's already
 /// there; otherwise an album opens its page (every source in one place) and an artist a search.
 struct DiscoveryCard: View {
     enum Destination: Hashable {
@@ -115,6 +115,9 @@ struct DiscoveryCard: View {
 
     let suggestion: DiscoveryService.Suggestion
     let owned: Destination?
+    /// Claude's reason compares the suggestion with the page it was asked from, so it only makes
+    /// sense on that page.
+    var showsReason = true
     @Environment(Router.self) private var router
     /// The cover, looked up when the saved suggestion has none (usually already, by the row).
     private var cover: URL? { DiscoveryService.knownCover(for: suggestion) ?? foundCover }
@@ -162,11 +165,13 @@ struct DiscoveryCard: View {
             if suggestion.title != nil {
                 Text(suggestion.artist).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
             }
-            Text(suggestion.reason)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(4)
-                .fixedSize(horizontal: false, vertical: true)
+            if showsReason {
+                Text(suggestion.reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .contentShape(.rect)
         .task(id: suggestion.id) {
@@ -209,7 +214,7 @@ struct DiscoverHomeRow: View {
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 14) {
                         ForEach(suggestions.prefix(16)) { suggestion in
-                            DiscoveryCard(suggestion: suggestion, owned: nil).frame(width: 150)
+                            DiscoveryCard(suggestion: suggestion, owned: nil, showsReason: false).frame(width: 150)
                         }
                     }
                     .padding(.horizontal, 16)
