@@ -22,21 +22,26 @@ struct ExternalAlbumView: View {
     @Environment(CopyFinder.self) private var copyFinder
     @Environment(StoreVerifier.self) private var storeVerifier
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
-    private var tracks: [Track] { library.allTracks }
     @Environment(LibraryStore.self) private var library
     @State private var store: BandcampAPI.StoreResult?
     @State private var buying: StorePurchase?
+    /// The library's album, if it was already there when the page opened. One added while the
+    /// page is open keeps this page (its songs show their downloads), rather than swapping to the
+    /// library's page, which jumped back to the top.
+    @State private var openedOwned: AlbumKey??
 
     var body: some View {
         let release = self.release
+        let ownedNow = LibraryIndex(albums: Array(library.albumsByKey.keys)).album(for: release)
         Group {
-            if let owned = LibraryIndex(albums: Array(Set(tracks.map(\.albumKey)))).album(for: release) {
+            if let owned = openedOwned ?? ownedNow {
                 AlbumDetailView(key: owned)
             } else {
                 ReleaseDetailView(release: { self.release }, buying: $buying, soulseekStatus: copyFinder.copies(of: album.key)?.status)
                     .sheet(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price) }
             }
         }
+        .onAppear { if openedOwned == nil { openedOwned = .some(ownedNow) } }
         .task(id: album) {
             async let found = bandcamp.storeRelease(artist: album.artist, title: album.title)
             _ = await references.reference(for: album.key)
