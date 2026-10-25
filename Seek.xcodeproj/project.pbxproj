@@ -35,6 +35,7 @@
 		4DFE50F029744BA8D0D24E3A /* Socket.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FDB5C53213D818261E3A4C /* Socket.swift */; };
 		4F83DFB0163D9C177AF7C41B /* Sharing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB4862807F3C7280017E2E5 /* Sharing.swift */; };
 		50BB5C369EA6F77F03F7E4B2 /* AudioLevelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */; };
+		5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */; };
 		5264CCC7F63906EE896DCCAB /* SoulseekViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA253B9CAD1D454634531B9F /* SoulseekViews.swift */; };
 		597B21D9B9C0806BBDD24AE5 /* ReleaseMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48482135E9A3FFBE80AC32BF /* ReleaseMatching.swift */; };
 		5B58ABF76A91A668EED6FA11 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC14CDFF8825F7D5C03612D /* LibraryStore.swift */; };
@@ -137,6 +138,7 @@
 		7CD2A2D1464C8BA2F4367671 /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		7D7EB4B5DD82FC9DE0A39BD7 /* tone.flac */ = {isa = PBXFileReference; path = tone.flac; sourceTree = "<group>"; };
 		832927A227E2E6F4B4D0CD15 /* SeekApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekApp.swift; sourceTree = "<group>"; };
+		86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		A30FEB4461396E57E31B1B25 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A386E31E425646123D2B8E03 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
@@ -323,6 +325,7 @@
 		F38D50F1A13EBCD02809F92F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */,
 				832927A227E2E6F4B4D0CD15 /* SeekApp.swift */,
 			);
 			path = App;
@@ -461,6 +464,7 @@
 				99983F2E894CD7C2AC49BCF7 /* AlbumAbout.swift in Sources */,
 				C876F8754B2D061B7F90B227 /* AlbumHeader.swift in Sources */,
 				1F6D0D1B6568BAA96495EC1C /* AlbumReferences.swift in Sources */,
+				5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */,
 				829DBB029B43343DD9A65902 /* ArtistCatalog.swift in Sources */,
 				E1BFC9698DFED1C896C8235A /* AudioLevels.swift in Sources */,
 				44D5680808DC341E54AFC0AF /* BandcampAPI.swift in Sources */,

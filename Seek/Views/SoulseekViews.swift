@@ -287,6 +287,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                if AppUpdater.shared.availableBuild != nil {
+                    Section {
+                        Button("Update Seek", systemImage: "arrow.down.app") { AppUpdater.shared.install() }
+                    } footer: {
+                        Text("A new version is on 4n.studio. Seek closes while it installs.")
+                    }
+                }
                 Section {
                     if let saved = client.savedUsername {
                         LabeledContent("Username", value: saved)

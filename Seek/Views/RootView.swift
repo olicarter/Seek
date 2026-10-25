@@ -64,6 +64,7 @@ struct RootView: View {
                 .onTapGesture { showingNowPlaying = true }
         }
         .newPlaylistPrompt()
+        .appUpdatePrompt()
         // Full screen everywhere, as in Apple Music; Now Playing handles the swipe down itself.
         .fullScreenCover(isPresented: $showingNowPlaying) { NowPlayingView() }
         .onChange(of: scenePhase) { _, phase in
