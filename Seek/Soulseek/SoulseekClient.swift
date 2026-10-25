@@ -780,6 +780,46 @@ final class SoulseekClient {
 
     // MARK: - Finding another copy
 
+    /// A song stuck in a user's queue (thousands ahead of it, or not moving for minutes) is looked
+    /// for elsewhere, like one whose user went offline. It only fails when the user refuses, so
+    /// until now it could wait in a queue of 18,000 for good.
+    nonisolated static func shouldLookElsewhere(place: Int?, queuedFor: TimeInterval) -> Bool {
+        (place ?? 0) >= 50 || queuedFor >= 5 * 60
+    }
+
+    /// When each folder's songs were last looked for elsewhere, so a hopeless one isn't searched
+    /// for again every minute.
+    @ObservationIgnored private var lookedElsewhere: [String: Date] = [:]
+    @ObservationIgnored private var queueWatch: Task<Void, Never>?
+
+    private func lookElsewhere(for transfer: Transfer) {
+        guard !transfer.forStreaming else { return }
+        let key = "\(transfer.username)\u{0}\(transfer.file.folder)"
+        if let last = lookedElsewhere[key], Date.now.timeIntervalSince(last) < 15 * 60 { return }
+        lookedElsewhere[key] = .now
+        SoulseekEvents.record("\(transfer.file.name) is stuck in \(transfer.username)'s queue (\(transfer.state.label)); looking for another copy")
+        rescue(from: transfer)
+    }
+
+    /// Checks once a minute, while anything's queued, for songs that have stopped moving.
+    private func watchQueues() {
+        guard queueWatch == nil else { return }
+        queueWatch = Task {
+            defer { queueWatch = nil }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                let queued = transfers.filter { if case .queued = $0.state { !$0.forStreaming } else { false } }
+                if queued.isEmpty { return }
+                for transfer in queued {
+                    guard case .queued(let place) = transfer.state, let since = transfer.queuedSince else { continue }
+                    if Self.shouldLookElsewhere(place: place, queuedFor: Date.now.timeIntervalSince(since)) {
+                        lookElsewhere(for: transfer)
+                    }
+                }
+            }
+        }
+    }
+
     /// Folders (user and path) whose stalled songs are being looked for elsewhere. Observed, so
     /// their rows keep showing them on the way rather than offering to add them again.
     private var rescuing: Set<String> = []
@@ -1030,7 +1070,11 @@ final class SoulseekClient {
                 await connectIfNeeded()
                 let peer = try await peerConnection(to: transfer.username)
                 try await peer.send(Frame.message(PeerCode.queueUpload) { $0.string(transfer.path) })
-                if transfer.state == .connecting { transfer.state = .queued(place: nil) }
+                if transfer.state == .connecting {
+                    transfer.state = .queued(place: nil)
+                    transfer.queuedSince = .now
+                    watchQueues()
+                }
                 try await peer.send(Frame.message(PeerCode.placeInQueueRequest) { $0.string(transfer.path) })
             } catch {
                 guard transfer.state == .connecting else { return }
@@ -1366,6 +1410,7 @@ final class SoulseekClient {
             let place = try reader.uint32()
             if let transfer = transfer(from: peer.username, path: path), case .queued = transfer.state {
                 transfer.state = .queued(place: Int(place))
+                if Self.shouldLookElsewhere(place: Int(place), queuedFor: 0) { lookElsewhere(for: transfer) }
             }
 
         case PeerCode.uploadFailed:

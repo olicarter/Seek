@@ -63,6 +63,8 @@ final class Transfer: Identifiable {
     var plannedPath: String?
     /// When it'll be tried again by itself, after failing for a reason that may pass.
     var retryAt: Date?
+    /// When the user put it in their queue, to notice one that isn't moving.
+    @ObservationIgnored var queuedSince: Date?
     /// A library download that's also being played: it leaves a copy in the stream cache for the
     /// player before moving into the library.
     @ObservationIgnored var alsoStreaming = false
