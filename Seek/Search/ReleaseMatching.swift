@@ -605,10 +605,18 @@ struct LibraryIndex: Sendable {
         self.byTitle = byTitle
     }
 
-    func album(for release: SearchRelease) -> AlbumKey? {
+    /// `named`: the release's title names exactly which release it is (an album page opened from
+    /// Apple's catalogue or a suggestion), so an edition in it counts as with the catalogue.
+    func album(for release: SearchRelease, named: Bool = false) -> AlbumKey? {
         let candidates = byTitle[ReleaseText.fold(ReleaseText.cleanTitle(release.title))] ?? []
+        // A release Apple names as an edition ("Copacetic (Remixed/Remastered)") is only the
+        // library's album when that names the edition too: owning the original isn't owning it.
+        let full = ReleaseText.fold(release.title)
+        let edition = (release.catalog != nil || named) && full != ReleaseText.fold(ReleaseText.cleanTitle(release.title))
+            ? Set(full.split(separator: " ")) : nil
         return candidates.first { candidate in
-            ReleaseText.artistsMatch(candidate.artist, release.artist)
+            if let edition, !edition.isSubset(of: Set(ReleaseText.fold(candidate.key.title).split(separator: " "))) { return false }
+            return ReleaseText.artistsMatch(candidate.artist, release.artist)
                 || release.seller.map { ReleaseText.artistsMatch(candidate.artist, $0) } == true
         }?.key
     }

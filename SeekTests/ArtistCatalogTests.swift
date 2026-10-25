@@ -295,3 +295,26 @@ struct RemasterTests {
         #expect(!ArtistCatalog.mentions("copacetic", artist: "Knuckle Puck", title: "20/20"))
     }
 }
+
+struct EditionInLibraryTests {
+    private func release(_ title: String, catalog: Bool) -> SearchRelease {
+        var release = SearchRelease(id: title, artist: "Knuckle Puck", title: title)
+        if catalog {
+            release.catalog = CatalogRelease(artist: "Knuckle Puck", title: title, kind: .album, released: .now, trackCount: 11)
+        }
+        return release
+    }
+
+    @Test func owningTheOriginalIsntOwningTheRemaster() {
+        let original = LibraryIndex(albums: [AlbumKey(artist: "Knuckle Puck", title: "Copacetic")])
+        #expect(original.album(for: release("Copacetic (Remixed/Remastered)", catalog: true)) == nil)
+        #expect(original.album(for: release("Copacetic", catalog: true)) != nil)
+        // Without the catalogue to say it's another release, an edition note is still ignored.
+        #expect(original.album(for: release("Copacetic (Remastered)", catalog: false)) != nil)
+        // An album page opened for the remaster by name.
+        #expect(original.album(for: release("Copacetic (Remixed/Remastered)", catalog: false), named: true) == nil)
+
+        let remaster = LibraryIndex(albums: [AlbumKey(artist: "Knuckle Puck", title: "Copacetic (Remixed / Remastered)")])
+        #expect(remaster.album(for: release("Copacetic (Remixed/Remastered)", catalog: true)) != nil)
+    }
+}
