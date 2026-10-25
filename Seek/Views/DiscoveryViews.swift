@@ -8,7 +8,7 @@ struct DiscoveryRow: View {
     @Environment(DiscoveryService.self) private var discovery
     @Environment(Router.self) private var router
     @Environment(LibraryStore.self) private var library
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
     @Query private var entries: [Discovery]
 
     init(subject: DiscoveryService.Subject) {
@@ -198,7 +198,7 @@ struct DiscoveryCard: View {
 /// in the library yet. Uses the cache only, so it never asks Claude by itself.
 struct DiscoverHomeRow: View {
     @Query(sort: \Discovery.createdAt, order: .reverse) private var entries: [Discovery]
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
     @Environment(LibraryStore.self) private var library
     @Environment(DiscoveryService.self) private var discovery
 

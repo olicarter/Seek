@@ -70,6 +70,11 @@ struct SeekApp: App {
                         library.replace(paths, withPurchaseFrom: item.itemURL)
                     }
                     discovery.resumePending()
+                    #if DEBUG
+                    if PerfHarness.requestedImports > 0 {
+                        Task { await PerfHarness.run(PerfHarness.requestedImports, library: library) }
+                    }
+                    #endif
                     // Only once the library can take the files.
                     client.restoreDownloads()
                     bandcamp.restoreDownloads()

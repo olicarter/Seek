@@ -91,7 +91,8 @@ struct SearchView: View {
     @Environment(FolderResolver.self) private var resolver
     @Environment(StoreVerifier.self) private var storeVerifier
     @Environment(\.horizontalSizeClass) private var sizeClass
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var query = ""
     @State private var submitted = ""
     @State private var losslessOnly = false

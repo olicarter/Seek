@@ -4,7 +4,7 @@ import SwiftUI
 /// iPhone library tab: section links, recently added, and a search across the whole library.
 struct LibraryHomeView: View {
     @Environment(LibraryStore.self) private var library
-    @Query(sort: \Track.dateAdded, order: .reverse) private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
     @Environment(Router.self) private var router
     @State private var query = ""
 
@@ -55,10 +55,16 @@ struct LibraryHomeView: View {
         }
     }
 
+    /// The 12 albums with the newest songs. The songs come newest first, so this stops as soon as
+    /// it has 12 rather than grouping the whole library into albums each time a song arrives.
     private var recentAlbums: [Album] {
-        LibraryMemo.value("recentAlbums", version: library.contentVersion(trackCount: tracks.count)) {
-            Array(LibraryGrouping.albums(tracks).sorted { $0.dateAdded > $1.dateAdded }.prefix(12))
+        var keys: [AlbumKey] = []
+        for track in tracks where keys.count < 12 {
+            let key = track.albumKey
+            if !keys.contains(key) { keys.append(key) }
         }
+        let albums = library.albumsByKey
+        return keys.compactMap { albums[$0] }
     }
 }
 
@@ -135,7 +141,8 @@ struct EmptyLibraryView: View {
 }
 
 struct ArtistsView: View {
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var query = ""
     @State private var deleting: PendingDelete?
 
@@ -171,12 +178,13 @@ struct ArtistsView: View {
 }
 
 struct AlbumsView: View {
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var query = ""
     @AppStorage("albumsLayout") private var layout = AlbumLayout.grid
 
     var body: some View {
-        let albums = LibraryGrouping.albums(tracks).filter {
+        let albums = library.albums.filter {
             query.isEmpty || $0.title.localizedStandardContains(query) || $0.artist.localizedStandardContains(query)
         }
         Group {
@@ -224,7 +232,8 @@ struct DownloadedView: View {
 }
 
 struct SongsView: View {
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var query = ""
     @Environment(Player.self) private var player
 
@@ -290,7 +299,7 @@ struct AlbumDetailView: View {
     @State private var bandcampRelease: BandcampAPI.StoreResult?
     @State private var confirmingReplace = false
     @State private var buying: StorePurchase?
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
     @Environment(Player.self) private var player
     @Environment(LibraryStore.self) private var library
     @Environment(BandcampClient.self) private var bandcamp
@@ -317,7 +326,7 @@ struct AlbumDetailView: View {
     }
 
     var body: some View {
-        let album = Album(key: key, tracks: LibraryGrouping.sortedForAlbum(tracks.filter { $0.albumKey == key }))
+        let album = library.albumsByKey[key] ?? Album(key: key, tracks: [])
         List {
             let copies = copyFinder.copies(of: key)
             let missing = references.cached(key).map { MissingTracks.missing(from: $0, have: album.tracks) } ?? []
@@ -632,7 +641,8 @@ struct AlbumFooter: View {
 
 /// Browse by record label: every label in the library with its albums and newest artwork.
 struct LabelsView: View {
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var query = ""
 
     var body: some View {
@@ -681,7 +691,8 @@ struct LabelsView: View {
 /// Every album in the library released on one label.
 struct LabelDetailView: View {
     let name: String
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
 
     var body: some View {
         let albums = LibraryGrouping.albums(tracks.filter { $0.label == name }).sorted { $0.year > $1.year }
@@ -694,7 +705,8 @@ struct LabelDetailView: View {
 
 struct ArtistDetailView: View {
     let name: String
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @Environment(Player.self) private var player
     @Environment(\.dismiss) private var dismiss
     @State private var deleting: PendingDelete?
@@ -860,7 +872,8 @@ struct PlaylistsView: View {
 
 struct PlaylistDetailView: View {
     @Bindable var playlist: Playlist
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @Environment(Player.self) private var player
 
     var body: some View {
@@ -1133,7 +1146,8 @@ struct OtherCopiesSection: View {
 /// playable on its own like a playlist.
 struct FavoritesView: View {
     @Query(sort: \Favorite.favoritedAt, order: .reverse) private var favorites: [Favorite]
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @Environment(Player.self) private var player
     @Environment(SoulseekClient.self) private var client
 

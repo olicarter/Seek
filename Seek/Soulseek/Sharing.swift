@@ -134,7 +134,7 @@ final class SharingService {
         rebuild = Task {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled else { return }
-            let files = library.sharedFiles()
+            let files = await library.sharedFiles()
             let built = await Task.detached { ShareIndex(files: files) }.value
             guard !Task.isCancelled else { return }
             let changed = built.fileCount != index.fileCount || built.folderCount != index.folderCount

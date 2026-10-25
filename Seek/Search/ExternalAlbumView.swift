@@ -22,7 +22,8 @@ struct ExternalAlbumView: View {
     @Environment(CopyFinder.self) private var copyFinder
     @Environment(StoreVerifier.self) private var storeVerifier
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
+    @Environment(LibraryStore.self) private var library
     @State private var store: BandcampAPI.StoreResult?
     @State private var buying: StorePurchase?
 

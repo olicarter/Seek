@@ -237,10 +237,12 @@ enum LibraryGrouping {
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    /// Each song's place read once, then sorted: reading a song's fields is slow enough that
+    /// doing it at every comparison made grouping a big library take a noticeable moment.
     static func sortedForAlbum(_ tracks: [Track]) -> [Track] {
-        tracks.sorted {
-            ($0.discNumber, $0.trackNumber, $0.path) < ($1.discNumber, $1.trackNumber, $1.path)
-        }
+        tracks.map { (key: ($0.discNumber, $0.trackNumber, $0.path), track: $0) }
+            .sorted { $0.key < $1.key }
+            .map(\.track)
     }
 
     static func sortedByTitle(_ tracks: [Track]) -> [Track] {

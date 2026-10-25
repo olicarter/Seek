@@ -38,6 +38,7 @@
 		5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */; };
 		5264CCC7F63906EE896DCCAB /* SoulseekViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA253B9CAD1D454634531B9F /* SoulseekViews.swift */; };
 		597B21D9B9C0806BBDD24AE5 /* ReleaseMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48482135E9A3FFBE80AC32BF /* ReleaseMatching.swift */; };
+		5A6D49181AF28CBA380102A0 /* PerfHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FD190F215D9287B4545F5E /* PerfHarness.swift */; };
 		5B58ABF76A91A668EED6FA11 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC14CDFF8825F7D5C03612D /* LibraryStore.swift */; };
 		690AAD66C439162C45E27140 /* RealSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A35F73D4A3ADDF23CA97 /* RealSearchTests.swift */; };
 		6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CC9811E43E6250AF81358F /* DiscoveryTests.swift */; };
@@ -144,6 +145,7 @@
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		A30FEB4461396E57E31B1B25 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A386E31E425646123D2B8E03 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		A5FD190F215D9287B4545F5E /* PerfHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfHarness.swift; sourceTree = "<group>"; };
 		ABE0976C16CBAC17D5F2A90E /* EditAlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditAlbumView.swift; sourceTree = "<group>"; };
 		B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLevelsTests.swift; sourceTree = "<group>"; };
 		B5783D6255712D74EF1D20ED /* AlbumHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumHeader.swift; sourceTree = "<group>"; };
@@ -329,6 +331,7 @@
 			isa = PBXGroup;
 			children = (
 				86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */,
+				A5FD190F215D9287B4545F5E /* PerfHarness.swift */,
 				832927A227E2E6F4B4D0CD15 /* SeekApp.swift */,
 			);
 			path = App;
@@ -492,6 +495,7 @@
 				CFD8A875E9F3BB52097DE132 /* Metadata.swift in Sources */,
 				F363701A2DF64983C8BC6EB0 /* Models.swift in Sources */,
 				7481309C45E19A3544BD20F7 /* NewPlaylistPrompt.swift in Sources */,
+				5A6D49181AF28CBA380102A0 /* PerfHarness.swift in Sources */,
 				0ACAB136DCB6343F593BF3EB /* Player.swift in Sources */,
 				F3EF3CB518F48E3BA6B05A34 /* PlayerViews.swift in Sources */,
 				3394F20943425224B65AA31A /* ProgressRing.swift in Sources */,

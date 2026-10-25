@@ -278,7 +278,7 @@ struct SettingsView: View {
     @Environment(SharingService.self) private var sharing
     @State private var cacheCleared = false
     @Environment(LibraryStore.self) private var library
-    @Query private var tracks: [Track]
+    private var tracks: [Track] { library.allTracks }
     @State private var confirmingRemoveAll = false
     @AppStorage(LibraryStore.automaticDownloadsKey) private var automaticDownloads = LibraryStore.defaultAutomaticDownloads
     @State private var username = ""

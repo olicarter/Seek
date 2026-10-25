@@ -58,6 +58,9 @@ final class LibraryStore {
     var cloudOnlyCount: Int { cloudOnly.count }
 
     @ObservationIgnored private let context: ModelContext
+    /// Held so it lives as long as the store: work scheduled for later (refreshing the songs,
+    /// syncing details) used a context whose container had gone, which crashed.
+    @ObservationIgnored private let container: ModelContainer
     @ObservationIgnored private var query: NSMetadataQuery?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     /// The files as last reconciled with the library, to skip reconciling when only upload or
@@ -71,7 +74,83 @@ final class LibraryStore {
     @ObservationIgnored private var coverWorker: Task<Void, Never>?
 
     init(container: ModelContainer) {
+        self.container = container
         context = container.mainContext
+        refreshAllTracks()
+        saveObserver = NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: nil, queue: .main) { [weak self, weak container] note in
+            // Only this library's saves (its own context, or the sync's on the same container).
+            guard let saved = note.object as? ModelContext, let container, saved.container === container else { return }
+            func ids(_ key: ModelContext.NotificationKey) -> [PersistentIdentifier] {
+                (note.userInfo?[key.rawValue] as? [PersistentIdentifier] ?? []).filter { $0.entityName == "Track" }
+            }
+            let inserted = ids(.insertedIdentifiers), deleted = ids(.deletedIdentifiers)
+            let fromMain = saved === self?.context
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if fromMain {
+                    self.patchAllTracks(inserted: inserted, deleted: deleted)
+                } else if !(inserted.isEmpty && deleted.isEmpty) {
+                    // Songs added or removed on another context: read them afresh. (Edits made
+                    // there are merged into the songs here, so need nothing.)
+                    self.refreshAllTracksSoon()
+                }
+            }
+        }
+    }
+
+    /// Fetching every song took a fifth of a second per song arriving (more on a big library), so
+    /// saves made here patch the list instead: new songs go on the front (they're the newest),
+    /// removed ones come out, and edited ones are the same objects, already up to date.
+    private func patchAllTracks(inserted: [PersistentIdentifier], deleted: [PersistentIdentifier]) {
+        guard !inserted.isEmpty || !deleted.isEmpty else { return }
+        var tracks = allTracks
+        if !deleted.isEmpty {
+            let gone = Set(deleted)
+            tracks.removeAll { gone.contains($0.persistentModelID) }
+        }
+        let added = inserted.compactMap { context.model(for: $0) as? Track }
+        guard added.count == inserted.count else {
+            refreshAllTracks()
+            return
+        }
+        allTracks = added.sorted { $0.dateAdded > $1.dateAdded } + tracks
+    }
+
+    /// Every song, newest first, shared by the views that show the whole library. Each holding
+    /// its own query refetched them all on every save, several times for each song arriving,
+    /// which made scrolling stutter while an album downloaded.
+    private(set) var allTracks: [Track] = [] {
+        didSet { tracksVersion += 1 }
+    }
+    @ObservationIgnored private var tracksVersion = 0
+    @ObservationIgnored private var tracksRefresh: Task<Void, Never>?
+
+    /// Every album, grouped once per change to the library rather than by each view that lists them.
+    var albums: [Album] {
+        LibraryMemo.value("allAlbums", version: "\(tracksVersion)-\(contentChanges)") { LibraryGrouping.albums(allTracks) }
+    }
+
+    var albumsByKey: [AlbumKey: Album] {
+        LibraryMemo.value("albumsByKey", version: "\(tracksVersion)-\(contentChanges)") {
+            Dictionary(albums.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+    }
+    @ObservationIgnored private var saveObserver: NSObjectProtocol?
+
+    private func refreshAllTracks() {
+        tracksRefresh?.cancel()
+        tracksRefresh = nil
+        allTracks = (try? context.fetch(FetchDescriptor<Track>(sortBy: [SortDescriptor(\.dateAdded, order: .reverse)]))) ?? []
+    }
+
+    private func refreshAllTracksSoon() {
+        guard tracksRefresh == nil else { return }
+        tracksRefresh = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            tracksRefresh = nil
+            refreshAllTracks()
+        }
     }
 
     static func makeContainer() -> ModelContainer {
@@ -157,11 +236,22 @@ final class LibraryStore {
     }
 
     /// Every library file with what peers are told about it.
-    func sharedFiles() -> [SharedFile] {
+    /// Read on a context of its own away from the main thread: it goes through every song (and
+    /// asks the disk for sizes the iCloud index hasn't given), which held up scrolling.
+    func sharedFiles() async -> [SharedFile] {
+        let container = context.container
+        let sizes = fileSizes
+        let root = root
+        return await Task.detached(priority: .utility) {
+            Self.sharedFiles(in: ModelContext(container), sizes: sizes, root: root)
+        }.value
+    }
+
+    nonisolated private static func sharedFiles(in context: ModelContext, sizes: [String: Int64], root: URL?) -> [SharedFile] {
         let tracks = (try? context.fetch(FetchDescriptor<Track>())) ?? []
         return tracks.compactMap { track in
-            var size = fileSizes[track.path]
-            if size == nil, let url = url(for: track),
+            var size = sizes[track.path]
+            if size == nil, let url = root?.appending(path: track.path),
                let bytes = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
                 size = Int64(bytes)
             }
