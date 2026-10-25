@@ -247,14 +247,17 @@ struct TrackRow: View {
             switch library.availability(of: track) {
             case .cloudOnly:
                 EmptyView()
+            // Centred in the same column as the rings of songs still downloading into the album.
             case .downloading(let progress):
                 ProgressRing(progress: progress, size: 14, lineWidth: 2)
+                    .frame(width: 28)
             case .onDevice:
                 // Like Apple Music: only songs kept for offline listening are marked.
                 if library.usesICloud, track.keepOffline {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .frame(width: 28)
                         .accessibilityLabel("Downloaded")
                 }
             }

@@ -1015,8 +1015,13 @@ struct ReleaseAccessory: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("In Library")
-        case .downloadingBandcamp(let progress), .downloadingSoulseek(let progress):
-            RoundProgress(progress: progress)
+        case .downloadingBandcamp, .downloadingSoulseek:
+            // Added, as in Apple Music: the songs below show how their downloads are going.
+            Image(systemName: "checkmark")
+                .font(.title3.weight(.semibold))
+                .frame(width: 50, height: 50)
+                .background(.fill.secondary, in: .circle)
+                .accessibilityLabel("Added to Library")
         case .downloadBandcamp(let item):
             RoundButton(systemImage: "plus", label: "Add from Bandcamp") {
                 if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }
