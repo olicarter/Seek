@@ -63,6 +63,7 @@
 		C2B23499A3C981D22C38AA93 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD2A2D1464C8BA2F4367671 /* ProtocolTests.swift */; };
 		C33BFAFB922E27CC6ED837C4 /* StreamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58F21093F066169F0B1C999 /* StreamingTests.swift */; };
 		C876F8754B2D061B7F90B227 /* AlbumHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5783D6255712D74EF1D20ED /* AlbumHeader.swift */; };
+		CF3499F7AE5850F824BA970D /* ArrivingTrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7756E0651A70996486396F8B /* ArrivingTrackTests.swift */; };
 		CFD8A875E9F3BB52097DE132 /* Metadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7C40FD57A3C96816171BD /* Metadata.swift */; };
 		CFDE7097EA13D30D3909CDEA /* StoreVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BF7E3C485E5CD55E400E06E /* StoreVerifier.swift */; };
 		D5A71927EAAF8002D2535124 /* CopyFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F6A3A21F66280E16B1B47D /* CopyFinder.swift */; };
@@ -131,6 +132,7 @@
 		63E0A4CC586BC109FC84CAFE /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
 		75C8A82DC797528466349191 /* SameRip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SameRip.swift; sourceTree = "<group>"; };
 		7643ED3950B6BAC3E1083BA7 /* ReleaseMatchingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseMatchingTests.swift; sourceTree = "<group>"; };
+		7756E0651A70996486396F8B /* ArrivingTrackTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrivingTrackTests.swift; sourceTree = "<group>"; };
 		77D4CE9A07C1084D08B3F891 /* ArtistCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistCatalogTests.swift; sourceTree = "<group>"; };
 		7B272034F5BEB6DBBDE46D47 /* ClaudeTagFixer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeTagFixer.swift; sourceTree = "<group>"; };
 		7BF7E3C485E5CD55E400E06E /* StoreVerifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreVerifier.swift; sourceTree = "<group>"; };
@@ -214,6 +216,7 @@
 			isa = PBXGroup;
 			children = (
 				43016CFBDD94A9A66A0651F8 /* AlbumReferenceTests.swift */,
+				7756E0651A70996486396F8B /* ArrivingTrackTests.swift */,
 				77D4CE9A07C1084D08B3F891 /* ArtistCatalogTests.swift */,
 				B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */,
 				95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */,
@@ -520,6 +523,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D8EF7E30D9FE024C9001C810 /* AlbumReferenceTests.swift in Sources */,
+				CF3499F7AE5850F824BA970D /* ArrivingTrackTests.swift in Sources */,
 				7FF0A4E8F725CBA2AE49BB0C /* ArtistCatalogTests.swift in Sources */,
 				50BB5C369EA6F77F03F7E4B2 /* AudioLevelsTests.swift in Sources */,
 				1CE12F46D5A2B81B5BFC0297 /* BandcampTests.swift in Sources */,
