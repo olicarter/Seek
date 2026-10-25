@@ -121,6 +121,21 @@ struct AlbumReferenceTests {
         #expect(AlbumReferences.standardEdition(editions, atLeast: 40)?["trackCount"] as? Int == 30)
     }
 
+    @Test func prefersTheAlbumOverAnEPOfTheSameName() {
+        // As iTunes lists them.
+        let editions: [[String: Any]] = [
+            ["collectionName": "From Under the Cork Tree", "trackCount": 13],
+            ["collectionName": "From Under the Cork Tree (Limited \"Black Clouds and Underdogs\" Edition) - EP", "trackCount": 8],
+            ["collectionName": "From Under The Cork Tree (20th Anniversary Deluxe)", "trackCount": 31],
+        ]
+        let title = "From Under the Cork Tree"
+        #expect(AlbumReferences.bestEdition(editions, title: title, atLeast: 0)?["trackCount"] as? Int == 13)
+        #expect(AlbumReferences.bestEdition(editions, title: title, atLeast: 13)?["trackCount"] as? Int == 13)
+        #expect(AlbumReferences.bestEdition(editions, title: title, atLeast: 20)?["trackCount"] as? Int == 31)
+        // Only an EP by that name: it's what there is.
+        #expect(AlbumReferences.bestEdition(Array(editions[1...1]), title: title, atLeast: 0)?["trackCount"] as? Int == 8)
+    }
+
     @Test func bonusDiscsArentMissingUntilYouHaveSome() {
         let reference = AlbumReference(source: .itunes, artist: "Slowdive", title: "Souvlaki", tracks: [
             ReferenceTrack(number: 1, disc: 1, title: "Alison"),

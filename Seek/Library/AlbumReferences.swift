@@ -48,7 +48,8 @@ final class AlbumReferences {
     private static var cacheURL: URL {
         // v3: stricter title matching (tribute albums no longer count as the original).
         // v4: Apple's catalogue before Bandcamp, where anyone can upload an album's name.
-        URL.applicationSupportDirectory.appending(path: "album-references-v4.json")
+        // v5: the album itself before an EP or single sharing its name.
+        URL.applicationSupportDirectory.appending(path: "album-references-v5.json")
     }
 
     init() {
@@ -121,10 +122,10 @@ final class AlbumReferences {
             URLQueryItem(name: "limit", value: "10"),
         ]
         func matching(_ results: [[String: Any]]) -> [String: Any]? {
-            standardEdition(results.filter {
+            bestEdition(results.filter {
                 ReleaseText.artistsMatch($0["artistName"] as? String ?? "", album.artist)
                     && ReleaseText.titlesMatch($0["collectionName"] as? String ?? "", album.title)
-            }, atLeast: trackCount)
+            }, title: album.title, atLeast: trackCount)
         }
         var found: [String: Any]?
         if let url = search.url, let (data, _) = try? await URLSession.shared.data(from: url),
@@ -169,6 +170,23 @@ final class AlbumReferences {
               let results = (try? JSONSerialization.jsonObject(with: albumData) as? [String: Any])?["results"] as? [[String: Any]]
         else { return nil }
         return results.filter { $0["collectionId"] != nil }
+    }
+
+    /// The album itself among releases sharing its name. An EP or single under the album's name
+    /// ("From Under the Cork Tree (Limited … Edition) - EP", 8 remixes and live songs) only when
+    /// there's nothing else; then the edition named exactly as the album, if it has enough
+    /// tracks; otherwise the smallest edition that does.
+    nonisolated static func bestEdition(_ editions: [[String: Any]], title: String, atLeast count: Int) -> [String: Any]? {
+        func name(_ edition: [String: Any]) -> String { edition["collectionName"] as? String ?? "" }
+        func isShort(_ edition: [String: Any]) -> Bool { name(edition).hasSuffix(" - EP") || name(edition).hasSuffix(" - Single") }
+        let albums = editions.filter { !isShort($0) }
+        let pool = albums.isEmpty ? editions : albums
+        let wanted = ReleaseText.fold(title)
+        let exact = pool.filter { ReleaseText.fold(CatalogRelease.cleanTitle(name($0))) == wanted }
+        if let edition = standardEdition(exact, atLeast: count), (edition["trackCount"] as? Int ?? 0) >= count {
+            return edition
+        }
+        return standardEdition(pool, atLeast: count)
     }
 
     /// Of several editions (standard, deluxe, anniversary), the one with the fewest tracks that
