@@ -1072,7 +1072,7 @@ struct ReleaseAccessory: View {
                 if let listedSongs, !listedSongs.isEmpty {
                     for folder in release.folders {
                         let songs = listedSongs.filter { $0.username == folder.username && $0.folder == folder.path }
-                        if !songs.isEmpty { client.download(songs, in: folder, album: listedAlbum) }
+                        if !songs.isEmpty { client.download(songs, in: folder, album: listedAlbum, others: release.folders) }
                     }
                 } else {
                     client.download(folder)

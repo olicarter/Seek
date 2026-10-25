@@ -516,13 +516,14 @@ final class SoulseekClient {
     }
 
     /// Downloads just these songs from a folder: an album's listed tracks, not its extras.
-    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil) {
+    /// `others`: the album's other copies, where helpers with the same rip may be.
+    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil, others: [RemoteFolder] = []) {
         for file in files {
             if let transfer = download(file), let album, transfer.state != .completed { transfer.album = album }
         }
         var chosen = folder
         chosen.files = files
-        share(chosen)
+        share(chosen, among: others)
     }
 
     /// Downloads a whole folder. A search only lists the files that matched, so the rest are
@@ -885,6 +886,10 @@ final class SoulseekClient {
                           move.old.state != .downloading, move.old.state != .cancelled else { continue }
                     self.move(move.old, to: move.new)
                 }
+                // The new copy's songs are shared out too, among the others found with it.
+                var moved = candidate
+                moved.files = moves.map(\.new)
+                share(moved, among: Array(ranked))
                 return
             }
             SoulseekEvents.record("no other copy of \(query) found; carrying on with \(failed.username)")
@@ -918,47 +923,72 @@ final class SoulseekClient {
 
     /// An album coming from one user, with others who have the very same files sending some of
     /// its songs alongside them. Most users send one song at a time, so this goes several times
-    /// as fast, and a slow user only holds up the songs they're sending.
+    /// as fast, and a slow user only holds up the songs they're sending. Each helper takes the
+    /// next song as soon as one finishes, so the fastest end up sending most of the album.
     private final class SharedAlbum {
         let owner: String
         let folder: String
         /// Each helper's copy of the owner's songs, keyed by the owner's file id.
         var helpers: [String: [String: RemoteFile]]
+        /// Others with the same rip, ready to take over from a helper that drops out.
+        var spares: [String: [String: RemoteFile]]
         /// Songs lent to helpers, keyed by the helper's transfer: who has it, and the owner's file.
         var lent: [UUID: (helper: String, original: RemoteFile)] = [:]
 
-        init(owner: String, folder: String, helpers: [String: [String: RemoteFile]]) {
+        init(owner: String, folder: String, helpers: [String: [String: RemoteFile]], spares: [String: [String: RemoteFile]]) {
             self.owner = owner
             self.folder = folder
             self.helpers = helpers
+            self.spares = spares
         }
     }
 
     @ObservationIgnored private var sharedAlbums: [SharedAlbum] = []
-    static let maxHelpers = 2
+    /// Folders being looked at for helpers right now, so one album isn't looked at twice.
+    @ObservationIgnored private var findingHelpers: Set<String> = []
+    /// Up to five users sending one album at once (the owner and four helpers): several times
+    /// as fast as one, without asking any one user for much.
+    static let maxHelpers = 4
+    static let maxSpares = 2
     /// One song sending and the next asked for, so there's no gap between them.
     static let songsPerHelper = 2
 
-    /// Finds users in the current search with the same rip of an album being downloaded, free
-    /// to send now, and lends them songs from it.
-    private func share(_ folder: RemoteFolder) {
+    /// Finds users with the same rip of an album being downloaded, free to send now, among the
+    /// album's other copies (`others`, e.g. what its page found) and the current search, and
+    /// lends them songs from it. Users whose listing only showed part of the folder are asked
+    /// for the rest, as matching needs every song.
+    private func share(_ folder: RemoteFolder, among others: [RemoteFolder] = []) {
         let songs = folder.files.filter { AudioFormats.playable.contains($0.fileExtension) }
-        guard songs.count >= 4,
-              !sharedAlbums.contains(where: { $0.owner == folder.username && $0.folder == folder.path }) else { return }
-        let candidates = (currentSearch?.folders ?? [])
-            .filter { $0.username != folder.username && $0.hasFreeSlot }
+        guard songs.count >= 4, !sharedAlbums.contains(where: { $0.owner == folder.username && $0.folder == folder.path }),
+              findingHelpers.insert(folder.id).inserted else { return }
+        var seen = Set<String>()
+        let candidates = (others + (currentSearch?.folders ?? []))
+            .filter { $0.username != folder.username && $0.hasFreeSlot && !BannedUsers.contains($0.username) && seen.insert($0.id).inserted }
             .sorted { $0.averageSpeed > $1.averageSpeed }
-        var helpers: [String: [String: RemoteFile]] = [:]
-        for candidate in candidates where helpers[candidate.username] == nil {
-            guard let match = SameRip.match(songs, in: complete(candidate).files) else { continue }
-            helpers[candidate.username] = match
-            if helpers.count == Self.maxHelpers { break }
+        Task {
+            defer { findingHelpers.remove(folder.id) }
+            var helpers: [String: [String: RemoteFile]] = [:], spares: [String: [String: RemoteFile]] = [:]
+            for candidate in candidates.prefix(16) where helpers[candidate.username] == nil && spares[candidate.username] == nil {
+                var files = complete(candidate).files
+                if files.filter({ AudioFormats.playable.contains($0.fileExtension) }).count < songs.count,
+                   let all = try? await contents(of: candidate) {
+                    files = all
+                }
+                guard let match = SameRip.match(songs, in: files) else { continue }
+                if helpers.count < Self.maxHelpers {
+                    helpers[candidate.username] = match
+                } else {
+                    spares[candidate.username] = match
+                    if spares.count == Self.maxSpares { break }
+                }
+            }
+            guard !helpers.isEmpty, !sharedAlbums.contains(where: { $0.owner == folder.username && $0.folder == folder.path }) else { return }
+            let album = SharedAlbum(owner: folder.username, folder: folder.path, helpers: helpers, spares: spares)
+            sharedAlbums.append(album)
+            SoulseekEvents.record("sharing \(folder.name) from \(folder.username) with \(helpers.keys.sorted().joined(separator: ", "))"
+                + (spares.isEmpty ? "" : " (spares: \(spares.keys.sorted().joined(separator: ", ")))"))
+            for helper in helpers.keys { lend(album, to: helper) }
         }
-        guard !helpers.isEmpty else { return }
-        let album = SharedAlbum(owner: folder.username, folder: folder.path, helpers: helpers)
-        sharedAlbums.append(album)
-        SoulseekEvents.record("sharing \(folder.name) from \(folder.username) with \(helpers.keys.sorted().joined(separator: ", "))")
-        for helper in helpers.keys { lend(album, to: helper) }
     }
 
     /// Moves songs the owner hasn't started on to a helper, from the end of the album, since
@@ -994,6 +1024,7 @@ final class SoulseekClient {
               let loan = album.lent.removeValue(forKey: transfer.id) else { return false }
         SoulseekEvents.record("\(loan.helper) couldn't send \(transfer.file.name) (\(reason)); back to \(album.owner)")
         album.helpers[loan.helper] = nil
+        BannedUsers.insertIfBanned(loan.helper, reason: reason)
         // Its other lent song too, if it hasn't started.
         for (id, other) in album.lent where other.helper == loan.helper {
             guard let pending = transfers.first(where: { $0.id == id }), pending.state.isWaiting else { continue }
@@ -1001,6 +1032,13 @@ final class SoulseekClient {
             move(pending, to: other.original)
         }
         move(transfer, to: loan.original)
+        // A spare takes their place.
+        if let (spare, copies) = album.spares.first {
+            album.spares[spare] = nil
+            album.helpers[spare] = copies
+            SoulseekEvents.record("\(spare) takes over from \(loan.helper)")
+            lend(album, to: spare)
+        }
         if album.lent.isEmpty { sharedAlbums.removeAll { $0 === album } }
         return true
     }
@@ -1557,6 +1595,10 @@ enum BannedUsers {
 
     static func contains(_ username: String) -> Bool {
         (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(username)
+    }
+
+    static func insertIfBanned(_ username: String, reason: String) {
+        if reason.lowercased().contains("banned") { insert(username) }
     }
 
     static func insert(_ username: String) {
