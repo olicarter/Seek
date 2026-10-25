@@ -680,7 +680,8 @@ struct ReleaseDetailView: View {
                         .aspectRatio(1, contentMode: .fit)
                 } accessory: {
                     ReleaseAccessory(release: release, inLibrary: inLibrary, buying: $buying,
-                                     isPreparing: soulseekStatus == .searching)
+                                     isPreparing: soulseekStatus == .searching,
+                                     listedSongs: listedSongs(release))
                 }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -821,6 +822,13 @@ struct ReleaseDetailView: View {
     }
 
     /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
+    /// With a tracklist, the file each listed song's row would download, as the rows pick them.
+    func listedSongs(_ release: SearchRelease) -> [RemoteFile]? {
+        guard let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) else { return nil }
+        let files = release.folders.map(client.complete).flatMap(\.files)
+        return reference.tracks.compactMap { MissingTracks.file(for: $0, in: files) }
+    }
+
     static func trackName(_ fileName: String) -> String {
         let stem = (fileName as NSString).deletingPathExtension
         var parts = stem.split(separator: /\s+[-–—]\s+/).map(String.init)
@@ -990,6 +998,9 @@ struct ReleaseAccessory: View {
     let inLibrary: AlbumKey?
     @Binding var buying: StorePurchase?
     var isPreparing = false
+    /// The songs the page lists, each from the copy its row shows: what adding the album gets,
+    /// rather than everything in the folder (bonus tracks, other editions' extras).
+    var listedSongs: [RemoteFile]? = nil
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
 
@@ -1011,7 +1022,16 @@ struct ReleaseAccessory: View {
                 if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }
             }
         case .downloadSoulseek(let folder):
-            RoundButton(systemImage: "plus", label: "Add to Library") { client.download(folder) }
+            RoundButton(systemImage: "plus", label: "Add to Library") {
+                if let listedSongs, !listedSongs.isEmpty {
+                    for folder in release.folders {
+                        let songs = listedSongs.filter { $0.username == folder.username && $0.folder == folder.path }
+                        if !songs.isEmpty { client.download(songs, in: folder) }
+                    }
+                } else {
+                    client.download(folder)
+                }
+            }
         case .buy(let store, let price):
             let paid = price.flatMap { $0.amount > 0 ? $0 : nil }
             RoundButton(systemImage: "cart", label: paid.map { "Buy for \($0.formatted)" } ?? "Get on Bandcamp") {

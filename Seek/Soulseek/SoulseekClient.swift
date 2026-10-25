@@ -515,6 +515,14 @@ final class SoulseekClient {
         return transfer
     }
 
+    /// Downloads just these songs from a folder: an album's listed tracks, not its extras.
+    func download(_ files: [RemoteFile], in folder: RemoteFolder) {
+        for file in files { download(file) }
+        var chosen = folder
+        chosen.files = files
+        share(chosen)
+    }
+
     /// Downloads a whole folder. A search only lists the files that matched, so the rest are
     /// asked for and added once the user replies.
     func download(_ folder: RemoteFolder) {
