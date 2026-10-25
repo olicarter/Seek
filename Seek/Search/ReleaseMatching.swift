@@ -548,9 +548,12 @@ enum ReleaseGrouper {
         let keyed = folders.map { folder in
             let lossless = folder.isLossless
             return (folder: folder, lossless: lossless, hiRes: lossless && folder.isHiRes,
-                    complete: CopyFilter.isComplete(folder, expectedTracks: expectedTracks))
+                    complete: CopyFilter.isComplete(folder, expectedTracks: expectedTracks),
+                    banned: BannedUsers.contains(folder.username))
         }
         return keyed.sorted { a, b in
+            // A user who's banned this account won't send anything, however good their copy.
+            if a.banned != b.banned { return !a.banned }
             // The whole album before any partial copy, however good its quality.
             if a.complete != b.complete { return a.complete }
             if a.lossless != b.lossless { return a.lossless }

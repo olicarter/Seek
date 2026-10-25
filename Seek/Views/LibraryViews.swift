@@ -564,7 +564,7 @@ extension AlbumDetailView {
         let claimed = Set(missing.compactMap { MissingTracks.download(for: $0, in: downloads)?.id })
         let paths = Set(album.tracks.map(\.path))
         return downloads.filter {
-            $0.state.isActive && !claimed.contains($0.id) && !($0.plannedPath.map(paths.contains) ?? false)
+            client.isOnItsWay($0) && !claimed.contains($0.id) && !($0.plannedPath.map(paths.contains) ?? false)
         }
     }
 
@@ -958,7 +958,7 @@ struct PendingSongRow: View {
             }
             .foregroundStyle(.secondary)
             Spacer()
-            if let transfer, transfer.state.isActive {
+            if let transfer, client.isOnItsWay(transfer) {
                 ProgressRing(progress: transfer.ringProgress)
             } else if let transfer, case .failed = transfer.state {
                 Image(systemName: "exclamationmark.circle").foregroundStyle(.red)
@@ -1024,7 +1024,7 @@ struct MissingTrackRow: View {
                 .foregroundStyle(titleStyle)
             Spacer()
             Group {
-                if let file, let transfer = client.transfers.first(where: { $0.file.id == file.id && !$0.forStreaming }), transfer.state.isActive {
+                if let file, let transfer = client.transfers.first(where: { $0.file.id == file.id && !$0.forStreaming }), client.isOnItsWay(transfer) {
                     ProgressRing(progress: transfer.ringProgress)
                 } else if let file, client.isDownloading(file) {
                     Image(systemName: "checkmark.circle")

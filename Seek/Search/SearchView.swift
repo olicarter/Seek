@@ -355,9 +355,9 @@ struct ReleaseAction {
         guard !release.fileIDs.isEmpty else { return nil }
         // Finished songs still count, so the ring doesn't fall back each time one completes.
         let transfers = client.transfers.filter {
-            ($0.state.isActive || $0.state == .completed) && !$0.forStreaming && release.fileIDs.contains($0.file.id)
+            (client.isOnItsWay($0) || $0.state == .completed) && !$0.forStreaming && release.fileIDs.contains($0.file.id)
         }
-        guard transfers.contains(where: \.state.isActive) else { return nil }
+        guard transfers.contains(where: client.isOnItsWay) else { return nil }
         let size = transfers.reduce(0) { $0 + $1.size }
         return size > 0 ? Double(transfers.reduce(0) { $0 + $1.bytesReceived }) / Double(size) : 0
     }

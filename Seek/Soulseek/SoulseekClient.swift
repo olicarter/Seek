@@ -752,6 +752,7 @@ final class SoulseekClient {
     private func fail(_ transfer: Transfer, _ reason: String) {
         if takeBack(transfer, reason) { return }
         transfer.state = .failed(reason)
+        if reason.lowercased().contains("banned") { BannedUsers.insert(transfer.username) }
         // The user's gone, has refused, or keeps failing: look for the album from someone else.
         let rescuing = !transfer.forStreaming
             && (reason == PeerError.offline.errorDescription || transfer.retries >= 2 || RetryPolicy.isPermanent(reason))
@@ -779,8 +780,16 @@ final class SoulseekClient {
 
     // MARK: - Finding another copy
 
-    /// Folders (user and path) whose stalled songs are being looked for elsewhere.
-    @ObservationIgnored private var rescuing: Set<String> = []
+    /// Folders (user and path) whose stalled songs are being looked for elsewhere. Observed, so
+    /// their rows keep showing them on the way rather than offering to add them again.
+    private var rescuing: Set<String> = []
+
+    /// A download still on its way: going now, waiting to try again, or being moved to another
+    /// copy. Only one given up for good offers to be added again.
+    func isOnItsWay(_ transfer: Transfer) -> Bool {
+        transfer.state.isActive || transfer.retryAt != nil
+            || rescuing.contains("\(transfer.username)\u{0}\(transfer.file.folder)") && transfer.state != .cancelled && transfer.state != .completed
+    }
     /// Users already tried and lost for each album, so a second rescue doesn't go back to them.
     @ObservationIgnored private var lostUsers: [String: Set<String>] = [:]
 
@@ -1479,5 +1488,22 @@ final class PeerConnection {
         } catch {}
         isOpen = false
         client?.peerClosed(self)
+    }
+}
+
+/// Users who've banned this account (many ban anyone sharing fewer than so many files), kept
+/// across launches so their copies are tried last rather than failing every song again.
+enum BannedUsers {
+    private static let key = "bannedByUsers"
+
+    static func contains(_ username: String) -> Bool {
+        (UserDefaults.standard.stringArray(forKey: key) ?? []).contains(username)
+    }
+
+    static func insert(_ username: String) {
+        var users = UserDefaults.standard.stringArray(forKey: key) ?? []
+        guard !users.contains(username) else { return }
+        users.append(username)
+        UserDefaults.standard.set(users, forKey: key)
     }
 }
