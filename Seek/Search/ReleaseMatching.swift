@@ -135,9 +135,26 @@ enum ReleaseText {
         return value
     }
 
+    /// An artist's name as people write it: without notes in brackets at the end ("The Story So
+    /// Far (CA)", "… (pop punk band from Walnut Creek, CA, 2007–present)"), and "Story So Far,
+    /// The" turned round. Folders named either way are the same artist's.
+    static func canonicalArtist(_ name: String) -> String {
+        var result = name.trimmingCharacters(in: .whitespaces)
+        // Notes in any brackets, possibly several: "Story So Far, The {MbId-bc303c9e-…}".
+        while let note = result.firstMatch(of: /\s+[(\[{][^()\[\]{}]*[)\]}]$/) {
+            let bare = String(result[..<note.range.lowerBound])
+            guard !fold(bare).isEmpty else { break }
+            result = bare
+        }
+        if let match = result.firstMatch(of: /^(.+),\s*(?i:(the|a|an))$/) {
+            result = "\(match.output.2) \(match.output.1)"
+        }
+        return result
+    }
+
     private static func foldedName(_ text: String) -> String {
         if let cached = nameCache.object(forKey: text as NSString) { return cached as String }
-        let value = fold(text)
+        let value = fold(canonicalArtist(text))
         nameCache.setObject(value as NSString, forKey: text as NSString)
         return value
     }
@@ -399,7 +416,7 @@ enum ReleaseGrouper {
             if hints[folder.id] == nil, let fixed = Self.parentIsArtist(folder, parsed: parsed, words: words) { parsed = fixed }
             if parsed.confidence < 0.7, hints[folder.id] == nil { unsure.append(folder) }
 
-            let artist = parsed.artist ?? ""
+            let artist = parsed.artist.map(ReleaseText.canonicalArtist) ?? ""
             let match = artist.isEmpty
                 ? releases.firstIndex { ReleaseText.fold(ReleaseText.cleanTitle($0.title)) == ReleaseText.fold(parsed.title) && parsed.title.count >= 6 }
                 : index(artist: artist, title: parsed.title, seller: nil)

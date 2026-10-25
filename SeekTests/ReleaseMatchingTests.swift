@@ -108,6 +108,27 @@ struct ReleaseGrouperTests {
                                 url: URL(string: "https://x.bandcamp.com/album/\(id)")!, artworkURL: nil)
     }
 
+    @Test func artistNotesAndSortedNamesAreTheSameArtist() {
+        // Folder names from a real search for "the story so far" (usernames made up).
+        let paths = [
+            "music\\The Story So Far\\I Want to Disappear (2024)",
+            "music\\The Story So Far (pop punk band from Walnut Creek, CA, 2007–present)\\[2024] I Want to Disappear",
+            "media\\Story So Far, The (pop punk band from Walnut Creek, CA, 2007–present)\\I Want to Disappear",
+            "Soulseek\\The Story So Far (CA) - 2024 - I Want To Disappear [MP3]",
+            "Music on 16TB-3\\S\\Story So Far, The\\2024 I Want To Disappear",
+        ]
+        let folders = paths.enumerated().map { folder($0.element, user: "user\($0.offset)") }
+        let releases = ReleaseGrouper.group(query: "the story so far", owned: [], store: [], folders: folders).releases
+        #expect(releases.count == 1)
+        #expect(releases.first?.artist == "The Story So Far")
+        #expect(releases.first?.folders.count == paths.count)
+
+        #expect(ReleaseText.canonicalArtist("Story So Far, The {MbId-bc303c9e}") == "The Story So Far")
+        // "!!!" folds to nothing, so the name keeps its note rather than becoming unmatchable.
+        #expect(ReleaseText.canonicalArtist("!!! (Chk Chk Chk)") == "!!! (Chk Chk Chk)")
+        #expect(ReleaseText.artistsMatch("The Story So Far (CA)", "The Story So Far"))
+    }
+
     @Test func soulseekFoldersJoinTheBandcampRelease() {
         let result = ReleaseGrouper.group(
             query: "cryogeyser",
