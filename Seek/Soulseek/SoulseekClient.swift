@@ -756,9 +756,7 @@ final class SoulseekClient {
         if takeBack(transfer, reason) { return }
         transfer.state = .failed(reason)
         if reason.lowercased().contains("banned") { BannedUsers.insert(transfer.username) }
-        // The user's gone, has refused, or keeps failing: look for the album from someone else.
-        let rescuing = !transfer.forStreaming
-            && (reason == PeerError.offline.errorDescription || transfer.retries >= 2 || RetryPolicy.isPermanent(reason))
+        let rescuing = !transfer.forStreaming && Self.looksElsewhere(after: reason, retries: transfer.retries)
         if rescuing { rescue(from: transfer) }
         guard !transfer.forStreaming, let delay = RetryPolicy.delay(after: transfer.retries, reason: reason) else {
             transfer.retryAt = nil
@@ -782,6 +780,14 @@ final class SoulseekClient {
     }
 
     // MARK: - Finding another copy
+
+    /// Whether a failed song is looked for from someone else: the user's gone, has refused,
+    /// keeps failing, or has a queue limit ("Too many megabytes"), which takes minutes to clear
+    /// while another copy may start now. The song is still tried again here meanwhile.
+    nonisolated static func looksElsewhere(after reason: String, retries: Int) -> Bool {
+        reason == PeerError.offline.errorDescription || retries >= 2
+            || RetryPolicy.isPermanent(reason) || RetryPolicy.isQueueLimit(reason)
+    }
 
     /// A song stuck in a user's queue (thousands ahead of it, or not moving for minutes) is looked
     /// for elsewhere, like one whose user went offline. It only fails when the user refuses, so

@@ -108,3 +108,13 @@ struct AlbumSharingTests {
         #expect(!SoulseekClient.isLendable(.downloading, retryAt: nil))
     }
 }
+
+struct LookingElsewhereTests {
+    @Test func aQueueLimitLooksForAnotherCopyAtOnce() {
+        #expect(SoulseekClient.looksElsewhere(after: "Too many megabytes", retries: 0))
+        #expect(SoulseekClient.looksElsewhere(after: "Too many files", retries: 0))
+        // A dropped connection is tried again first.
+        #expect(!SoulseekClient.looksElsewhere(after: "Connection reset by peer", retries: 0))
+        #expect(SoulseekClient.looksElsewhere(after: "Connection reset by peer", retries: 2))
+    }
+}
