@@ -186,6 +186,7 @@ struct SearchView: View {
             ContentUnavailableView("Search", systemImage: "magnifyingglass", description: Text(emptyPrompt))
         } else {
             List {
+                artistSection
                 releasesSection
                 songsSection
                 if showAllFolders { allFoldersSection }
@@ -246,6 +247,41 @@ struct SearchView: View {
     }
 
     // MARK: - Releases
+
+    /// The artist searched for, as in Apple Music: their page, with everything they've released.
+    /// From Apple's catalogue, or the library when Apple doesn't know them.
+    private var searchedArtist: (name: String, artwork: URL?)? {
+        guard !submitted.isEmpty, query.isEmpty || query == submitted else { return nil }
+        let wanted = ReleaseText.artistMatchName(submitted)
+        let owned = library.albums.first { ReleaseText.artistMatchName($0.artist) == wanted }?.artist
+        let theirs = catalogFound.filter { ReleaseText.artistMatchName($0.artist) == wanted }
+        guard let name = owned ?? theirs.first?.artist else { return nil }
+        let newest = theirs.filter { $0.kind == .album }.max { $0.released < $1.released } ?? theirs.max { $0.released < $1.released }
+        return (name, newest?.artworkURL)
+    }
+
+    @ViewBuilder private var artistSection: some View {
+        if let artist = searchedArtist {
+            Section {
+                NavigationLink(value: ArtistKey(name: artist.name)) {
+                    HStack(spacing: 14) {
+                        Color.secondary.opacity(0.15)
+                            .overlay {
+                                RemoteImage(url: artist.artwork) {
+                                    Image(systemName: "music.mic").foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(width: 64, height: 64)
+                            .clipShape(.circle)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(artist.name).font(.headline)
+                            Text("Artist").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @ViewBuilder private var releasesSection: some View {
         let releases = results.result.releases
