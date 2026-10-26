@@ -355,16 +355,8 @@ struct AlbumDetailView: View {
                 onPlay: { player.play(queue, startingAt: 0) },
                 onShuffle: { player.playShuffled(queue) }
             ) {
-                // Apple's cover for this very release when it has one, as search shows: files'
-                // own art is often a scan with borders, or another edition's.
-                if let cover = catalog?.first(where: { AlbumIdentity.sameRelease($0.title, key.title) })?.artworkURL {
-                    Color.clear
-                        .aspectRatio(1, contentMode: .fit)
-                        .overlay { RemoteImage(url: cover) { ArtworkView(data: album.artwork, cornerRadius: 10) } }
-                        .clipShape(.rect(cornerRadius: 10))
-                } else {
-                    ArtworkView(data: album.artwork, cornerRadius: 10)
-                }
+                // Apple's cover when it has the album (see AppleCovers).
+                ArtworkView(data: album.artwork, cornerRadius: 10)
             } accessory: {
                 HStack(spacing: 14) {
                     OfflineButton(tracks: album.tracks)

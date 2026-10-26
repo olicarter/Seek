@@ -220,7 +220,8 @@ struct Album: Identifiable {
     var title: String { key.title }
     var artist: String { key.artist }
     var year: Int { tracks.map(\.year).max() ?? 0 }
-    var artwork: Data? { tracks.first(where: { $0.artwork != nil })?.artwork }
+    /// Apple's cover for the album when it has one, otherwise the files' own.
+    @MainActor var artwork: Data? { AppleCovers.shared.cover(for: key) ?? tracks.first(where: { $0.artwork != nil })?.artwork }
     var label: String { tracks.first(where: { !$0.label.isEmpty })?.label ?? "" }
     var dateAdded: Date { tracks.map(\.dateAdded).max() ?? .distantPast }
 }

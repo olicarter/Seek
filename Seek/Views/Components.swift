@@ -218,7 +218,7 @@ struct TrackRow: View {
             if showNumber {
                 TrackNumberColumn(number: track.trackNumber, isCurrent: isCurrent, isFavorite: isFavorite)
             } else if showArtwork {
-                ArtworkView(key: track.path, cornerRadius: 4) { track.artwork }
+                ArtworkView(key: track.path, cornerRadius: 4) { track.cover }
                     .frame(width: 44, height: 44)
                     .overlay {
                         if isCurrent {

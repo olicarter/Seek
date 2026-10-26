@@ -46,10 +46,10 @@ struct MiniPlayer: View {
         let side: CGFloat = drag < 0 ? 1 : -1
         return HStack(spacing: 10) {
             ZStack {
-                ArtworkView(data: current?.artwork, cornerRadius: 4)
+                ArtworkView(data: current?.cover, cornerRadius: 4)
                     .opacity(sameCover ? 1 : 1 - progress)
                 if let other, !sameCover {
-                    ArtworkView(data: other.artwork, cornerRadius: 4).opacity(progress)
+                    ArtworkView(data: other.cover, cornerRadius: 4).opacity(progress)
                 }
             }
             .frame(width: 32, height: 32)
@@ -138,7 +138,7 @@ struct NowPlayingView: View {
         .foregroundStyle(.white)
         .tint(.white)
         .environment(\.colorScheme, .dark)
-        .background { NowPlayingBackground(artwork: player.current?.artwork) }
+        .background { NowPlayingBackground(artwork: player.current?.cover) }
         // Full screen like Apple Music, but it follows the finger down and the app shows behind.
         .mask {
             RoundedRectangle(cornerRadius: dragOffset > 0 ? 44 : 0, style: .continuous)
@@ -188,7 +188,7 @@ struct NowPlayingView: View {
                 QueueList()
             } else {
                 Spacer(minLength: 24)
-                ArtworkView(data: player.current?.artwork, cornerRadius: 10)
+                ArtworkView(data: player.current?.cover, cornerRadius: 10)
                     .matchedGeometryEffect(id: "artwork", in: artworkSpace)
                     .frame(maxWidth: 420)
                     .shadow(color: .black.opacity(0.35), radius: 24, y: 12)
@@ -232,7 +232,7 @@ struct NowPlayingView: View {
             let side = max(min(maxSide, geometry.size.height - controlsHeight, 560), 240)
             HStack(spacing: 64) {
                 VStack(spacing: 0) {
-                    ArtworkView(data: player.current?.artwork, cornerRadius: 14)
+                    ArtworkView(data: player.current?.cover, cornerRadius: 14)
                         .frame(width: side, height: side)
                         .shadow(color: .black.opacity(0.4), radius: 30, y: 16)
                         .scaleEffect(player.isPlaying ? 1 : 0.88)
@@ -308,7 +308,7 @@ struct NowPlayingView: View {
 
     private var compactHeader: some View {
         HStack(spacing: 14) {
-            ArtworkView(data: player.current?.artwork, cornerRadius: 6)
+            ArtworkView(data: player.current?.cover, cornerRadius: 6)
                 .matchedGeometryEffect(id: "artwork", in: artworkSpace)
                 .frame(width: 64, height: 64)
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 4)
