@@ -25,7 +25,9 @@ final class Player {
     private(set) var currentTime: Double = 0
     private(set) var duration: Double = 0
     private(set) var shuffle = false
-    var repeatMode: RepeatMode = .off
+    var repeatMode: RepeatMode = .off {
+        didSet { remember() }
+    }
 
     var current: Track? { queue.indices.contains(index) ? queue[index] : nil }
 
@@ -54,17 +56,25 @@ final class Player {
     @ObservationIgnored private var endObserver: NSObjectProtocol?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var isSeeking = false
+    /// Where to start the current song when it's first played: the position it was left at
+    /// before the app last closed (an update, or the system ending it).
+    @ObservationIgnored private var resumeAt: Double?
+    /// When the position was last saved, so it's saved every few seconds rather than twice a second.
+    @ObservationIgnored private var rememberedTime: Double = 0
 
     init(library: LibraryStore) {
         self.library = library
         timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
             MainActor.assumeIsolated {
                 // While the next song is being fetched, the old one's position would show.
-                guard let self, !self.isSeeking, !self.isLoading else { return }
+                // Nor before a restored song has loaded, whose place was kept from last time.
+                guard let self, !self.isSeeking, !self.isLoading, self.player.currentItem != nil else { return }
                 self.currentTime = time.seconds
+                if abs(self.currentTime - self.rememberedTime) >= 5 { self.remember() }
             }
         }
         setUpRemoteCommands()
+        restore()
     }
 
     // MARK: - Queue
@@ -94,12 +104,14 @@ final class Player {
         if queue.isEmpty { return play([track]) }
         queue.insert(track, at: index + 1)
         originalQueue.append(track)
+        remember()
     }
 
     func addToQueue(_ track: Track) {
         if queue.isEmpty { return play([track]) }
         queue.append(track)
         originalQueue.append(track)
+        remember()
     }
 
     func jump(to track: Track) {
@@ -111,12 +123,14 @@ final class Player {
     func removeFromQueue(at offsets: IndexSet) {
         let absolute = IndexSet(offsets.map { $0 + index + 1 })
         queue.remove(atOffsets: absolute)
+        remember()
     }
 
     func moveInQueue(from source: IndexSet, to destination: Int) {
         var rest = Array(upNext)
         rest.move(fromOffsets: source, toOffset: destination)
         queue = Array(queue[...index]) + rest
+        remember()
     }
 
     func toggleShuffle() {
@@ -129,6 +143,7 @@ final class Player {
             queue = originalQueue
             index = queue.firstIndex(where: { $0 === current }) ?? 0
         }
+        remember()
     }
 
     // MARK: - Transport
@@ -140,7 +155,7 @@ final class Player {
     func resume() {
         guard current != nil else { return }
         activateSession()
-        if player.currentItem == nil { return load(autoplay: true) }
+        if player.currentItem == nil { return load(autoplay: true, from: resumeAt ?? 0) }
         player.play()
         isPlaying = true
         updateNowPlaying()
@@ -150,6 +165,7 @@ final class Player {
         player.pause()
         isPlaying = false
         updateNowPlaying()
+        remember()
     }
 
     func next() {
@@ -193,6 +209,13 @@ final class Player {
     }
 
     func seek(to seconds: Double) {
+        // A song restored from last time, not loaded yet: it starts here once played.
+        if player.currentItem == nil, !isLoading, current != nil {
+            resumeAt = seconds
+            currentTime = seconds
+            updateNowPlaying()
+            return remember()
+        }
         isSeeking = true
         currentTime = seconds
         player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600)) { [weak self] _ in
@@ -203,28 +226,23 @@ final class Player {
         }
     }
 
-    private func load(autoplay: Bool) {
+    private func load(autoplay: Bool, from start: Double = 0) {
         guard let track = current else { return }
         loadTask?.cancel()
+        resumeAt = nil
         player.pause()
         // Let go of the previous song straight away, so nothing of it lingers while this one loads.
         player.replaceCurrentItem(with: nil)
-        currentTime = 0
+        currentTime = start
         duration = track.duration
         isLoading = true
         isPlaying = autoplay
         updateNowPlaying()
+        remember()
 
         // Fetch the next song while this one plays, so they follow on without a wait.
         if let next = upNext.first, next.isStreamed { streamer?.prefetch(next) }
-        if track.isStreamed, track.artwork == nil, let art = track.stream?.artworkURL {
-            Task {
-                if let (data, _) = try? await URLSession.shared.data(from: art) {
-                    track.artwork = data
-                    if current === track { updateNowPlaying() }
-                }
-            }
-        }
+        fetchArtwork(for: track)
 
         loadTask = Task {
             let resolved = await playableItem(for: track)
@@ -244,6 +262,10 @@ final class Player {
                 MainActor.assumeIsolated { self?.itemFinished() }
             }
             player.replaceCurrentItem(with: item)
+            if start > 0 {
+                await player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                guard !Task.isCancelled, current === track else { return }
+            }
             if let loaded = try? await item.asset.load(.duration), loaded.isNumeric {
                 duration = loaded.seconds
             }
@@ -252,6 +274,17 @@ final class Player {
                 player.play()
             }
             updateNowPlaying()
+        }
+    }
+
+    /// A streamed song's cover, which only its release page has.
+    private func fetchArtwork(for track: Track) {
+        guard track.isStreamed, track.artwork == nil, let art = track.stream?.artworkURL else { return }
+        Task {
+            if let (data, _) = try? await URLSession.shared.data(from: art) {
+                track.artwork = data
+                if current === track { updateNowPlaying() }
+            }
         }
     }
 
@@ -359,5 +392,90 @@ final class Player {
             info[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+}
+
+// MARK: - Remembering what was playing
+
+/// The queue and where it was up to, saved as it changes so an update (or the system closing
+/// the app) picks up where it was left, paused.
+private struct PlayerMemory: Codable {
+    /// A library song by its path; a streamed one with everything needed to fetch it again.
+    struct Item: Codable {
+        var path: String
+        var streamed: Streamed?
+    }
+
+    struct Streamed: Codable {
+        var title: String
+        var artist: String
+        var album: String
+        var number: Int
+        var disc: Int
+        var duration: Double
+        var source: StreamSource
+    }
+
+    var queue: [Item]
+    var original: [Item]
+    var index: Int
+    var time: Double
+    var shuffle: Bool
+    var repeatMode: Int
+
+    static var url: URL { URL.applicationSupportDirectory.appending(path: "now-playing.json") }
+}
+
+extension Player {
+    fileprivate func remember() {
+        rememberedTime = currentTime
+        guard !queue.isEmpty else {
+            try? FileManager.default.removeItem(at: PlayerMemory.url)
+            return
+        }
+        // Streamed songs are the same objects in both lists: each is saved once per list.
+        func item(_ track: Track) -> PlayerMemory.Item {
+            PlayerMemory.Item(path: track.path, streamed: track.stream.map {
+                PlayerMemory.Streamed(title: track.title, artist: track.artist, album: track.album,
+                                      number: track.trackNumber, disc: track.discNumber,
+                                      duration: track.duration, source: $0)
+            })
+        }
+        let memory = PlayerMemory(queue: queue.map(item), original: originalQueue.map(item), index: index,
+                                  time: currentTime, shuffle: shuffle,
+                                  repeatMode: RepeatMode.allCases.firstIndex(of: repeatMode) ?? 0)
+        try? JSONEncoder().encode(memory).write(to: PlayerMemory.url, options: .atomic)
+    }
+
+    /// Puts back what was playing, paused at the same place. Nothing loads until it's played,
+    /// so opening the app doesn't start fetching a streamed song.
+    fileprivate func restore() {
+        guard let data = try? Data(contentsOf: PlayerMemory.url),
+              let memory = try? JSONDecoder().decode(PlayerMemory.self, from: data) else { return }
+        let library = Dictionary(self.library.allTracks.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        // One object per song, so the shuffled and original lists still find each other.
+        var streamed: [String: Track] = [:]
+        func track(_ item: PlayerMemory.Item) -> Track? {
+            guard let saved = item.streamed else { return library[item.path] }
+            if let made = streamed[item.path] { return made }
+            let made = Track.streamed(ReferenceTrack(number: saved.number, disc: saved.disc, title: saved.title, duration: saved.duration),
+                                      artist: saved.artist, album: saved.album, source: saved.source)
+            streamed[item.path] = made
+            return made
+        }
+        let restored = memory.queue.map(track)
+        // Songs deleted since are skipped, keeping the place on the same song.
+        guard memory.queue.indices.contains(memory.index), let playing = restored[memory.index] else { return }
+        queue = restored.compactMap { $0 }
+        originalQueue = memory.original.compactMap(track)
+        index = queue.firstIndex { $0 === playing } ?? 0
+        shuffle = memory.shuffle
+        duration = playing.duration
+        currentTime = min(memory.time, max(playing.duration - 1, 0))
+        resumeAt = currentTime
+        fetchArtwork(for: playing)
+        // Last: setting it saves, which should save the place just restored.
+        repeatMode = RepeatMode.allCases.indices.contains(memory.repeatMode) ? RepeatMode.allCases[memory.repeatMode] : .off
+        updateNowPlaying()
     }
 }

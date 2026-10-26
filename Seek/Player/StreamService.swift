@@ -3,7 +3,7 @@ import Observation
 
 /// Where a song that isn't in the library can be played from: Soulseek files (best first) and,
 /// as a last resort, the release's Bandcamp page, whose own player streams it.
-struct StreamSource {
+struct StreamSource: Codable {
     var candidates: [RemoteFile]
     var bandcampPage: URL?
     var number: Int
