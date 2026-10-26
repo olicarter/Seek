@@ -73,3 +73,16 @@ struct StreamingTests {
         #expect(reused < 0.01)
     }
 }
+
+struct StreamHedgingTests {
+    @Test func aSecondCopyIsAskedOnlyWhileTheFirstIsSlowToStart() {
+        // The first copy at once.
+        #expect(StreamService.asksAnother(asking: 0, anySending: false, sinceLastAsk: .infinity))
+        // Not before it's had a few seconds, nor once it's sending.
+        #expect(!StreamService.asksAnother(asking: 1, anySending: false, sinceLastAsk: 2))
+        #expect(StreamService.asksAnother(asking: 1, anySending: false, sinceLastAsk: 4))
+        #expect(!StreamService.asksAnother(asking: 1, anySending: true, sinceLastAsk: 10))
+        // Never more than two at once.
+        #expect(!StreamService.asksAnother(asking: 2, anySending: false, sinceLastAsk: 10))
+    }
+}

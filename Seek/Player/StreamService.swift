@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import Observation
 
 /// Where a song that isn't in the library can be played from: Soulseek files (best first) and,
@@ -98,6 +99,11 @@ final class StreamService {
 
     init(client: SoulseekClient) {
         self.client = client
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let unmetered = path.status == .satisfied && !path.isExpensive && !path.isConstrained
+            Task { @MainActor in self?.isUnmetered = unmetered }
+        }
+        pathMonitor.start(queue: .global(qos: .utility))
         try? FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
         if let data = try? Data(contentsOf: Self.indexURL), let saved = try? JSONDecoder().decode([String: Entry].self, from: data) {
             // The system may have cleared some of the cache; forget what's gone.
@@ -198,30 +204,90 @@ final class StreamService {
     }
 
     private func fetch(_ source: StreamSource, key: String) async -> Playable? {
-        for file in ordered(source.candidates) {
-            if let cached = cachedURL(for: file) { return .file(cached) }
-            let transfer = client.stream(file)
-            let started = Date.now
-            while true {
-                try? await Task.sleep(for: .milliseconds(200))
-                progress[key] = transfer.progress
-                if transfer.state == .completed, let cached = cachedURL(for: file) { return .file(cached) }
+        let candidates = ordered(source.candidates)
+        for file in candidates { if let cached = cachedURL(for: file) { return .file(cached) } }
+        var waiting = candidates[...]
+        var asking: [(file: RemoteFile, transfer: Transfer, since: Date)] = []
+        var lastAsked = Date.distantPast
+        while true {
+            // The best copy at once; another alongside when none has started within a few seconds.
+            if let next = waiting.first,
+               Self.asksAnother(asking: asking.count, anySending: asking.contains { Self.isSending($0.transfer) },
+                                sinceLastAsk: Date.now.timeIntervalSince(lastAsked)) {
+                waiting.removeFirst()
+                if !asking.isEmpty { SoulseekEvents.record("stream: \(source.title) hasn't started; also asking \(next.username)") }
+                asking.append((next, client.stream(next), .now))
+                lastAsked = .now
+            }
+            if asking.isEmpty { break }
+            try? await Task.sleep(for: .milliseconds(200))
+            progress[key] = asking.map(\.transfer.progress).max()
+            for (file, transfer, _) in asking {
+                if transfer.state == .completed, let cached = cachedURL(for: file) {
+                    stopAsking(asking, except: transfer)
+                    return .file(cached)
+                }
+                guard Self.isSending(transfer) else { continue }
+                // One has started: the others are let go.
+                if asking.count > 1 {
+                    stopAsking(asking, except: transfer)
+                    asking = asking.filter { $0.transfer === transfer }
+                }
                 if transfer.state == .downloading, Self.progressiveFormats.contains(file.fileExtension),
                    transfer.bytesReceived >= min(Self.startBytes, transfer.size) {
                     return .progressive(loader(for: transfer), file: file)
                 }
-                if case .failed = transfer.state { break }
-                if transfer.state == .cancelled { break }
-                // A copy stuck in someone's queue or failing to connect: try the next one.
-                let sending = transfer.state == .downloading || transfer.state == .importing
-                if !sending, Date.now.timeIntervalSince(started) > Self.startTimeout {
-                    SoulseekEvents.record("stream: \(file.username) didn't start within \(Int(Self.startTimeout))s, trying the next copy")
-                    client.cancel(transfer)
-                    break
+                break
+            }
+            asking.removeAll { entry in
+                if case .failed = entry.transfer.state { return true }
+                if entry.transfer.state == .cancelled { return true }
+                // Stuck in someone's queue or failing to connect: let it go.
+                if !Self.isSending(entry.transfer), Date.now.timeIntervalSince(entry.since) > Self.startTimeout {
+                    SoulseekEvents.record("stream: \(entry.file.username) didn't start within \(Int(Self.startTimeout))s")
+                    if entry.transfer.forStreaming { client.cancel(entry.transfer) }
+                    return true
                 }
+                return false
             }
         }
         return await bandcampStream(source).map(Playable.remote)
+    }
+
+    /// Seconds to wait for a copy to start before asking another alongside it.
+    static let hedgeDelay: TimeInterval = 4
+    /// Copies asked at once for one song: a second only while the first is slow to start.
+    static let maxAsking = 2
+
+    /// Whether to ask another copy for a song now: the first straight away; a second alongside
+    /// only when nothing has started for a few seconds. A song is one user's single upload, so
+    /// asking two briefly costs them little, unlike queueing a whole album with several.
+    nonisolated static func asksAnother(asking: Int, anySending: Bool, sinceLastAsk: TimeInterval) -> Bool {
+        asking == 0 || asking < maxAsking && !anySending && sinceLastAsk >= hedgeDelay
+    }
+
+    private static func isSending(_ transfer: Transfer) -> Bool {
+        transfer.state == .downloading || transfer.state == .importing
+    }
+
+    /// Cancels the other copies asked for, but never a library download being shared with the player.
+    private func stopAsking(_ asking: [(file: RemoteFile, transfer: Transfer, since: Date)], except kept: Transfer) {
+        for entry in asking where entry.transfer !== kept && entry.transfer.forStreaming {
+            client.cancel(entry.transfer)
+        }
+    }
+
+    // MARK: - Starting early
+
+    /// Whether the network is unmetered (Wi-Fi), where fetching ahead costs nothing.
+    private(set) var isUnmetered = false
+    @ObservationIgnored private let pathMonitor = NWPathMonitor()
+
+    /// The first song of an album page left open a moment, on Wi-Fi: Play then starts from the
+    /// phone rather than waiting on a peer.
+    func warm(_ track: Track?) {
+        guard isUnmetered, let track, track.isStreamed else { return }
+        prefetch(track)
     }
 
     /// One loader per download, following it until it's in the cache (or gives up for good).

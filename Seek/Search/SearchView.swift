@@ -855,6 +855,12 @@ struct ReleaseDetailView: View {
                 guard release.artist != "Unknown Artist" else { return }
                 catalog = await ArtistCatalog.releases(for: release.artist)
             }
+            // Left open a moment: the first song starts fetching, so Play starts at once.
+            .task(id: streamQueue(release).first?.track.path) {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                streamer.warm(streamQueue(release).first?.track)
+            }
             // The cover shown here is Apple's: once the album is being added, it keeps it from the
             // first song rather than showing the files' own until a lookup finds it.
             .task(id: ReleaseAction.soulseekProgress(release, client: client) != nil || release.inLibrary != nil) {
