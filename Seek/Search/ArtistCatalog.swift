@@ -155,7 +155,10 @@ enum ArtistCatalog {
 extension CatalogRelease {
     /// Whether a search result is this release, by title and artist (either may be a collaboration).
     func matches(_ release: SearchRelease) -> Bool {
-        guard ReleaseText.titlesMatch(release.title, title) else { return false }
+        // A double A-side's copies are often named for the first side alone.
+        let sides = AlbumIdentity.sides(title)
+        guard ReleaseText.titlesMatch(release.title, title)
+            || sides.count > 1 && ReleaseText.titlesMatch(release.title, sides[0]) else { return false }
         let mine = ReleaseText.fold(artist), theirs = ReleaseText.fold(release.artist)
         return ReleaseText.artistsMatch(release.artist, artist) || mine.contains(theirs) || theirs.contains(mine)
     }

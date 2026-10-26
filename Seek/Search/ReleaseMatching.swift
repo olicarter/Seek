@@ -16,7 +16,7 @@ enum ReleaseText {
         "vinyl", "cd", "lossless", "hi res", "hires", "remaster", "remastered", "deluxe", "edition", "expanded",
         "bonus", "bandcamp", "beatport", "qobuz", "vbr", "cbr", "kbps", "24b", "16b", "lp", "ep", "single",
         "explicit", "digital master", "mastered for itunes", "itunes", "apple music", "spotify", "tidal", "deezer",
-        "amazon", "hdtracks",
+        "amazon", "hdtracks", "digital media", "digital release",
     ]
     /// Tags short enough to turn up inside ordinary words ("ep" in "Reprod", "cd" in "abcd"),
     /// so they only count as whole words.
@@ -72,7 +72,9 @@ enum ReleaseText {
             // Letters and numbers as people read them: an emoji's variation selector isn't one.
             let bare = last.filter { $0.isLetter || $0.isNumber }
             let bracketed = (last.hasPrefix("[") && last.hasSuffix("]")) || (last.hasPrefix("(") && last.hasSuffix(")"))
-            if bare.isEmpty || isLooseTag(last) {
+            // A year after such tags: "… Die Brucke 320 WEB 2007".
+            let isYear = bare.count == 4 && Int(bare).map { (1950...2099).contains($0) } == true
+            if bare.isEmpty || isLooseTag(last) || isYear && words.count > 2 && isLooseTag(words[words.count - 2]) {
                 words.removeLast()
             } else if bracketed, words.count > 2, isLooseTag(words[words.count - 2]) {
                 words.removeLast()
@@ -138,6 +140,12 @@ enum ReleaseText {
     /// The" turned round. Folders named either way are the same artist's.
     static func canonicalArtist(_ name: String) -> String {
         var result = name.trimmingCharacters(in: .whitespaces)
+        // A catalogue number or year in front: "[DRUNK5] Peverelist", "(2007) Peverelist".
+        while let note = result.firstMatch(of: /^[(\[{][^()\[\]{}]*[)\]}]\s+/) {
+            let rest = String(result[note.range.upperBound...])
+            guard !fold(rest).isEmpty else { break }
+            result = rest
+        }
         // Notes in any brackets, possibly several: "Story So Far, The {MbId-bc303c9e-…}".
         while let note = result.firstMatch(of: /\s+[(\[{][^()\[\]{}]*[)\]}]$/) {
             let bare = String(result[..<note.range.lowerBound])
@@ -438,12 +446,23 @@ enum ReleaseGrouper {
         // An artist search: match releases to the artist's catalogue, and list main releases
         // that nothing else found, so the artist's albums lead whatever the sources return.
         var matchedCatalog = Set<Int>()
+        /// The release each catalogue entry went to: others matching it join that one.
+        var catalogRelease: [Int: Int] = [:]
+        var merged = Set<Int>()
         for i in releases.indices {
             let candidates = catalog.indices.filter { catalog[$0].matches(releases[i]) }
             // The exact title first: "Album (Deluxe)" is the deluxe entry, not the standard one.
             let exact = candidates.first { AlbumIdentity.sameRelease(catalog[$0].title, releases[i].title) }
             guard let c = exact ?? candidates.first else { continue }
             matchedCatalog.insert(c)
+            // Copies read under a noisy artist ("[DRUNK5] Peverelist") or name ("Roll With The
+            // Punches" for "Roll with the Punches / Die Brücke") are the same release.
+            if let first = catalogRelease[c], releases[i].store == nil, releases[i].owned == nil {
+                releases[first].folders += releases[i].folders
+                merged.insert(i)
+                continue
+            }
+            catalogRelease[c] = catalogRelease[c] ?? i
             // A single Bandcamp track named like an album ("whole lotta red", a fan upload) isn't
             // the album: it goes back to being its own result.
             if catalog[c].kind >= .ep, let store = releases[i].store, store.isTrack {
@@ -460,6 +479,7 @@ enum ReleaseGrouper {
             if releases[i].year == nil { releases[i].year = catalog[c].year }
             if releases[i].fallbackArtwork == nil { releases[i].fallbackArtwork = catalog[c].artworkURL }
         }
+        releases = releases.enumerated().filter { !merged.contains($0.offset) }.map(\.element)
         // Standard and deluxe editions match each other's names, so their copies land together.
         // Where the catalogue has both, the deluxe copies (named so, or with its track count) move
         // to their own release.

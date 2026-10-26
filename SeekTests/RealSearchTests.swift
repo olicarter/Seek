@@ -58,3 +58,21 @@ struct DoubleASideTests {
         #expect(folders.count >= 8)
     }
 }
+
+struct DoubleASideSearchTests {
+    /// Searching the artist, every copy of the single is one result, however its folder or
+    /// artist is written ("[DRUNK5] Peverelist", "… 320 WEB 2007", the first side alone).
+    @Test func anArtistSearchGroupsEveryCopyOfTheSingle() throws {
+        let releases = RealSearchTests.releases(try RealSearchTests.load("search-peverelist"))
+        let single = releases.filter { AlbumIdentity.sameRelease($0.title, "Roll with the Punches / Die Brücke") }
+        #expect(single.count == 1)
+        #expect((single.first?.folders.count ?? 0) >= 11)
+        #expect(!releases.contains { $0.artist.hasPrefix("[") })
+    }
+
+    @Test func namesLoseCatalogueNumbersAndTags() {
+        #expect(ReleaseText.canonicalArtist("[DRUNK5] Peverelist") == "Peverelist")
+        #expect(ReleaseText.cleanTitle("Roll With The Punches _ Die Brucke 320 WEB 2007") == "Roll With The Punches _ Die Brucke")
+        #expect(ReleaseText.cleanTitle("Roll With the Punches _ Die Brücke [Digital Media]") == "Roll With the Punches _ Die Brücke")
+    }
+}
