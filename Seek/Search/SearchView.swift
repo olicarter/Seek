@@ -853,6 +853,13 @@ struct ReleaseDetailView: View {
                 guard release.artist != "Unknown Artist" else { return }
                 catalog = await ArtistCatalog.releases(for: release.artist)
             }
+            // The cover shown here is Apple's: once the album is being added, it keeps it from the
+            // first song rather than showing the files' own until a lookup finds it.
+            .task(id: ReleaseAction.soulseekProgress(release, client: client) != nil || release.inLibrary != nil) {
+                guard ReleaseAction.soulseekProgress(release, client: client) != nil || release.inLibrary != nil,
+                      let url = release.catalog?.artworkURL ?? release.trustedArtwork else { return }
+                AppleCovers.shared.prime(AlbumKey(artist: release.artist, title: release.title), artworkURL: url)
+            }
             .task(id: release.store?.id) {
                 if let store = release.store, release.owned == nil { await bandcamp.loadPrice(for: store) }
             }

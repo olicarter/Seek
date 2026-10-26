@@ -86,19 +86,40 @@ final class AppleCovers {
         // The release itself, or one whose name gives no edition where the library's doesn't either.
         let release = catalog.first { AlbumIdentity.sameRelease($0.title, album.title) }
             ?? catalog.first { AlbumIdentity.sameReleaseLoosely($0.title, album.title) }
-        var entry = Entry(file: nil, checked: .now)
-        if let url = release?.artworkURL.flatMap({ URL(string: $0.absoluteString.replacingOccurrences(of: "600x600bb", with: "1000x1000bb")) }) {
-            guard let (data, response) = try? await URLSession.shared.data(from: url),
-                  (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty else { return }
-            let file = "\(UUID().uuidString).jpg"
-            try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
-            guard (try? data.write(to: Self.folder.appending(path: file), options: .atomic)) != nil else { return }
-            entry.file = file
-            images.setObject(data as NSData, forKey: file as NSString)
+        if let url = release?.artworkURL {
+            await save(url, for: key)
+        } else {
+            entries[key] = Entry(file: nil, checked: .now)
+            saveIndex()
         }
-        entries[key] = entry
+    }
+
+    /// Takes the cover an album page already showed from Apple's catalogue, so an album added
+    /// from it has Apple's cover from the first song, rather than the files' own until a lookup.
+    func prime(_ album: AlbumKey, artworkURL: URL) {
+        let key = AlbumIdentity.releaseKey(album)
+        guard entries[key]?.file == nil, queued.insert(key).inserted else { return }
+        Task {
+            defer { queued.remove(key) }
+            await save(artworkURL, for: key)
+        }
+    }
+
+    private func save(_ artworkURL: URL, for key: String) async {
+        let large = URL(string: artworkURL.absoluteString.replacingOccurrences(of: "600x600bb", with: "1000x1000bb")) ?? artworkURL
+        guard let (data, response) = try? await URLSession.shared.data(from: large),
+              (response as? HTTPURLResponse)?.statusCode == 200, !data.isEmpty else { return }
+        let file = "\(UUID().uuidString).jpg"
+        try? FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
+        guard (try? data.write(to: Self.folder.appending(path: file), options: .atomic)) != nil else { return }
+        images.setObject(data as NSData, forKey: file as NSString)
+        entries[key] = Entry(file: file, checked: .now)
+        saveIndex()
+        coverArrived()
+    }
+
+    private func saveIndex() {
         try? JSONEncoder().encode(entries).write(to: Self.indexURL, options: .atomic)
-        if entry.file != nil { coverArrived() }
     }
 
     /// Redraws artwork once a few covers have come in, rather than for each.
