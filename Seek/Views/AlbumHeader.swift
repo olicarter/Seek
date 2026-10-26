@@ -134,6 +134,11 @@ struct RoundProgress: View {
 struct ExpandableText: View {
     let text: String
     @State private var expanded = false
+    /// The text's height in three lines, and in full: MORE only when the full text is taller.
+    @State private var shownHeight: CGFloat = 0
+    @State private var fullHeight: CGFloat = 0
+
+    private var isCut: Bool { fullHeight > shownHeight + 1 }
 
     var body: some View {
         Text(text)
@@ -141,8 +146,18 @@ struct ExpandableText: View {
             .foregroundStyle(.secondary)
             .lineLimit(expanded ? nil : 3)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if !expanded { shownHeight = $0 } }
+            .background(alignment: .topLeading) {
+                // The whole text at the same width, unseen, to tell whether three lines cut it off.
+                Text(text)
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { fullHeight = $0 }
+                    .hidden()
+            }
             .overlay(alignment: .bottomTrailing) {
-                if !expanded {
+                if !expanded && isCut {
                     Text("MORE")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(.primary)
@@ -156,6 +171,7 @@ struct ExpandableText: View {
             .contentShape(.rect)
             // Straight away, not animated (the list row resizing too made it slow and jumpy).
             .onTapGesture {
+                guard isCut || expanded else { return }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) { expanded.toggle() }
