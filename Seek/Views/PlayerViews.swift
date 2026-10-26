@@ -389,11 +389,12 @@ private struct ScrubBar: View {
             GeometryReader { geometry in
                 let fraction = duration > 0 ? min(max(shown / duration, 0), 1) : 0
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.2))
-                    Capsule()
+                    Rectangle().fill(.white.opacity(0.2))
+                    Rectangle()
                         .fill(.white.opacity(isDragging ? 1 : 0.7))
                         .frame(width: geometry.size.width * fraction)
                 }
+                .clipShape(.capsule)
                 .frame(height: isDragging ? 12 : 7)
                 .frame(maxHeight: .infinity)
                 .contentShape(.rect)
@@ -446,12 +447,15 @@ private struct VolumeSlider: View {
         HStack(spacing: 12) {
             Image(systemName: "speaker.fill")
             GeometryReader { geometry in
+                // A square-ended fill inside the rounded track, like Apple Music's: a rounded fill
+                // squashes at low volumes, so steps looked uneven.
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.2))
-                    Capsule()
+                    Rectangle().fill(.white.opacity(0.2))
+                    Rectangle()
                         .fill(.white.opacity(isDragging ? 1 : 0.7))
                         .frame(width: geometry.size.width * volume)
                 }
+                .clipShape(.capsule)
                 .frame(height: isDragging ? 12 : 7)
                 .frame(maxHeight: .infinity)
                 .contentShape(.rect)
@@ -460,7 +464,11 @@ private struct VolumeSlider: View {
                         .onChanged { value in
                             let start = dragStart ?? volume
                             dragStart = start
-                            set(min(max(start + value.translation.width / geometry.size.width, 0), 1))
+                            let raw = min(max(start + value.translation.width / geometry.size.width, 0), 1)
+                            // In the system's own steps, so the bar doesn't jump when let go.
+                            let stepped = (raw * Self.steps).rounded() / Self.steps
+                            guard stepped != volume else { return }
+                            withAnimation(.easeOut(duration: 0.12)) { set(stepped) }
                         }
                         .onEnded { _ in dragStart = nil }
                 )
@@ -473,7 +481,8 @@ private struct VolumeSlider: View {
         .foregroundStyle(.white.opacity(isDragging ? 0.9 : 0.6))
         .background { HiddenVolumeView(view: volumeView) }
         .onReceive(AVAudioSession.sharedInstance().publisher(for: \.outputVolume)) { value in
-            if dragStart == nil { volume = Double(value) }
+            // The buttons move it a step at a time: slide there rather than jump.
+            if dragStart == nil, Double(value) != volume { withAnimation(.easeOut(duration: 0.2)) { volume = Double(value) } }
         }
         .accessibilityElement()
         .accessibilityLabel("Volume")
@@ -482,6 +491,9 @@ private struct VolumeSlider: View {
             set(min(max(volume + (direction == .increment ? 0.0625 : -0.0625), 0), 1))
         }
     }
+
+    /// iOS keeps the volume in sixteenths, as its buttons step it.
+    private static let steps = 16.0
 
     private func set(_ value: Double) {
         volume = value
