@@ -444,7 +444,7 @@ struct AlbumMenuItems: View {
         Button("Shuffle", systemImage: "shuffle") { player.play(album.tracks.shuffled(), startingAt: 0) }
         DownloadMenuItems(tracks: album.tracks)
         Divider()
-        Button("Delete Album", systemImage: "trash", role: .destructive) {
+        DeleteFromLibraryButton {
             deleting = PendingDelete(name: album.title, tracks: album.tracks)
         }
     }
@@ -561,5 +561,18 @@ struct FavoriteButton: View {
             library.toggleFavorite(track)
             player.updateFavoriteCommand()
         }
+    }
+}
+
+/// Removes an album, artist or song from the library, as Apple Music words it, in red even in
+/// menus tinted white.
+struct DeleteFromLibraryButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: .destructive, action: action) {
+            Label("Delete from Library", systemImage: "trash")
+        }
+        .tint(.red)
     }
 }

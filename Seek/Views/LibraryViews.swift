@@ -158,7 +158,7 @@ struct ArtistsView: View {
                     ForEach(section.items, id: \.self) { name in
                         NavigationLink(name, value: ArtistKey(name: name))
                             .contextMenu {
-                                Button("Delete Artist", systemImage: "trash", role: .destructive) { askToDelete(name) }
+                                DeleteFromLibraryButton { askToDelete(name) }
                             }
                             .swipeActions {
                                 Button("Delete", systemImage: "trash", role: .destructive) { askToDelete(name) }
@@ -437,7 +437,7 @@ struct AlbumDetailView: View {
                     bandcampMenuItem(release)
                 }
                 Divider()
-                Button("Delete Album", systemImage: "trash", role: .destructive) {
+                DeleteFromLibraryButton {
                     deleting = PendingDelete(name: album.title, tracks: album.tracks)
                 }
                 .disabled(album.tracks.isEmpty)
@@ -745,7 +745,7 @@ struct ArtistDetailView: View {
             Menu("More", systemImage: "ellipsis") {
                 DownloadMenuItems(tracks: artistTracks)
                 Divider()
-                Button("Delete Artist", systemImage: "trash", role: .destructive) {
+                DeleteFromLibraryButton {
                     deleting = PendingDelete(name: name, tracks: artistTracks)
                 }
                 .disabled(artistTracks.isEmpty)
