@@ -821,13 +821,15 @@ struct ReleaseDetailView: View {
                 if release.owned != nil || release.store != nil {
                     Section("Bandcamp") { bandcampRows(release) }
                 }
-                if soulseekStatus == .searching {
+                // Copies list as they're found, matching the add buttons above, which use them.
+                if !release.folders.isEmpty {
+                    SoulseekCopiesSection(folders: release.folders, expectedTracks: expected,
+                                          isLooking: soulseekStatus == .searching)
+                } else if soulseekStatus == .searching {
                     Section("Soulseek") {
                         Label { Text("Looking on Soulseek…") } icon: { ProgressView() }
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
-                } else if !release.folders.isEmpty {
-                    SoulseekCopiesSection(folders: release.folders, expectedTracks: expected)
                 }
                 OtherVersionsRow(versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? [])
                     .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
@@ -1035,6 +1037,8 @@ struct SoulseekCopiesSection: View {
     var title = "Soulseek"
     /// The album's song count, when known, so copies missing most of it aren't offered first.
     var expectedTracks: Int? = nil
+    /// Still looking: more copies may come.
+    var isLooking = false
     @Environment(SoulseekClient.self) private var client
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
     @State private var showingAll = false
@@ -1054,6 +1058,10 @@ struct SoulseekCopiesSection: View {
             }
             if !showingAll, folders.count > min(shown.count, 8) {
                 Button("Show All \(folders.count) Copies") { withAnimation { showingAll = true } }
+            }
+            if isLooking {
+                Label { Text("Looking for more…") } icon: { ProgressView() }
+                    .font(.subheadline).foregroundStyle(.secondary)
             }
         } header: {
             Text(preferred != nil && !showingAll
