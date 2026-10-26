@@ -310,6 +310,7 @@ struct AlbumDetailView: View {
     @Environment(StreamService.self) private var streamer
     @Environment(AlbumAbout.self) private var about
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
     @State private var confirmingUpgrade = false
     /// Other copies are listed when the album could be better, or when asked for from the menu.
@@ -453,6 +454,10 @@ struct AlbumDetailView: View {
                 if let release = bandcampRelease {
                     Divider()
                     bandcampMenuItem(release)
+                    Button("Open on Bandcamp", systemImage: "safari") { buying = StorePurchase(result: release) }
+                } else if let page = bandcampPage(album) {
+                    Divider()
+                    Button("Open on Bandcamp", systemImage: "safari") { openURL(page) }
                 }
                 Divider()
                 DeleteFromLibraryButton {
@@ -615,6 +620,12 @@ extension AlbumDetailView {
     private static func isFor(_ album: Album, _ transfer: Transfer) -> Bool {
         if let target = transfer.album { return AlbumIdentity.releaseKey(target) == AlbumIdentity.releaseKey(album.key) }
         return AlbumIdentity.folder(transfer.file.folder, holds: album.title)
+    }
+
+    /// The album's Bandcamp page when it came from there: the files' own link, or the purchase.
+    func bandcampPage(_ album: Album) -> URL? {
+        album.tracks.lazy.compactMap { $0.sourceURL.contains("bandcamp.com") ? URL(string: $0.sourceURL) : nil }.first
+            ?? bandcamp.ownedRelease(artist: key.artist, title: key.title)?.itemURL
     }
 
     @ViewBuilder func bandcampMenuItem(_ release: BandcampAPI.StoreResult) -> some View {

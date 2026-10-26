@@ -1034,6 +1034,7 @@ struct ReleaseMenuItems: View {
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
     @Environment(Router.self) private var router
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         if let folder = release.bestFolder {
@@ -1049,7 +1050,12 @@ struct ReleaseMenuItems: View {
             Button(price.map { "Buy on Bandcamp · \($0.formatted)" } ?? "Get on Bandcamp", systemImage: "cart") {
                 buying = StorePurchase(result: store, price: price)
             }
+        }
+        // Its page, bought or not.
+        if let store = release.store {
             Button("Open on Bandcamp", systemImage: "safari") { buying = StorePurchase(result: store) }
+        } else if let page = release.owned?.itemURL {
+            Button("Open on Bandcamp", systemImage: "safari") { openURL(page) }
         }
         Divider()
         Button("Search for \(release.artist)", systemImage: "magnifyingglass") { router.search(release.artist) }
