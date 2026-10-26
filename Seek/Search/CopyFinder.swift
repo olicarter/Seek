@@ -35,7 +35,7 @@ final class CopyFinder {
         if let existing = copies[key], existing.status == .searching || existing.searchedAt.timeIntervalSinceNow > -1800 { return }
         copies[key] = Copies(status: .searching)
         Task {
-            let query = "\(album.artist) \(ReleaseText.cleanTitle(album.title))"
+            let query = Self.query(for: album)
             // Copies show (and can play) as they're found, rather than after the whole search.
             let found = await client.quietSearch(query) { [weak self] soFar in
                 let matched = await Self.matching(album, query: query, in: soFar, quality: quality)
@@ -58,15 +58,33 @@ final class CopyFinder {
 
     static let enoughCopies = 5
 
+    /// What to search Soulseek for. It only finds folders with every word searched for.
+    /// A double A-side by its first side: copies spell the other one many ways ("Die Brucke",
+    /// or left out). Words that are only punctuation ("/") match nothing, so they're left out.
+    nonisolated static func query(for album: AlbumKey) -> String {
+        let title = AlbumIdentity.sides(album.title)[0]
+        return "\(album.artist) \(ReleaseText.cleanTitle(title))"
+            .split(separator: " ")
+            .filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }
+            .joined(separator: " ")
+    }
+
     /// The folders that are this album, best first.
-    private static func matching(_ album: AlbumKey, query: String, in folders: [RemoteFolder],
+    nonisolated static func matching(_ album: AlbumKey, query: String, in folders: [RemoteFolder],
                                  quality: QualityPreference) async -> [RemoteFolder] {
         let grouped = await Task.detached {
             ReleaseGrouper.group(query: query, owned: [], store: [], folders: folders, quality: quality)
         }.value
-        return grouped.releases.first {
-            ReleaseText.titlesMatch($0.title, album.title) && ReleaseText.artistsMatch($0.artist, album.artist)
-        }?.folders ?? []
+        let sides = AlbumIdentity.sides(album.title)
+        // A double A-side's copies may be named for both sides or the first alone.
+        return grouped.releases
+            .filter { release in
+                ReleaseText.artistsMatch(release.artist, album.artist)
+                    && (ReleaseText.titlesMatch(release.title, album.title)
+                        || sides.count > 1 && ReleaseText.titlesMatch(release.title, sides[0]))
+            }
+            .flatMap(\.folders)
+            .sorted { ReleaseGrouper.better($0, $1, quality: quality) }
     }
 
     /// Downloads a better copy and, once every file is in, swaps the album's tracks for it by

@@ -35,3 +35,26 @@ struct RealSearchTests {
         #expect(releases.contains { $0.title == "WLR Leaks and Beyond" && $0.year == 2019 })
     }
 }
+
+struct DoubleASideTests {
+    static let album = AlbumKey(artist: "Peverelist", title: "Roll with the Punches / Die Brücke")
+
+    /// Soulseek only finds folders with every word searched for: a "/" or one side's name in
+    /// another spelling ("Brucke") finds nothing.
+    @Test func theSearchUsesWordsCopiesAreNamedWith() {
+        let words = CopyFinder.query(for: Self.album).split(separator: " ")
+        #expect(!words.contains("/"))
+        #expect(!words.contains { $0.lowercased().hasPrefix("br") })
+    }
+
+    @Test func copiesNamedForBothSidesOrTheFirstAreFound() async throws {
+        let dump = try RealSearchTests.load("search-peverelist")
+        let folders = await CopyFinder.matching(Self.album, query: CopyFinder.query(for: Self.album), in: dump.folders, quality: .cd)
+        let names = Set(folders.map(\.name))
+        #expect(names.contains { $0.contains("Roll With the Punches _ Die Brücke") })
+        #expect(names.contains { $0.contains("Roll_With_The_Punches-(DRUNK005-WEB)") })
+        // Remixes of the A-side are other releases.
+        #expect(!names.contains { $0.contains("Kowton") || $0.contains("Jook") })
+        #expect(folders.count >= 8)
+    }
+}

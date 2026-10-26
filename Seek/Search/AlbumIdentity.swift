@@ -123,6 +123,13 @@ enum AlbumIdentity {
         return x.recordingKey == y.recordingKey && (x.edition == y.edition || x.edition.isEmpty || y.edition.isEmpty)
     }
 
+    /// A double A-side's two names ("Roll with the Punches / Die Brücke"), or the one name.
+    /// Copies are often named for the first side alone.
+    static func sides(_ text: String) -> [String] {
+        let parts = text.split(separator: /\s+\/\s+/).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return parts.count > 1 ? parts : [text]
+    }
+
     // MARK: - Keys
 
     /// One key per release of an artist's: what library albums are grouped by.
