@@ -5,20 +5,13 @@ import SwiftUI
 
 struct MiniPlayer: View {
     @Environment(Player.self) private var player
+    /// How far the song has been swiped: left towards the next song, right towards the one before.
+    @State private var drag: CGFloat = 0
+    @State private var width: CGFloat = 1
 
     var body: some View {
         HStack(spacing: 10) {
-            ArtworkView(data: player.current?.artwork, cornerRadius: 4)
-                .frame(width: 32, height: 32)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(player.current?.title ?? "Not Playing")
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-                if let artist = player.current?.displayArtist {
-                    Text(artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-            Spacer()
+            swipeable
             Button {
                 player.togglePlayPause()
             } label: {
@@ -33,6 +26,92 @@ struct MiniPlayer: View {
         .buttonStyle(.plain)
         .font(.title3)
         .padding(.horizontal, 14)
+    }
+
+    /// The song coming in as it's swiped.
+    private var neighbour: Track? {
+        drag < 0 ? player.nextTrack : drag > 0 ? player.previousTrack : nil
+    }
+
+    /// Swiping moves the title (and the artist, if it changes) with the finger, the next song's
+    /// coming in beside it, and fades the cover across if it changes. Let go far enough (or
+    /// flicked) and that song plays; otherwise it springs back.
+    private var swipeable: some View {
+        let current = player.current
+        let other = neighbour
+        let progress = min(abs(drag) / max(width, 1), 1)
+        let sameCover = other.map { $0.albumKey == current?.albumKey } ?? true
+        let sameArtist = other.map { $0.displayArtist == current?.displayArtist } ?? true
+        // The next song comes in from the right, the one before from the left.
+        let side: CGFloat = drag < 0 ? 1 : -1
+        return HStack(spacing: 10) {
+            ZStack {
+                ArtworkView(data: current?.artwork, cornerRadius: 4)
+                    .opacity(sameCover ? 1 : 1 - progress)
+                if let other, !sameCover {
+                    ArtworkView(data: other.artwork, cornerRadius: 4).opacity(progress)
+                }
+            }
+            .frame(width: 32, height: 32)
+            ZStack(alignment: .leading) {
+                lines(current, offset: drag, artistOffset: sameArtist ? 0 : drag, showsArtist: true)
+                if let other {
+                    let offset = drag + side * width
+                    lines(other, offset: offset, artistOffset: offset, showsArtist: !sameArtist)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .clipped()
+        }
+        .contentShape(.rect)
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onChanged { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) || drag != 0 else { return }
+                    let dx = value.translation.width
+                    // Nowhere to go that way: it gives a little, then springs back.
+                    let possible = dx < 0 ? player.nextTrack != nil : player.previousTrack != nil
+                    drag = possible ? dx : dx * 0.25
+                }
+                .onEnded { value in
+                    guard drag != 0 else { return }
+                    let forward = drag < 0
+                    let possible = forward ? player.nextTrack != nil : player.previousTrack != nil
+                    let far = abs(drag) > width * 0.35 || abs(value.predictedEndTranslation.width) > width * 0.7
+                    guard possible, far else {
+                        withAnimation(.spring(duration: 0.3)) { drag = 0 }
+                        return
+                    }
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        drag = forward ? -width : width
+                    } completion: {
+                        if forward { player.next() } else { player.skipBack() }
+                        // The new song now sits where the old one was: no animation back.
+                        var transaction = Transaction()
+                        transaction.disablesAnimations = true
+                        withTransaction(transaction) { drag = 0 }
+                    }
+                }
+        )
+    }
+
+    /// A song's title and artist. The artist line is always laid out (hidden when it doesn't
+    /// change), so titles stay level as they pass.
+    private func lines(_ track: Track?, offset: CGFloat, artistOffset: CGFloat, showsArtist: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(track?.title ?? "Not Playing")
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+                .offset(x: offset)
+            Text(track?.displayArtist ?? " ")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .offset(x: artistOffset)
+                .opacity(showsArtist ? 1 : 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

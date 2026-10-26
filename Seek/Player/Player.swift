@@ -166,6 +166,23 @@ final class Player {
         load(autoplay: true)
     }
 
+    /// What `next()` would play.
+    var nextTrack: Track? {
+        if queue.indices.contains(index + 1) { return queue[index + 1] }
+        return repeatMode == .all && !queue.isEmpty ? queue[0] : nil
+    }
+
+    /// The song before this one in the queue.
+    var previousTrack: Track? { queue.indices.contains(index - 1) ? queue[index - 1] : nil }
+
+    /// Back to the song before, however far into this one (swiping, unlike the back button,
+    /// never restarts the song).
+    func skipBack() {
+        guard index > 0 else { return }
+        index -= 1
+        load(autoplay: isPlaying)
+    }
+
     func previous() {
         if currentTime > 3 || index == 0 {
             seek(to: 0)
