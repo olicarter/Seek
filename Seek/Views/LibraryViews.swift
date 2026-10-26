@@ -356,7 +356,16 @@ struct AlbumDetailView: View {
             ) {
                 ArtworkView(data: album.artwork, cornerRadius: 10)
             } accessory: {
-                OfflineButton(tracks: album.tracks)
+                HStack(spacing: 14) {
+                    OfflineButton(tracks: album.tracks)
+                    // Bought: from the purchase itself, or the store's copy matched to it.
+                    if let owned = bandcamp.ownedRelease(artist: key.artist, title: key.title)
+                        ?? bandcampRelease.flatMap(bandcamp.owned) {
+                        BandcampPurchaseButton(owned: owned) {}
+                    } else if let release = bandcampRelease {
+                        BandcampPurchaseButton(owned: nil, price: bandcamp.prices[release.id]) { confirmingReplace = true }
+                    }
+                }
             }
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)

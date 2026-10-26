@@ -707,9 +707,19 @@ struct ReleaseDetailView: View {
                     ReleaseArtwork(url: release.artworkURL.map(Self.large), size: 300)
                         .aspectRatio(1, contentMode: .fit)
                 } accessory: {
-                    ReleaseAccessory(release: release, inLibrary: inLibrary, buying: $buying,
-                                     isPreparing: soulseekStatus == .searching,
-                                     listedSongs: listedSongs(release), listedAlbum: listedAlbum(release))
+                    HStack(spacing: 14) {
+                        ReleaseAccessory(release: release, inLibrary: inLibrary,
+                                         isPreparing: soulseekStatus == .searching,
+                                         listedSongs: listedSongs(release), listedAlbum: listedAlbum(release))
+                        if let owned = release.owned {
+                            BandcampPurchaseButton(owned: owned) {}
+                        } else if let store = release.store {
+                            let price = bandcamp.prices[store.id]
+                            BandcampPurchaseButton(owned: nil, price: price) {
+                                buying = StorePurchase(result: store, price: bandcamp.isSignedIn ? price.flatMap { $0.amount > 0 ? $0 : nil } : nil)
+                            }
+                        }
+                    }
                 }
                 .listRowSeparator(.hidden)
                 .listRowBackground(Color.clear)
@@ -1050,7 +1060,6 @@ struct ReleaseMenuItems: View {
 struct ReleaseAccessory: View {
     let release: SearchRelease
     let inLibrary: AlbumKey?
-    @Binding var buying: StorePurchase?
     var isPreparing = false
     /// The songs the page lists, each from the copy its row shows: what adding the album gets,
     /// rather than everything in the folder (bonus tracks, other editions' extras).
@@ -1093,14 +1102,9 @@ struct ReleaseAccessory: View {
                     client.download(folder)
                 }
             }
-        case .buy(let store, let price):
-            let paid = price.flatMap { $0.amount > 0 ? $0 : nil }
-            RoundButton(systemImage: "cart", label: paid.map { "Buy for \($0.formatted)" } ?? "Get on Bandcamp") {
-                buying = StorePurchase(result: store, price: bandcamp.isSignedIn ? paid : nil)
-            }
-        case .none:
-            // Keeps the three buttons balanced while sources are found. A spinner, not a ring:
-            // nothing is downloading yet.
+        case .buy, .none:
+            // Buying has its own button beside this one. A spinner while sources are found (not
+            // a ring: nothing is downloading yet), otherwise a plus with nothing to add.
             if isPreparing {
                 ProgressView()
                     .frame(width: 50, height: 50)

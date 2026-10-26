@@ -19,7 +19,7 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
     let onPlay: () -> Void
     let onShuffle: () -> Void
     @ViewBuilder let artwork: () -> Artwork
-    /// The round button on the right: download, buy, or a tick when it's all here.
+    /// The round buttons on the right: download (a tick when it's all here), then buy.
     @ViewBuilder let accessory: () -> Accessory
 
     var body: some View {
@@ -53,7 +53,7 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
             }
             .padding(.horizontal)
 
-            HStack(spacing: 18) {
+            HStack(spacing: 14) {
                 RoundButton(systemImage: "shuffle", label: "Shuffle", action: onShuffle)
                     .opacity(canPlay ? 1 : 0.4)
                     .allowsHitTesting(canPlay)
@@ -74,10 +74,12 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
                 .buttonStyle(.plain)
                 .opacity(canPlay || isPreparing ? 1 : 0.4)
                 .allowsHitTesting(canPlay)
+                // Its own round buttons: add, and Bandcamp's buy when it sells the album.
                 accessory()
-                    .frame(width: 50, height: 50)
+                    .frame(minWidth: 50, minHeight: 50)
             }
             .padding(.top, 6)
+            .padding(.horizontal)
 
             if let description {
                 ExpandableText(text: description)
@@ -116,6 +118,40 @@ struct RoundButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+    }
+}
+
+/// Beside the add button when Bandcamp sells the album: a bag to buy it, filled and ticked once
+/// it's been bought, which opens its Bandcamp page.
+struct BandcampPurchaseButton: View {
+    let owned: BandcampItem?
+    var price: BandcampAPI.Price?
+    let buy: () -> Void
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        if let owned {
+            Button {
+                if let page = owned.itemURL { openURL(page) }
+            } label: {
+                Image(systemName: "bag.fill")
+                    .font(.title3.weight(.semibold))
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2.weight(.bold))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(Color(.systemBackground), .tint)
+                            .offset(x: 6, y: 5)
+                    }
+                    .frame(width: 50, height: 50)
+                    .background(.fill.secondary, in: .circle)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Bought on Bandcamp")
+        } else {
+            let paid = price.flatMap { $0.amount > 0 ? $0 : nil }
+            RoundButton(systemImage: "bag", label: paid.map { "Buy on Bandcamp for \($0.formatted)" } ?? "Get on Bandcamp", action: buy)
+        }
     }
 }
 
