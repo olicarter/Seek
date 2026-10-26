@@ -934,6 +934,9 @@ final class SoulseekClient {
         var spares: [String: [String: RemoteFile]]
         /// Songs lent to helpers, keyed by the helper's transfer: who has it, and the owner's file.
         var lent: [UUID: (helper: String, original: RemoteFile)] = [:]
+        /// Songs each helper couldn't send. A dropped connection now and then is normal; only
+        /// a helper that keeps failing is let go.
+        var failures: [String: Int] = [:]
 
         init(owner: String, folder: String, helpers: [String: [String: RemoteFile]], spares: [String: [String: RemoteFile]]) {
             self.owner = owner
@@ -952,6 +955,22 @@ final class SoulseekClient {
     static let maxSpares = 2
     /// One song sending and the next asked for, so there's no gap between them.
     static let songsPerHelper = 2
+    /// Songs a helper may fail to send before it gets no more.
+    static let failuresPerHelper = 2
+
+    /// Whether a helper that couldn't send a song stops helping: gone, refusing, or failing again.
+    nonisolated static func dropsHelper(after reason: String, failures: Int) -> Bool {
+        reason == PeerError.offline.errorDescription || RetryPolicy.isPermanent(reason)
+            || reason.lowercased().contains("banned") || failures >= failuresPerHelper
+    }
+
+    /// An owner's song a helper can take over: not started, including one waiting to be tried
+    /// again (a timeout or dropped connection), which otherwise stopped the album being shared.
+    nonisolated static func isLendable(_ state: Transfer.State, retryAt: Date?) -> Bool {
+        if state.isWaiting { return true }
+        if case .failed = state { return retryAt != nil }
+        return false
+    }
 
     /// Finds users with the same rip of an album being downloaded, free to send now, among the
     /// album's other copies (`others`, e.g. what its page found) and the current search, and
@@ -999,7 +1018,7 @@ final class SoulseekClient {
             let next = transfers
                 .filter {
                     !$0.forStreaming && $0.username == album.owner && $0.file.folder == album.folder
-                        && $0.state.isWaiting && copies[$0.file.id] != nil
+                        && Self.isLendable($0.state, retryAt: $0.retryAt) && copies[$0.file.id] != nil
                 }
                 .max { $0.file.name.localizedStandardCompare($1.file.name) == .orderedAscending }
             guard let next, let copy = copies[next.file.id] else { break }
@@ -1017,12 +1036,20 @@ final class SoulseekClient {
         lend(album, to: loan.helper)
     }
 
-    /// A helper couldn't send a song: it goes back to the owner, and the helper gets no more.
-    /// False when the transfer wasn't lent.
+    /// A helper couldn't send a song: it goes back to the owner. A helper that's gone, refuses,
+    /// or keeps failing gets no more, and a spare takes its place; otherwise it carries on with
+    /// another song. False when the transfer wasn't lent.
     private func takeBack(_ transfer: Transfer, _ reason: String) -> Bool {
         guard let album = sharedAlbums.first(where: { $0.lent[transfer.id] != nil }),
               let loan = album.lent.removeValue(forKey: transfer.id) else { return false }
         SoulseekEvents.record("\(loan.helper) couldn't send \(transfer.file.name) (\(reason)); back to \(album.owner)")
+        let failures = album.failures[loan.helper, default: 0] + 1
+        album.failures[loan.helper] = failures
+        guard Self.dropsHelper(after: reason, failures: failures) else {
+            move(transfer, to: loan.original)
+            lend(album, to: loan.helper)
+            return true
+        }
         album.helpers[loan.helper] = nil
         BannedUsers.insertIfBanned(loan.helper, reason: reason)
         // Its other lent song too, if it hasn't started.

@@ -91,3 +91,20 @@ struct SameRipSubsetTests {
         #expect(SameRip.match(adding, in: other) == nil)
     }
 }
+
+struct AlbumSharingTests {
+    @Test func aHelperKeepsHelpingAfterOneDroppedConnection() {
+        #expect(!SoulseekClient.dropsHelper(after: "Connection reset by peer", failures: 1))
+        #expect(SoulseekClient.dropsHelper(after: "Connection reset by peer", failures: 2))
+        #expect(SoulseekClient.dropsHelper(after: PeerError.offline.errorDescription ?? "", failures: 1))
+        #expect(SoulseekClient.dropsHelper(after: "Banned", failures: 1))
+    }
+
+    @Test func songsWaitingToBeTriedAgainCanBeLent() {
+        #expect(SoulseekClient.isLendable(.queued(place: 3), retryAt: nil))
+        #expect(SoulseekClient.isLendable(.failed("Timed out"), retryAt: .now.addingTimeInterval(30)))
+        // Given up on for good, or already coming: not the helper's to take.
+        #expect(!SoulseekClient.isLendable(.failed("File not shared"), retryAt: nil))
+        #expect(!SoulseekClient.isLendable(.downloading, retryAt: nil))
+    }
+}
