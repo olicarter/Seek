@@ -38,7 +38,7 @@ struct ExternalAlbumView: View {
                 AlbumDetailView(key: owned)
             } else {
                 ReleaseDetailView(release: { self.release }, buying: $buying, soulseekStatus: copyFinder.copies(of: album.key)?.status)
-                    .sheet(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price) }
+                    .fullScreenCover(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price, replacing: $0.replacing) }
             }
         }
         .onAppear { if openedOwned == nil { openedOwned = .some(ownedNow) } }

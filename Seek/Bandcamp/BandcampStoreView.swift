@@ -1,10 +1,13 @@
 import SwiftUI
 import WebKit
 
-/// A release to open in the store sheet; with a price, Seek buys it at that price in one go.
+/// A release to open in the store; with a price, Seek buys it at that price in one go, once
+/// confirmed.
 struct StorePurchase: Identifiable {
     let result: BandcampAPI.StoreResult
     var price: BandcampAPI.Price?
+    /// Library songs Bandcamp's copy replaces once it downloads (buying a library album).
+    var replacing: [String] = []
     var id: Int { result.id }
 }
 
@@ -16,9 +19,13 @@ struct StorePurchase: Identifiable {
 /// release to the collection, Seek downloads it into the library.
 struct BandcampStoreView: View {
     let result: BandcampAPI.StoreResult
-    var buyNow: BandcampAPI.Price?
+    @State private var buyNow: BandcampAPI.Price?
+    /// Library songs the purchase replaces, set up once it's confirmed.
+    private let replacing: [String]
     /// The seller takes PayPal only: the page is shown to pay there, rather than paying in one tap.
     private let paypalOnly: Bool
+    /// A one-tap purchase waits on the confirmation screen; the page only loads once it's given.
+    @State private var confirmed: Bool
     @Environment(BandcampClient.self) private var bandcamp
     @Environment(\.dismiss) private var dismiss
     @State private var checkout = StoreCheckout()
@@ -26,17 +33,37 @@ struct BandcampStoreView: View {
     /// needs the user to finish, or straight away for "Open on Bandcamp".
     @State private var showPage: Bool
 
-    init(result: BandcampAPI.StoreResult, buyNow: BandcampAPI.Price? = nil) {
+    init(result: BandcampAPI.StoreResult, buyNow: BandcampAPI.Price? = nil, replacing: [String] = []) {
         self.result = result
+        self.replacing = replacing
         // Sellers taking PayPal only are paid on the page: one tap uses a saved card.
         paypalOnly = buyNow?.paypalOnly == true
         // Free releases ("name your price" from nothing) go to the page, where you choose.
         let buyNow = (buyNow?.amount ?? 0) > 0 && !paypalOnly ? buyNow : nil
-        self.buyNow = buyNow
+        _buyNow = State(initialValue: buyNow)
         _showPage = State(initialValue: buyNow == nil)
+        _confirmed = State(initialValue: buyNow == nil)
     }
 
     var body: some View {
+        if confirmed {
+            store
+        } else {
+            PurchaseConfirmation(result: result, price: buyNow, replacesSongs: !replacing.isEmpty) {
+                withAnimation(.smooth) { confirmed = true }
+            } payMore: {
+                // To Bandcamp's own page to choose the amount there.
+                buyNow = nil
+                showPage = true
+                confirmed = true
+            } cancel: {
+                dismiss()
+            }
+            .transition(.opacity)
+        }
+    }
+
+    private var store: some View {
         NavigationStack {
             ZStack {
                 // Straight to checkout only when it's something to buy and the purchase will reach Seek.
@@ -66,7 +93,10 @@ struct BandcampStoreView: View {
                 }
             }
         }
-        .onAppear { bandcamp.watchForPurchase(of: result) }
+        .onAppear {
+            bandcamp.watchForPurchase(of: result)
+            if !replacing.isEmpty { bandcamp.replace(replacing, with: result) }
+        }
     }
 
     @ViewBuilder private var banner: some View {
@@ -604,5 +634,90 @@ struct PurchaseProgressView: View {
         case .enterPrice: return (.checkout, "This release needs an amount entered on Bandcamp.")
         case .browsing: return (.checkout, checkout.gaveUp ? "Seek couldn't start checkout on this page." : nil)
         }
+    }
+}
+
+/// Buying music is an occasion: the cover large over its own colours, the price, and one
+/// button to buy it. Nothing is paid until that's pressed.
+private struct PurchaseConfirmation: View {
+    let result: BandcampAPI.StoreResult
+    let price: BandcampAPI.Price?
+    /// Buying a library album: Bandcamp's copy replaces the files once it downloads.
+    let replacesSongs: Bool
+    let buy: () -> Void
+    let payMore: () -> Void
+    let cancel: () -> Void
+    @State private var appeared = false
+
+    var body: some View {
+        let cover = result.artworkURL.map(ReleaseDetailView.large)
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button("Cancel", systemImage: "xmark", action: cancel)
+                    .labelStyle(.iconOnly)
+                    .font(.headline)
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.15), in: .circle)
+                    .buttonStyle(.plain)
+            }
+            Spacer(minLength: 16)
+            Color.white.opacity(0.08)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay { RemoteImage(url: cover) { Color.clear } }
+                .clipShape(.rect(cornerRadius: 14))
+                .frame(maxWidth: 300)
+                .shadow(color: .black.opacity(0.5), radius: 30, y: 16)
+                .scaleEffect(appeared ? 1 : 0.85)
+                .opacity(appeared ? 1 : 0)
+            VStack(spacing: 6) {
+                Text(result.title).font(.title.bold())
+                Text(result.artist).font(.title3).foregroundStyle(.white.opacity(0.75))
+            }
+            .multilineTextAlignment(.center)
+            .padding(.top, 28)
+            Spacer(minLength: 24)
+            VStack(spacing: 14) {
+                Button(action: buy) {
+                    Text(price.map { "Buy for \($0.formatted)" } ?? "Buy")
+                        .font(.title3.bold())
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity, minHeight: 58)
+                        .background(.white, in: .capsule)
+                }
+                .buttonStyle(.plain)
+                Text(replacesSongs
+                     ? "Paid on Bandcamp with your saved card. Bandcamp's copy then replaces the files you have."
+                     : "Paid on Bandcamp with your saved card, then added to your library.")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                Button("Pay More on Bandcamp", action: payMore)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.top, 2)
+            }
+            .frame(maxWidth: 420)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            // The cover's colours, blurred, behind everything, as in Now Playing. A background,
+            // so the oversized image doesn't widen the page.
+            ZStack {
+                Color.black
+                RemoteImage(url: cover) { Color.clear }
+                    .blur(radius: 70, opaque: true)
+                    .scaleEffect(1.4)
+                    .opacity(0.9)
+                LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.55)], startPoint: .top, endPoint: .bottom)
+            }
+            .clipped()
+            .ignoresSafeArea()
+        }
+        .preferredColorScheme(.dark)
+        .onAppear { withAnimation(.spring(duration: 0.5, bounce: 0.25)) { appeared = true } }
     }
 }

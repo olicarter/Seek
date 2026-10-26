@@ -172,7 +172,7 @@ struct SearchView: View {
                     indexedTrackCount = count
                     regroup()
                 }
-                .sheet(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price) }
+                .fullScreenCover(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price, replacing: $0.replacing) }
         }
         .onAppear {
             client.searchViewAppeared()

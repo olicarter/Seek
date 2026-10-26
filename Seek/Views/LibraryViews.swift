@@ -365,7 +365,7 @@ struct AlbumDetailView: View {
                         ?? bandcampRelease.flatMap(bandcamp.owned) {
                         BandcampPurchaseButton(owned: owned) {}
                     } else if let release = bandcampRelease {
-                        BandcampPurchaseButton(owned: nil, price: bandcamp.prices[release.id]) { confirmingReplace = true }
+                        BandcampPurchaseButton(owned: nil, price: bandcamp.prices[release.id]) { buy(release, replacing: album) }
                     }
                 }
             }
@@ -509,16 +509,14 @@ struct AlbumDetailView: View {
         }
         .confirmationDialog(replaceTitle, isPresented: $confirmingReplace, titleVisibility: .visible) {
             if let release = bandcampRelease {
-                let owned = bandcamp.owned(release) != nil
-                Button(owned ? "Add from Bandcamp" : "Buy on Bandcamp") {
+                Button("Add from Bandcamp") {
                     bandcamp.replace(album.tracks.map(\.path), with: release)
-                    if !owned { buying = StorePurchase(result: release, price: bandcamp.prices[release.id]) }
                 }
             }
         } message: {
             Text("When Bandcamp's copy has downloaded, each song here with a matching title is replaced by it, and playlists switch to the new copy. Songs without a match are kept.")
         }
-        .sheet(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price) }
+        .fullScreenCover(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price, replacing: $0.replacing) }
         .confirmationDialog(
             duplicatesTitle(album.tracks),
             isPresented: $confirmingDuplicates,
@@ -629,21 +627,25 @@ extension AlbumDetailView {
             ?? bandcamp.ownedRelease(artist: key.artist, title: key.title)?.itemURL
     }
 
+    /// Buying Bandcamp's copy of a library album: its full-screen confirmation, and once
+    /// bought, the album's files replaced by Bandcamp's.
+    func buy(_ release: BandcampAPI.StoreResult, replacing album: Album) {
+        buying = StorePurchase(result: release, price: bandcamp.prices[release.id], replacing: album.tracks.map(\.path))
+    }
+
     @ViewBuilder func bandcampMenuItem(_ release: BandcampAPI.StoreResult) -> some View {
         if bandcamp.owned(release) != nil {
             Button("Replace with Bandcamp Download", systemImage: "arrow.triangle.2.circlepath") { confirmingReplace = true }
         } else {
             let price = bandcamp.prices[release.id].map { " · \($0.formatted)" } ?? ""
-            Button("Buy on Bandcamp\(price)", systemImage: "cart") { confirmingReplace = true }
+            Button("Buy on Bandcamp\(price)", systemImage: "cart") {
+                buy(release, replacing: library.albumsByKey[key] ?? Album(key: key, tracks: []))
+            }
         }
     }
 
-    var replaceTitle: String {
-        guard let release = bandcampRelease else { return "" }
-        if bandcamp.owned(release) != nil { return "Replace these files with your Bandcamp download?" }
-        let price = bandcamp.prices[release.id].map { " for \($0.formatted)" } ?? ""
-        return "Buy “\(release.title)”\(price) and replace these files?"
-    }
+    /// Only for releases already bought: buying one has its own full-screen confirmation.
+    var replaceTitle: String { "Replace these files with your Bandcamp download?" }
 }
 
 /// Under the songs, as in Apple Music: the release date, "11 songs, 41 minutes" and the ℗ line.
