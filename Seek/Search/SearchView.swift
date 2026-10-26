@@ -656,6 +656,8 @@ struct ReleaseDetailView: View {
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
     @State private var loadingFolder: String?
+    /// The artist's releases in Apple Music: this one's date and ℗ line, and its other versions.
+    @State private var catalog: [CatalogRelease]?
     @Environment(AlbumReferences.self) private var references
     @Environment(Player.self) private var player
     @Environment(StreamService.self) private var streamer
@@ -735,8 +737,6 @@ struct ReleaseDetailView: View {
                                     if let stream { player.play(queue.map(\.track), startingAt: stream) }
                                 }
                         }
-                    } footer: {
-                        Text(reference.source == .bandcamp ? "Tracklist from Bandcamp." : "Tracklist from Apple Music.")
                     }
                 } else if let folder = release.bestFolder {
                     Section {
@@ -764,6 +764,14 @@ struct ReleaseDetailView: View {
                         if loadingFolder == folder.id { loadingFolder = nil }
                     }
                 }
+                let listed = catalog.flatMap { CatalogRelease.release(of: release.title, in: $0) } ?? release.catalog
+                let reference = references.cached(key)
+                let songs = reference?.tracks.count ?? release.bestFolder?.files.count ?? 0
+                AlbumFooter(released: listed?.released, year: release.year ?? reference?.year, songs: songs,
+                            duration: reference.map { $0.tracks.reduce(0) { $0 + ($1.duration ?? 0) } }
+                                ?? Double(release.bestFolder?.files.reduce(0) { $0 + ($1.duration ?? 0) } ?? 0),
+                            copyright: listed?.copyright)
+                    .listRowSeparator(.hidden)
                 if release.owned != nil || release.store != nil {
                     Section("Bandcamp") { bandcampRows(release) }
                 }
@@ -775,6 +783,9 @@ struct ReleaseDetailView: View {
                 } else if !release.folders.isEmpty {
                     SoulseekCopiesSection(folders: release.folders, expectedTracks: expected)
                 }
+                OtherVersionsRow(versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? [])
+                    .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
+                    .listRowSeparator(.hidden)
                 if !release.artist.isEmpty, release.artist != "Unknown Artist" {
                     DiscoveryRow(subject: .album(artist: release.artist, title: release.title))
                         .listRowInsets(EdgeInsets(top: 16, leading: 0, bottom: 16, trailing: 0))
@@ -789,6 +800,10 @@ struct ReleaseDetailView: View {
                 }
                 // White like Apple Music's, not the accent colour.
                 .tint(.primary)
+            }
+            .task(id: release.artist) {
+                guard release.artist != "Unknown Artist" else { return }
+                catalog = await ArtistCatalog.releases(for: release.artist)
             }
             .task(id: release.store?.id) {
                 if let store = release.store, release.owned == nil { await bandcamp.loadPrice(for: store) }

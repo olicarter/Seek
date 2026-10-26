@@ -318,3 +318,29 @@ struct EditionInLibraryTests {
         #expect(remaster.album(for: release("Copacetic (Remixed/Remastered)", catalog: true)) != nil)
     }
 }
+
+struct OtherVersionsTests {
+    private func release(_ name: String, year: Int, count: Int = 11) -> CatalogRelease {
+        CatalogRelease(artist: "Knuckle Puck", title: CatalogRelease.cleanTitle(name),
+                       kind: CatalogRelease.kind(of: name, trackCount: count),
+                       released: Calendar.current.date(from: DateComponents(year: year))!, trackCount: count)
+    }
+
+    private var catalog: [CatalogRelease] {
+        [release("Copacetic", year: 2015), release("Copacetic", year: 2015),
+         release("Copacetic (Remixed/Remastered)", year: 2025), release("Copacetic - Single", year: 2015, count: 1),
+         release("Shapeshifter", year: 2017)]
+    }
+
+    @Test func eachEditionListsTheOthersOnce() {
+        #expect(CatalogRelease.otherVersions(of: "Copacetic", in: catalog).map(\.title) == ["Copacetic (Remixed/Remastered)"])
+        // Tags spell the remaster their own way.
+        #expect(CatalogRelease.otherVersions(of: "Copacetic (Remixed & Remastered)", in: catalog).map(\.title) == ["Copacetic"])
+        #expect(CatalogRelease.otherVersions(of: "Shapeshifter", in: catalog).isEmpty)
+    }
+
+    @Test func theFooterUsesTheVeryRelease() {
+        #expect(CatalogRelease.release(of: "Copacetic (Remixed & Remastered)", in: catalog)?.year == 2025)
+        #expect(CatalogRelease.release(of: "Copacetic", in: catalog)?.year == 2015)
+    }
+}

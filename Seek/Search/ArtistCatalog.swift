@@ -26,6 +26,8 @@ struct CatalogRelease: Sendable, Equatable, Codable {
     var released: Date
     var trackCount: Int
     var artworkURL: URL?
+    /// "℗ 2015 Rise Records", as under the songs on the album's page.
+    var copyright: String? = nil
 
     var year: Int { Calendar.current.component(.year, from: released) }
 
@@ -124,7 +126,8 @@ enum ArtistCatalog {
                 kind: CatalogRelease.kind(of: name, trackCount: count),
                 released: released,
                 trackCount: count,
-                artworkURL: album.artworkUrl100.flatMap { URL(string: $0.replacingOccurrences(of: "100x100bb", with: "600x600bb")) }
+                artworkURL: album.artworkUrl100.flatMap { URL(string: $0.replacingOccurrences(of: "100x100bb", with: "600x600bb")) },
+                copyright: album.copyright
             )
         }
     }
@@ -145,6 +148,7 @@ enum ArtistCatalog {
         let trackCount: Int?
         let releaseDate: String?
         let artworkUrl100: String?
+        let copyright: String?
     }
 }
 
@@ -154,5 +158,27 @@ extension CatalogRelease {
         guard ReleaseText.titlesMatch(release.title, title) else { return false }
         let mine = ReleaseText.fold(artist), theirs = ReleaseText.fold(release.artist)
         return ReleaseText.artistsMatch(release.artist, artist) || mine.contains(theirs) || theirs.contains(mine)
+    }
+}
+
+extension CatalogRelease {
+    /// The album in its artist's catalogue: the very release, or failing that the same recording.
+    static func release(of title: String, in catalog: [CatalogRelease]) -> CatalogRelease? {
+        catalog.first { AlbumIdentity.sameRelease($0.title, title) }
+            ?? catalog.first { AlbumIdentity.sameRecording($0.title, title) }
+    }
+
+    /// The album's other releases, as Apple Music lists under "Other Versions": the same name
+    /// remastered, remixed, live or in another edition, newest first, each once. Singles named
+    /// after a song on it aren't versions of it.
+    static func otherVersions(of title: String, in catalog: [CatalogRelease]) -> [CatalogRelease] {
+        let album = AlbumIdentity.title(title)
+        var seen: Set<String> = [album.releaseKey]
+        return catalog
+            .sorted { $0.released > $1.released }
+            .filter { release in
+                let name = AlbumIdentity.title(release.title)
+                return release.kind != .single && name.core == album.core && seen.insert(name.releaseKey).inserted
+            }
     }
 }

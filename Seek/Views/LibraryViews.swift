@@ -315,6 +315,8 @@ struct AlbumDetailView: View {
     /// Other copies are listed when the album could be better, or when asked for from the menu.
     @State private var showingCopies = false
     @State private var showingArtist = false
+    /// The artist's releases in Apple Music: this one's date and ℗ line, and its other versions.
+    @State private var catalog: [CatalogRelease]?
 
     init(key: AlbumKey) {
         _key = State(initialValue: key)
@@ -391,7 +393,14 @@ struct AlbumDetailView: View {
                 }
             }
 
-            AlbumFooter(album: album)
+            let listed = catalog.flatMap { CatalogRelease.release(of: key.title, in: $0) }
+            AlbumFooter(released: listed?.released, year: album.year, songs: rows.count,
+                        duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
+                        copyright: listed?.copyright, label: album.label)
+                .listRowSeparator(.hidden)
+
+            OtherVersionsRow(versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? [])
+                .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
                 .listRowSeparator(.hidden)
 
             DiscoveryRow(subject: .album(artist: key.artist, title: key.title))
@@ -446,6 +455,7 @@ struct AlbumDetailView: View {
             .tint(.primary)
         }
         .deleteConfirmation($deleting) { dismiss() }
+        .task(id: key.artist) { catalog = await ArtistCatalog.releases(for: key.artist) }
         .task(id: key) {
             about.load(key, details: [album.year > 0 ? "Released \(album.year)" : nil,
                                      album.label.isEmpty ? nil : "Label: \(album.label)",
@@ -615,27 +625,91 @@ extension AlbumDetailView {
     }
 }
 
-/// "9 songs, 47 minutes" and the label, which links to everything on that label.
+/// Under the songs, as in Apple Music: the release date, "11 songs, 41 minutes" and the ℗ line.
+/// Without Apple's ℗ line, the library's label stands in, opening everything on that label.
 struct AlbumFooter: View {
-    let album: Album
+    var released: Date?
+    var year: Int?
+    var songs: Int
+    var duration: TimeInterval
+    var copyright: String?
+    var label = ""
 
     var body: some View {
-        let minutes = Int(album.tracks.reduce(0) { $0 + $1.duration } / 60)
-        VStack(alignment: .leading, spacing: 4) {
-            Text("^[\(album.tracks.count) song](inflect: true), \(minutes) min")
-            if let quality = AudioQuality.summary(of: album.tracks) {
-                Text(quality)
+        VStack(alignment: .leading, spacing: 2) {
+            if let released {
+                // Apple dates releases at midnight in California: the day is the UTC one.
+                Text(released.formatted(Date.FormatStyle(date: .long, time: .omitted, timeZone: .gmt)))
+            } else if let year, year > 0 {
+                Text(verbatim: "\(year)")
             }
-            if !album.label.isEmpty {
-                NavigationLink(value: LabelKey(name: album.label)) {
-                    Label(album.label, systemImage: "building.columns")
+            if songs > 0 {
+                let minutes = (duration / 60).rounded()
+                if minutes > 0 {
+                    let length = Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .wide))
+                    Text("^[\(songs) song](inflect: true), \(length)")
+                } else {
+                    Text("^[\(songs) song](inflect: true)")
                 }
-                .foregroundStyle(.tint)
+            }
+            if let copyright {
+                Text(copyright)
+            } else if !label.isEmpty {
+                NavigationLink(value: LabelKey(name: label)) {
+                    Text(verbatim: (year ?? 0) > 0 ? "℗ \(year ?? 0) \(label)" : "℗ \(label)")
+                }
+                .buttonStyle(.plain)
             }
         }
         .font(.subheadline)
         .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 8)
+    }
+}
+
+/// The album's other releases in Apple Music (remastered, deluxe, live), each opening its page.
+struct OtherVersionsRow: View {
+    let versions: [CatalogRelease]
+    @Environment(LibraryStore.self) private var library
+
+    var body: some View {
+        if !versions.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Other Versions").font(.title3.bold())
+                    .padding(.horizontal)
+                ScrollView(.horizontal) {
+                    LazyHStack(alignment: .top, spacing: 14) {
+                        ForEach(versions, id: \.title) { version in
+                            Group {
+                                if let owned = library.index.album(artist: version.artist, title: version.title, named: true) {
+                                    NavigationLink(value: owned) { card(version) }
+                                } else {
+                                    NavigationLink(value: ExternalAlbum(artist: version.artist, title: version.title,
+                                                                        artworkURL: version.artworkURL)) { card(version) }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+    }
+
+    private func card(_ version: CatalogRelease) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Color.secondary.opacity(0.15)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay { RemoteImage(url: version.artworkURL) { Color.clear } }
+                .clipShape(.rect(cornerRadius: 8))
+            Text(version.title).font(.subheadline.weight(.medium)).lineLimit(2)
+            Text(verbatim: "\(version.year)").font(.subheadline).foregroundStyle(.secondary)
+        }
+        .frame(width: 150)
+        .contentShape(.rect)
     }
 }
 
