@@ -576,3 +576,11 @@ struct DeleteFromLibraryButton: View {
         .tint(.red)
     }
 }
+
+extension EnvironmentValues {
+    /// Opens an artist's page in the navigation stack the view is in, as a link would. Pages
+    /// open by value everywhere: one opened from state (`navigationDestination(isPresented:)`)
+    /// is always drawn above those opened by value, so an album opened from that artist page
+    /// ended up beneath it.
+    @Entry var openArtist: ((ArtistKey) -> Void)? = nil
+}

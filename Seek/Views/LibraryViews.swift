@@ -53,6 +53,7 @@ struct LibraryHomeView: View {
             .searchable(text: $query, prompt: "Your Library")
             .libraryDestinations()
         }
+        .environment(\.openArtist) { router.libraryPath.append($0) }
     }
 
     /// The 12 albums with the newest songs. The songs come newest first, so this stops as soon as
@@ -315,7 +316,8 @@ struct AlbumDetailView: View {
     @State private var confirmingUpgrade = false
     /// Other copies are listed when the album could be better, or when asked for from the menu.
     @State private var showingCopies = false
-    @State private var showingArtist = false
+    @Environment(\.openArtist) private var openArtist
+    @Environment(Router.self) private var router
     /// The artist's releases in Apple Music: this one's date and ℗ line, and its other versions.
     @State private var catalog: [CatalogRelease]?
 
@@ -348,7 +350,7 @@ struct AlbumDetailView: View {
                 }
             }
             AlbumHeader(
-                title: album.title, artist: album.artist, onArtist: { showingArtist = true }, year: album.year,
+                title: album.title, artist: album.artist, onArtist: { openArtistPage() }, year: album.year,
                 isLossless: Self.isLossless(album.tracks), description: about.text(for: key),
                 isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
                 isPreparing: copies?.status == .searching,
@@ -420,7 +422,6 @@ struct AlbumDetailView: View {
         }
         .listStyle(.plain)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showingArtist) { ArtistDetailView(name: key.artist) }
         .sheet(isPresented: $showingCopies) {
             NavigationStack {
                 List {
@@ -642,6 +643,13 @@ extension AlbumDetailView {
                 buy(release, replacing: library.albumsByKey[key] ?? Album(key: key, tracks: []))
             }
         }
+    }
+
+    /// The artist's page, above this one in the same stack; from a stack that can't take it,
+    /// in the library.
+    func openArtistPage() {
+        let artist = ArtistKey(name: key.artist)
+        if let openArtist { openArtist(artist) } else { router.show(artist) }
     }
 
     /// Only for releases already bought: buying one has its own full-screen confirmation.

@@ -108,7 +108,8 @@ struct SearchView: View {
     @State private var storeLoadedFor: String?
     @State private var indexedTrackCount: Int?
     @State private var results = SearchResults()
-    @State private var selected: SearchRelease.ID?
+    /// Pages opened from the results, all by value (see `openArtist`).
+    @State private var path = NavigationPath()
     @State private var buying: StorePurchase?
     /// Rebuilt only when the library changes, never while typing.
     @State private var libraryIndex = LibraryIndex(albums: [])
@@ -123,7 +124,7 @@ struct SearchView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             resultsList
                 .navigationTitle("Search")
                 .searchable(text: $query, prompt: "Artists, albums, songs")
@@ -134,13 +135,13 @@ struct SearchView: View {
                 .onChange(of: router.pendingSearch, initial: true) { _, text in
                     guard let text else { return }
                     router.pendingSearch = nil
-                    selected = nil
+                    path = NavigationPath()
                     query = text
                     submitted = text
                     client.search(text)
                 }
                 .toolbar { filterMenu }
-                .modifier(ReleaseDestinations(selected: $selected, compact: sizeClass == .compact, results: results, buying: $buying))
+                .modifier(ReleaseDestinations(compact: sizeClass == .compact, results: results, buying: $buying))
                 .task(id: submitted) {
                     guard storeLoadedFor != submitted else { return }
                     storeFound = []
@@ -174,6 +175,7 @@ struct SearchView: View {
                 }
                 .fullScreenCover(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price, replacing: $0.replacing) }
         }
+        .environment(\.openArtist) { path.append($0) }
         .onAppear {
             client.searchViewAppeared()
             Task { await bandcamp.refreshIfStale() }
@@ -289,7 +291,7 @@ struct SearchView: View {
             ForEach(releases) { release in
                 ReleaseRow(release: release, inLibrary: release.inLibrary, buying: $buying)
                     .contentShape(.rect)
-                    .onTapGesture { selected = release.id }
+                    .onTapGesture { path.append(SearchResultPage(id: release.id)) }
             }
             status
         } header: {
@@ -978,17 +980,22 @@ private struct RegroupTriggers: ViewModifier {
     }
 }
 
+/// A search result's page, opened by value like every other page.
+struct SearchResultPage: Hashable {
+    let id: SearchRelease.ID
+}
+
 /// Release details, pushed like any other page. A release already in the library opens its
 /// library album page, which has everything the release page would and more.
 private struct ReleaseDestinations: ViewModifier {
-    @Binding var selected: SearchRelease.ID?
     let compact: Bool
     let results: SearchResults
     @Binding var buying: StorePurchase?
 
     func body(content: Content) -> some View {
         content
-            .navigationDestination(item: $selected) { id in
+            .navigationDestination(for: SearchResultPage.self) { page in
+                let id = page.id
                 if let key = results.release(id)?.inLibrary {
                     AlbumDetailView(key: key)
                 } else if let release = results.release(id), release.isCatalogOnly {

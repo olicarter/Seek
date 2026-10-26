@@ -25,21 +25,27 @@ struct RootView: View {
                 TabSection("Library") {
                     Tab("Artists", systemImage: "music.mic", value: AppTab.artists) {
                         NavigationStack(path: $router.artistsPath) { ArtistsView().libraryDestinations() }
+                            .environment(\.openArtist) { router.artistsPath.append($0) }
                     }
                     Tab("Albums", systemImage: "square.stack", value: AppTab.albums) {
                         NavigationStack(path: $router.albumsPath) { AlbumsView().libraryDestinations() }
+                            .environment(\.openArtist) { router.albumsPath.append($0) }
                     }
                     Tab("Labels", systemImage: "building.columns", value: AppTab.labels) {
                         NavigationStack(path: $router.labelsPath) { LabelsView().libraryDestinations() }
+                            .environment(\.openArtist) { router.labelsPath.append($0) }
                     }
                     Tab("Songs", systemImage: "music.note", value: AppTab.songs) {
                         NavigationStack(path: $router.songsPath) { SongsView().libraryDestinations() }
+                            .environment(\.openArtist) { router.songsPath.append($0) }
                     }
                     Tab("Playlists", systemImage: "music.note.list", value: AppTab.playlists) {
                         NavigationStack(path: $router.playlistsPath) { PlaylistsView().libraryDestinations() }
+                            .environment(\.openArtist) { router.playlistsPath.append($0) }
                     }
                     Tab("Favourites", systemImage: "heart", value: AppTab.favorites) {
                         NavigationStack(path: $router.favoritesPath) { FavoritesView().libraryDestinations() }
+                            .environment(\.openArtist) { router.favoritesPath.append($0) }
                     }
                     Tab("Downloaded", systemImage: "arrow.down.circle", value: AppTab.downloaded) {
                         NavigationStack { DownloadedView().libraryDestinations() }
