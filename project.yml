@@ -22,6 +22,7 @@ targets:
     sources: [Seek]
     dependencies:
       - package: ZIPFoundation
+      - target: SeekShare
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek
@@ -43,6 +44,10 @@ targets:
         UISupportedInterfaceOrientations~ipad:
           [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         ITSAppUsesNonExemptEncryption: false
+        # seek://search?q=… and seek://share?text=… (from the share extension).
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.olicarter.seek
+            CFBundleURLSchemes: [seek]
         NSLocalNetworkUsageDescription: Seek listens for incoming Soulseek peer connections.
         NSUbiquitousContainers:
           iCloud.dev.olicarter.seek:
@@ -56,6 +61,30 @@ targets:
         com.apple.developer.icloud-container-identifiers: [iCloud.dev.olicarter.seek]
         com.apple.developer.ubiquity-container-identifiers: [iCloud.dev.olicarter.seek]
         com.apple.developer.icloud-services: [CloudDocuments, CloudKit]
+  # "Seek" in the share sheet, for songs from Shazam and Apple Music.
+  SeekShare:
+    type: app-extension
+    platform: iOS
+    sources: [SeekShare]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.share
+        TARGETED_DEVICE_FAMILY: "1,2,6"
+        SUPPORTS_MACCATALYST: YES
+        DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
+    info:
+      path: SeekShare/Info.plist
+      properties:
+        CFBundleDisplayName: Seek
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsText: true
   SeekTests:
     type: bundle.unit-test
     platform: iOS

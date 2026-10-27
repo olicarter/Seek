@@ -42,6 +42,12 @@ struct SeekApp: App {
             RootView()
                 // On Mac the system accent colour would replace Seek's own.
                 .tint(Color("AccentColor"))
+                // A song shared from Shazam or Apple Music, or a seek://search link.
+                .onOpenURL { url in
+                    Task {
+                        if let query = await SharedSong.query(for: url) { router.search(query) }
+                    }
+                }
                 .task {
                     // Developer tool: run one search, save it, quit. Nothing else starts.
                     if let query = SearchDump.requestedQuery {

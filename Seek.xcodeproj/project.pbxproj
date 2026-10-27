@@ -45,6 +45,7 @@
 		690AAD66C439162C45E27140 /* RealSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A35F73D4A3ADDF23CA97 /* RealSearchTests.swift */; };
 		6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CC9811E43E6250AF81358F /* DiscoveryTests.swift */; };
 		6EF8E40FE2D96DE76D674F51 /* SearchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2484EE2114073E282CE92C2F /* SearchSession.swift */; };
+		7105FC684143FCFA7545E53F /* SharedSong.swift in Sources */ = {isa = PBXBuildFile; fileRef = F117C7DEFDBF95F507A68ADD /* SharedSong.swift */; };
 		7481309C45E19A3544BD20F7 /* NewPlaylistPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0E309A8E488487F7CC7D27 /* NewPlaylistPrompt.swift */; };
 		74F2D9ADDB10D503C179ADDD /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E0A4CC586BC109FC84CAFE /* Router.swift */; };
 		7918555FD0392AE55BF06AA2 /* EditAlbumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE0976C16CBAC17D5F2A90E /* EditAlbumView.swift */; };
@@ -60,13 +61,16 @@
 		8E435FBBC2A1211371BAD67C /* ProgressiveLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BEB9FE8921267E64A76AFCF /* ProgressiveLoader.swift */; };
 		95FF8F374DCDB53F213A8BE5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 6081BEE8E388ACD6A6F46094 /* ZIPFoundation */; };
 		99983F2E894CD7C2AC49BCF7 /* AlbumAbout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17740C12F4103D7CF6CCD61 /* AlbumAbout.swift */; };
+		99EBBCAF346FFEDAC8302299 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABABF5C9CB4F1BA6E6A9FE7F /* ShareViewController.swift */; };
 		A244D4623C875AB09091A92B /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5737ED89FD81A122A93C375C /* Log.swift */; };
 		A26E2F4678CB152398058B27 /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C654364489C8D9D4C375CE5 /* RemoteImage.swift */; };
 		A888B99F040547CD7805DD45 /* FolderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24BD138B246FE044B8C8F38 /* FolderResolver.swift */; };
 		B6F1A0111E20532F829C43C7 /* Messages.swift in Sources */ = {isa = PBXBuildFile; fileRef = D815CEE3D27AFC38A664F128 /* Messages.swift */; };
+		B92074B4F15D9A8DB9A6DC59 /* SharedSongTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD3CF2EF1E951986DBBBFD42 /* SharedSongTests.swift */; };
 		BD9E2C187C61A546E325BCA0 /* StreamService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239F3848E265086704591140 /* StreamService.swift */; };
 		C2B23499A3C981D22C38AA93 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CD2A2D1464C8BA2F4367671 /* ProtocolTests.swift */; };
 		C33BFAFB922E27CC6ED837C4 /* StreamingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E58F21093F066169F0B1C999 /* StreamingTests.swift */; };
+		C7295A426DA70A7E1F783C0A /* SeekShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4C81A88C2B9E1344A314A85A /* SeekShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C876F8754B2D061B7F90B227 /* AlbumHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5783D6255712D74EF1D20ED /* AlbumHeader.swift */; };
 		CF3499F7AE5850F824BA970D /* ArrivingTrackTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7756E0651A70996486396F8B /* ArrivingTrackTests.swift */; };
 		CFD8A875E9F3BB52097DE132 /* Metadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4A7C40FD57A3C96816171BD /* Metadata.swift */; };
@@ -89,6 +93,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5C35DF945316100B5C261AAD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2A6DEB621154363D3749FB9A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DBF787CD98407B628F02FE59;
+			remoteInfo = SeekShare;
+		};
 		CE6A31A09B98FA1D43094602 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 2A6DEB621154363D3749FB9A /* Project object */;
@@ -97,6 +108,20 @@
 			remoteInfo = Seek;
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		90669C53779890BD2CE34258 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C7295A426DA70A7E1F783C0A /* SeekShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		087FFD400AA97E45493959EE /* PaypalOnlyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaypalOnlyTests.swift; sourceTree = "<group>"; };
@@ -131,6 +156,7 @@
 		481C1720E44BCCE238F83E5F /* BandcampClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampClient.swift; sourceTree = "<group>"; };
 		48482135E9A3FFBE80AC32BF /* ReleaseMatching.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseMatching.swift; sourceTree = "<group>"; };
 		4A8B32F2D88ECB4B38C7B5CB /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		4C81A88C2B9E1344A314A85A /* SeekShare.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SeekShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4D52EF5EB3B46628A165BDD6 /* AlbumIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumIdentityTests.swift; sourceTree = "<group>"; };
 		4D5CC2DCE45E51F6022FF8DE /* search-playboi-carti.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "search-playboi-carti.json"; sourceTree = "<group>"; };
 		51769C4A62C28841B6D7E81A /* BandcampAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampAPI.swift; sourceTree = "<group>"; };
@@ -155,7 +181,9 @@
 		A386E31E425646123D2B8E03 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A5FD190F215D9287B4545F5E /* PerfHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfHarness.swift; sourceTree = "<group>"; };
 		AB87BDEC855171900581EFA6 /* QueueTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueueTests.swift; sourceTree = "<group>"; };
+		ABABF5C9CB4F1BA6E6A9FE7F /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		ABE0976C16CBAC17D5F2A90E /* EditAlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditAlbumView.swift; sourceTree = "<group>"; };
+		B33857599EA8D14622F8A1F7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLevelsTests.swift; sourceTree = "<group>"; };
 		B5783D6255712D74EF1D20ED /* AlbumHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumHeader.swift; sourceTree = "<group>"; };
 		B5A346FE0BC3517BF462FFB5 /* AppleCovers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleCovers.swift; sourceTree = "<group>"; };
@@ -175,11 +203,13 @@
 		E69F0648EA94E744E6B03B99 /* SearchDump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDump.swift; sourceTree = "<group>"; };
 		E7FDB5C53213D818261E3A4C /* Socket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Socket.swift; sourceTree = "<group>"; };
 		E9F6A3A21F66280E16B1B47D /* CopyFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyFinder.swift; sourceTree = "<group>"; };
+		F117C7DEFDBF95F507A68ADD /* SharedSong.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSong.swift; sourceTree = "<group>"; };
 		F17740C12F4103D7CF6CCD61 /* AlbumAbout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumAbout.swift; sourceTree = "<group>"; };
 		F9269557F674AD9A319152C9 /* Wire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Wire.swift; sourceTree = "<group>"; };
 		FA253B9CAD1D454634531B9F /* SoulseekViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulseekViews.swift; sourceTree = "<group>"; };
 		FC90C27FBC72E24B9BA5C2A0 /* FLACWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FLACWriter.swift; sourceTree = "<group>"; };
 		FD35A7139708078E9C01EBF6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		FD3CF2EF1E951986DBBBFD42 /* SharedSongTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSongTests.swift; sourceTree = "<group>"; };
 		FE807197E4721D5F4995B299 /* ProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressRing.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -211,6 +241,7 @@
 			isa = PBXGroup;
 			children = (
 				25D80CCDB51FA0F6E2DD2F9C /* Seek.app */,
+				4C81A88C2B9E1344A314A85A /* SeekShare.appex */,
 				1BC7E174CF0AADD502F93E12 /* SeekTests.xctest */,
 			);
 			name = Products;
@@ -220,6 +251,7 @@
 			isa = PBXGroup;
 			children = (
 				5447AE1AC61698C72985E1C8 /* Seek */,
+				FAF4E7D9E3FFAF416DCEA578 /* SeekShare */,
 				4E0E55E496B136F955892010 /* SeekTests */,
 				26A5D8980F387180A250AACE /* Products */,
 			);
@@ -243,6 +275,7 @@
 				7643ED3950B6BAC3E1083BA7 /* ReleaseMatchingTests.swift */,
 				B80418CD703C83960473941A /* ReservedPathTests.swift */,
 				163D1994128F9FA7736C4D9F /* SameRipTests.swift */,
+				FD3CF2EF1E951986DBBBFD42 /* SharedSongTests.swift */,
 				E28C95C56ADE287ABD3379EC /* SharingTests.swift */,
 				E58F21093F066169F0B1C999 /* StreamingTests.swift */,
 				157E83F17879FA8FE3992628 /* TrackInfoTests.swift */,
@@ -348,6 +381,7 @@
 				86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */,
 				A5FD190F215D9287B4545F5E /* PerfHarness.swift */,
 				832927A227E2E6F4B4D0CD15 /* SeekApp.swift */,
+				F117C7DEFDBF95F507A68ADD /* SharedSong.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -371,6 +405,15 @@
 			path = Soulseek;
 			sourceTree = "<group>";
 		};
+		FAF4E7D9E3FFAF416DCEA578 /* SeekShare */ = {
+			isa = PBXGroup;
+			children = (
+				B33857599EA8D14622F8A1F7 /* Info.plist */,
+				ABABF5C9CB4F1BA6E6A9FE7F /* ShareViewController.swift */,
+			);
+			path = SeekShare;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -381,10 +424,12 @@
 				22105EB321319FC5B809D15C /* Sources */,
 				E24CDEECCBED0D4A97FF7B4A /* Resources */,
 				053D8A82235A04EC7A5F6526 /* Frameworks */,
+				90669C53779890BD2CE34258 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				9604CD7C4191F6D85CE8526A /* PBXTargetDependency */,
 			);
 			name = Seek;
 			packageProductDependencies = (
@@ -413,6 +458,23 @@
 			productReference = 1BC7E174CF0AADD502F93E12 /* SeekTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		DBF787CD98407B628F02FE59 /* SeekShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 72D26914A092348E4EC36D21 /* Build configuration list for PBXNativeTarget "SeekShare" */;
+			buildPhases = (
+				CED841CF23E642017EEA56C6 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SeekShare;
+			packageProductDependencies = (
+			);
+			productName = SeekShare;
+			productReference = 4C81A88C2B9E1344A314A85A /* SeekShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -427,6 +489,10 @@
 						ProvisioningStyle = Automatic;
 					};
 					C992AE48499C00DA477CF9B4 = {
+						DevelopmentTeam = MPCJ63V5P5;
+						ProvisioningStyle = Automatic;
+					};
+					DBF787CD98407B628F02FE59 = {
 						DevelopmentTeam = MPCJ63V5P5;
 						ProvisioningStyle = Automatic;
 					};
@@ -450,6 +516,7 @@
 			projectRoot = "";
 			targets = (
 				7C2B59A2F6B0212930FD9483 /* Seek */,
+				DBF787CD98407B628F02FE59 /* SeekShare */,
 				C992AE48499C00DA477CF9B4 /* SeekTests */,
 			);
 		};
@@ -528,6 +595,7 @@
 				6EF8E40FE2D96DE76D674F51 /* SearchSession.swift in Sources */,
 				175BFD50DBE93932071CA5D7 /* SearchView.swift in Sources */,
 				FB6617E9F1041058093E1BDF /* SeekApp.swift in Sources */,
+				7105FC684143FCFA7545E53F /* SharedSong.swift in Sources */,
 				4F83DFB0163D9C177AF7C41B /* Sharing.swift in Sources */,
 				4DFE50F029744BA8D0D24E3A /* Socket.swift in Sources */,
 				D92D99BD5602AFE2CAD6C0A1 /* SoulseekClient.swift in Sources */,
@@ -559,9 +627,18 @@
 				7BB0A6B5FA1D69D3D4B33C7D /* ReleaseMatchingTests.swift in Sources */,
 				D8D9F549FF436E0052B2DD9F /* ReservedPathTests.swift in Sources */,
 				798EDB0341BC3D4836026EF4 /* SameRipTests.swift in Sources */,
+				B92074B4F15D9A8DB9A6DC59 /* SharedSongTests.swift in Sources */,
 				0163F424A5CD628CA289AA43 /* SharingTests.swift in Sources */,
 				C33BFAFB922E27CC6ED837C4 /* StreamingTests.swift in Sources */,
 				E9F817463A22A87BAE6818AF /* TrackInfoTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CED841CF23E642017EEA56C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				99EBBCAF346FFEDAC8302299 /* ShareViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -573,9 +650,31 @@
 			target = 7C2B59A2F6B0212930FD9483 /* Seek */;
 			targetProxy = CE6A31A09B98FA1D43094602 /* PBXContainerItemProxy */;
 		};
+		9604CD7C4191F6D85CE8526A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DBF787CD98407B628F02FE59 /* SeekShare */;
+			targetProxy = 5C35DF945316100B5C261AAD /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		1B66E94E7E349209D3D9F7E4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				INFOPLIST_FILE = SeekShare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.olicarter.seek.share;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				TARGETED_DEVICE_FAMILY = "1,2,6";
+			};
+			name = Release;
+		};
 		26D108A65932BDEB06097545 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -717,6 +816,23 @@
 			};
 			name = Debug;
 		};
+		EED1A8812B360CAFC57F5EE5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER = NO;
+				INFOPLIST_FILE = SeekShare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.olicarter.seek.share;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = YES;
+				TARGETED_DEVICE_FAMILY = "1,2,6";
+			};
+			name = Debug;
+		};
 		F9208B0B66AF76FF4FB0FF8A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -785,6 +901,15 @@
 			buildConfigurations = (
 				B7B90CAD99DBDDB66E606E88 /* Debug */,
 				F9208B0B66AF76FF4FB0FF8A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		72D26914A092348E4EC36D21 /* Build configuration list for PBXNativeTarget "SeekShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EED1A8812B360CAFC57F5EE5 /* Debug */,
+				1B66E94E7E349209D3D9F7E4 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
