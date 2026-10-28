@@ -1042,7 +1042,12 @@ struct SoulseekCopiesSection: View {
                 HStack {
                     NavigationLink(value: folder) { RemoteFolderRow(folder: folder) }
                     Button("Add to Library", systemImage: "plus.circle") {
-                        if let album { adder.add(album, from: [folder], client: client, references: references) } else { client.download(folder) }
+                        // This copy first; songs it lacks come from the others.
+                        if let album {
+                            adder.add(album, from: [folder] + folders.filter { $0.id != folder.id }, client: client, references: references)
+                        } else {
+                            client.download(folder)
+                        }
                     }
                     .labelStyle(.iconOnly)
                     .font(.title2)

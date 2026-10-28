@@ -45,8 +45,8 @@ struct OneSongFolderTests {
     }
 }
 
-/// Adding an album takes one copy with every song on its tracklist, and only those songs.
-struct FullCopyTests {
+/// Adding an album takes exactly the songs on its tracklist, from whichever copies have them.
+struct TracklistAddTests {
     private let reference = AlbumReference(source: .itunes, artist: "Cryogeyser", title: "Glitch", tracks: [
         ReferenceTrack(number: 1, disc: 1, title: "Glitch"),
         ReferenceTrack(number: 2, disc: 1, title: "Halftones"),
@@ -59,22 +59,30 @@ struct FullCopyTests {
                      hasFreeSlot: true, averageSpeed: 100, queueLength: 0)
     }
 
-    @Test func aCopyMissingASongIsNotUsed() {
+    private func picked(_ folders: [RemoteFolder]) -> [String]? {
+        AlbumAdder.songs(of: reference, in: folders)?.flatMap { folder, songs in songs.map { "\(folder.username) \($0.name)" } }
+    }
+
+    @Test func aSongInNoCopyAddsNothing() {
         let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
-        #expect(AlbumAdder.songs(of: reference, in: partial) == nil)
-        #expect(AlbumAdder.fullCopy(of: reference, in: [partial]) == nil)
+        let samePartial = folder("u2", files: ["01 Glitch.flac"])
+        #expect(picked([partial, samePartial]) == nil)
+    }
+
+    @Test func missingSongsComeFromOtherCopies() {
+        let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
+        let other = folder("u2", files: ["03 Love Is Land.flac"])
+        #expect(picked([partial, other]) == ["u1 01 Glitch.flac", "u1 02 Halftones.flac", "u2 03 Love Is Land.flac"])
+    }
+
+    @Test func oneCopyWithEverySongIsTakenWhole() {
+        let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
+        let full = folder("u2", files: ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac"])
+        #expect(picked([partial, full]) == ["u2 01 Glitch.flac", "u2 02 Halftones.flac", "u2 03 Love Is Land.flac"])
     }
 
     @Test func bonusTracksStayBehind() {
         let withBonus = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac", "04 Glitch (Demo).flac"])
-        let songs = AlbumAdder.songs(of: reference, in: withBonus)
-        #expect(songs?.map(\.name) == ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac"])
-    }
-
-    @Test func theFirstFullCopyIsTaken() {
-        let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
-        let full = folder("u2", files: ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac"])
-        let other = folder("u3", files: ["1. Glitch.flac", "2. Halftones.flac", "3. Love Is Land.flac"])
-        #expect(AlbumAdder.fullCopy(of: reference, in: [partial, full, other])?.0.username == "u2")
+        #expect(picked([withBonus]) == ["u1 01 Glitch.flac", "u1 02 Halftones.flac", "u1 03 Love Is Land.flac"])
     }
 }
