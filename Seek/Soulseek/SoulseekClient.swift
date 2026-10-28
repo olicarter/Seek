@@ -152,7 +152,8 @@ final class SoulseekClient {
 
     func saveTransfers() {
         // Streams are only for playing now; they aren't resumed after a restart.
-        guard let data = try? JSONEncoder().encode(transfers.filter { !$0.forStreaming }.map(SavedTransfer.init)),
+        // The Mac's (mirrored) are the Mac's to keep.
+        guard let data = try? JSONEncoder().encode(transfers.filter { !$0.forStreaming && !$0.onMac }.map(SavedTransfer.init)),
               data != lastSavedTransfers else { return }
         try? FileManager.default.createDirectory(at: URL.applicationSupportDirectory, withIntermediateDirectories: true)
         try? data.write(to: Self.transfersURL, options: .atomic)
@@ -184,6 +185,8 @@ final class SoulseekClient {
     /// Signs in with the saved account unless already signed in. Everyone asking at once shares
     /// one sign-in: each starting their own would close the others' connections.
     func connectIfNeeded() async {
+        // The Mac does the Soulseek work: one sign-in per account, so this device stays out.
+        if usingMac { return }
         if status == .connected { return }
         if let connectTask {
             await connectTask.value
@@ -198,6 +201,7 @@ final class SoulseekClient {
 
     func searchViewAppeared() {
         visibleSearchViews += 1
+        if let macLink { Task { await macLink.check() } }
         Task { await connectIfNeeded() }
     }
 
@@ -213,6 +217,7 @@ final class SoulseekClient {
 
     func appDidBecomeActive() {
         isInBackground = false
+        if let macLink { Task { await macLink.check(force: true) } }
         if visibleSearchViews > 0 || transfers.contains(where: \.state.isActive) {
             Task { await connectIfNeeded() }
         }
@@ -390,6 +395,7 @@ final class SoulseekClient {
     /// about once a second as they arrive, and can end the search early by returning true.
     func quietSearch(_ query: String, for duration: Duration = .seconds(12),
                      onUpdate: (([RemoteFolder]) async -> Bool)? = nil) async -> [RemoteFolder]? {
+        if let mac { return await mac.search(query, seconds: Int(duration.components.seconds), onUpdate: onUpdate) }
         await waitForSearchSlot()
         await connectIfNeeded()
         guard status == .connected else { return nil }
@@ -426,6 +432,17 @@ final class SoulseekClient {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
         lastSearchAt = .now
+        if let mac {
+            let session = SearchSession(token: Self.makeToken(), query: query)
+            currentSearch = session
+            Task {
+                _ = await mac.search(query, seconds: 20) { found in
+                    session.replaceFolders(found)
+                    return false
+                }
+            }
+            return
+        }
         Task {
             await connectIfNeeded()
             guard status == .connected else { return }
@@ -446,6 +463,11 @@ final class SoulseekClient {
         if let existing = transfers.first(where: { $0.file.id == file.id && !$0.forStreaming }),
            existing.state.isActive || isDone(existing) {
             return existing
+        }
+        if let mac {
+            let transfer = mirrored(file)
+            Task { await mac.download(file) }
+            return transfer
         }
         // A finished download of a song since deleted from the library is replaced by this one.
         transfers.removeAll { $0.file.id == file.id && !$0.forStreaming && $0.state == .completed }
@@ -515,7 +537,12 @@ final class SoulseekClient {
         let transfer = Transfer(file: file)
         transfer.forStreaming = true
         transfers.append(transfer)
-        requestUpload(transfer)
+        if let mac {
+            transfer.onMac = true
+            mac.pull(transfer)
+        } else {
+            requestUpload(transfer)
+        }
         return transfer
     }
 
@@ -524,6 +551,16 @@ final class SoulseekClient {
     /// `group`: songs added as one album, which all arrive or none stay (see checkAddGroups).
     func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil, others: [RemoteFolder] = [],
                   group: UUID? = nil) {
+        if let mac {
+            // Shown here straight away; the Mac's own state follows (see mirror).
+            for file in files where !transfers.contains(where: { $0.file.id == file.id && !$0.forStreaming && $0.state.isActive }) {
+                let transfer = mirrored(file)
+                transfer.album = album
+                transfer.addGroup = group
+            }
+            Task { await mac.download(files, in: folder, album: album, others: others, group: group) }
+            return
+        }
         for file in files {
             guard let transfer = download(file), transfer.state != .completed else { continue }
             if let album { transfer.album = album }
@@ -537,6 +574,11 @@ final class SoulseekClient {
     /// Downloads a whole folder. A search only lists the files that matched, so the rest are
     /// asked for and added once the user replies.
     func download(_ folder: RemoteFolder) {
+        if let mac {
+            for file in folder.files where !transfers.contains(where: { $0.file.id == file.id && !$0.forStreaming }) { _ = mirrored(file) }
+            Task { await mac.download(folder) }
+            return
+        }
         for file in folder.files { download(file) }
         Task {
             if let all = try? await contents(of: folder) { for file in all { download(file) } }
@@ -677,6 +719,11 @@ final class SoulseekClient {
     /// Every playable file in a folder on a peer, asked for once and kept for the session.
     func contents(of folder: RemoteFolder) async throws -> [RemoteFile] {
         if let cached = folderContents[folder.id] { return cached }
+        if let mac {
+            let files = try await mac.contents(of: folder)
+            folderContents[folder.id] = files
+            return files
+        }
         if let pending = folderRequests[folder.id] { return try await pending.value }
         let task = Task { () throws -> [RemoteFile] in
             await connectIfNeeded()
@@ -722,6 +769,10 @@ final class SoulseekClient {
 
     func retry(_ transfer: Transfer) {
         guard !transfer.state.isActive else { return }
+        if transfer.onMac {
+            Task { await mac?.act("retry", on: transfer) }
+            return
+        }
         transfer.retryAt = nil
         if let path = transfer.plannedPath { keepReserved?(path) }
         transfer.token = nil
@@ -941,6 +992,83 @@ final class SoulseekClient {
         return replacement
     }
 
+    // MARK: - Through the Mac
+
+    /// Seek on the Mac, doing this device's Soulseek work while it's reachable (see MacLink).
+    @ObservationIgnored private(set) weak var mac: MacLink?
+    /// The person's Mac, if they have one (set by the app on iPhone and iPad), checked now and then.
+    @ObservationIgnored var macLink: MacLink?
+    /// Whether the Mac is doing the Soulseek work now (shown in Settings and Activity).
+    private(set) var usingMac = false
+
+    /// Soulseek can be searched and downloaded from: signed in here, or through the Mac.
+    var canUseSoulseek: Bool { savedUsername != nil || usingMac }
+
+    /// To the Mac when it's reachable, back to this device's own Soulseek when it isn't. The
+    /// Mac takes over this device's downloads still to come (Soulseek allows one sign-in per
+    /// account, so both carrying on would push each other off): each album, or copy, as one.
+    func useMac(_ link: MacLink?) {
+        if let link {
+            guard mac == nil else { return }
+            let handing = transfers.filter { !$0.onMac && !$0.forStreaming && ($0.state.isActive || $0.retryAt != nil) }
+            for (_, songs) in Dictionary(grouping: handing, by: { $0.addGroup?.uuidString ?? "\($0.username)\u{0}\($0.file.folder)" }) {
+                guard let first = songs.first else { continue }
+                let folder = RemoteFolder(username: first.username, path: first.file.folder, files: songs.map(\.file),
+                                          hasFreeSlot: true, averageSpeed: 0, queueLength: 0)
+                Task { await link.download(songs.map(\.file), in: folder, album: first.album, others: [], group: first.addGroup) }
+            }
+            for transfer in handing {
+                cancel(transfer)
+                transfers.removeAll { $0 === transfer }
+            }
+            if !handing.isEmpty { SoulseekEvents.record("handing \(handing.count) downloads to the Mac") }
+            saveTransfers()
+            disconnect()
+            mac = link
+            usingMac = true
+            status = .connected
+        } else if mac != nil {
+            mac = nil
+            usingMac = false
+            status = .disconnected
+        }
+    }
+
+    /// A download the Mac does, shown here straight away.
+    private func mirrored(_ file: RemoteFile) -> Transfer {
+        let transfer = Transfer(file: file)
+        transfer.onMac = true
+        transfers.insert(transfer, at: 0)
+        return transfer
+    }
+
+    /// The Mac's downloads as they are now, mirrored here.
+    func mirror(_ wire: [MacLinkWire.Transfer]) {
+        var seen = Set<UUID>()
+        for item in wire {
+            seen.insert(item.id)
+            let transfer = transfers.first(where: { $0.onMac && $0.macID == item.id })
+                ?? transfers.first(where: { $0.onMac && $0.macID == nil && !$0.forStreaming && $0.file.id == item.file.id })
+                ?? mirrored(item.file)
+            transfer.macID = item.id
+            transfer.state = MacLinkWire.decode(item.state, item.detail)
+            transfer.size = item.size
+            transfer.bytesReceived = item.bytesReceived
+            transfer.bytesPerSecond = item.bytesPerSecond
+            transfer.album = item.album ?? transfer.album
+            transfer.addGroup = item.addGroup ?? transfer.addGroup
+            transfer.plannedPath = item.plannedPath
+            transfer.libraryPath = item.libraryPath
+            transfer.retryAt = item.retryAt
+        }
+        // Gone from the Mac (removed there), unless just asked for and not seen yet.
+        transfers.removeAll { transfer in
+            guard transfer.onMac, !transfer.forStreaming else { return false }
+            if let id = transfer.macID { return !seen.contains(id) }
+            return transfer.createdAt.timeIntervalSinceNow < -30
+        }
+    }
+
     // MARK: - Adding an album as one
 
     /// Files a user refused ("File not shared."), though their share listed them: not picked
@@ -950,6 +1078,8 @@ final class SoulseekClient {
     /// and the app says so.
     @ObservationIgnored var onAddGroupFailed: ((_ album: AlbumKey?, _ songs: Int, _ arrived: [String]) -> Void)?
     @ObservationIgnored private var failedGroups: Set<UUID> = []
+    /// Albums added as one that couldn't be, lately: for devices whose adds this Mac did (MacLink).
+    @ObservationIgnored private(set) var failedAdds: [MacLinkWire.FailedAdd] = []
 
     /// An album added as one (AlbumAdder) is all or nothing: once any of its songs has given up
     /// for good (failed, with no retry to come and no other copy being looked for), the rest are
@@ -957,7 +1087,9 @@ final class SoulseekClient {
     /// one song of two.
     func checkAddGroups() {
         for group in Set(transfers.compactMap(\.addGroup)) {
-            let members = transfers.filter { $0.addGroup == group && !$0.forStreaming }
+            // The Mac looks after its own (and says when one couldn't be added; see MacLink).
+            let members = transfers.filter { $0.addGroup == group && !$0.forStreaming && !$0.onMac }
+            guard !members.isEmpty else { continue }
             if failedGroups.contains(group) {
                 // Arrived after the album was given up (it was already being imported).
                 let late = members.compactMap { $0.state == .completed ? $0.libraryPath : nil }
@@ -986,7 +1118,12 @@ final class SoulseekClient {
                     member.state = .cancelled
                 }
             }
-            onAddGroupFailed?(members.first(where: { $0.album != nil })?.album, members.count, arrived)
+            let album = members.first(where: { $0.album != nil })?.album
+            if let album {
+                failedAdds.append(MacLinkWire.FailedAdd(group: group, album: album, songs: members.count))
+                failedAdds = failedAdds.suffix(20)
+            }
+            onAddGroupFailed?(album, members.count, arrived)
             saveTransfers()
         }
     }
@@ -1168,6 +1305,11 @@ final class SoulseekClient {
 
     func cancel(_ transfer: Transfer) {
         guard transfer.state.isActive else { return }
+        if transfer.onMac {
+            if transfer.forStreaming { mac?.stopPull(transfer) } else { Task { await mac?.act("cancel", on: transfer) } }
+            transfer.state = .cancelled
+            return
+        }
         for album in sharedAlbums { album.lent[transfer.id] = nil }
         transfer.state = .cancelled
         transfer.task?.cancel()
@@ -1189,6 +1331,11 @@ final class SoulseekClient {
     }
 
     func remove(_ transfer: Transfer) {
+        if transfer.onMac, !transfer.forStreaming {
+            Task { await mac?.act("remove", on: transfer) }
+            transfers.removeAll { $0 === transfer }
+            return
+        }
         if !transfer.state.isActive, transfer.state != .completed, let path = transfer.plannedPath {
             releaseReserved?(path, true)
         }

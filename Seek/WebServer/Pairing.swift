@@ -35,8 +35,10 @@ enum WebKey {
             && (origin == nil || hosts.contains { origin!.hasPrefix("http://\($0):") })
     }
 
-    static func matches(_ given: String) -> Bool {
-        // Compared in full every time, so timing doesn't give it away.
+    static func matches(_ given: String) -> Bool { compare(given, value) }
+
+    /// Compared in full every time, so timing doesn't give it away.
+    static func compare(_ given: String, _ value: String) -> Bool {
         let a = Array(given.utf8), b = Array(value.utf8)
         return a.count == b.count && zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
     }
@@ -54,6 +56,8 @@ enum Access {
     static func isTrusted(_ request: Request) async -> Bool {
         if WebKey.isLocal(request) { return true }
         guard let given = credential(request) else { return false }
+        // This person's iPhone or iPad, with the key from iCloud Keychain.
+        if AppKey.matches(given) { return true }
         if await Passkeys.shared.isValid(session: given) { return true }
         return await !Passkeys.shared.hasPasskeys && WebKey.matches(given)
     }

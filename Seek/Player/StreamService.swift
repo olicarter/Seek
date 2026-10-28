@@ -291,7 +291,7 @@ final class StreamService {
     }
 
     /// One loader per download, following it until it's in the cache (or gives up for good).
-    private func loader(for transfer: Transfer) -> ProgressiveLoader {
+    func loader(for transfer: Transfer) -> ProgressiveLoader {
         if let existing = loaders[transfer.file.id] { return existing }
         let loader = ProgressiveLoader(fileURL: transfer.partialURL, totalSize: Int64(transfer.size),
                                        fileExtension: transfer.file.fileExtension)

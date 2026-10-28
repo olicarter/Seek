@@ -436,7 +436,7 @@ struct AlbumDetailView: View {
                 let extra = LibraryStore.duplicates(in: album.tracks).reduce(0) { $0 + $1.remove.count }
                 Button("Remove Duplicates", systemImage: "square.on.square.dashed") { confirmingDuplicates = true }
                     .disabled(extra == 0)
-                if client.savedUsername != nil {
+                if client.canUseSoulseek {
                     Button("Other Copies on Soulseek", systemImage: "square.stack.3d.down.right") {
                         showingCopies = true
                         copyFinder.find(key, expectedTracks: references.cached(key)?.tracks.count, client: client, quality: quality)
@@ -472,7 +472,7 @@ struct AlbumDetailView: View {
             // Songs from a Bandcamp purchase: that page's tracklist is the one these files follow.
             let reference = await references.reference(for: key, page: page, purchased: page != nil, trackCount: album.tracks.count)
             let missing = reference.map { MissingTracks.missing(from: $0, have: album.tracks) } ?? []
-            if (!missing.isEmpty || !Self.isLossless(album.tracks)), client.savedUsername != nil {
+            if (!missing.isEmpty || !Self.isLossless(album.tracks)), client.canUseSoulseek {
                 copyFinder.find(key, expectedTracks: reference?.tracks.count, client: client, quality: quality)
             }
         }

@@ -40,6 +40,10 @@ struct SeekApp: App {
         sharing.onChange = { [weak client] in client?.shareCountsChanged() }
         library.onLibraryChanged = { [weak sharing] in sharing?.libraryChanged() }
         _sharing = State(initialValue: sharing)
+        #if !targetEnvironment(macCatalyst)
+        // The person's Mac, when it's reachable, does the Soulseek work (see MacLink).
+        client.macLink = MacLink(client: client)
+        #endif
         AppleCovers.shared.onCoversChanged = { ArtworkImages.invalidate() }
         library.onArtworkChanged = { keys in
             if let keys { ArtworkImages.forget(keys) } else { ArtworkImages.invalidate() }
@@ -64,6 +68,7 @@ struct SeekApp: App {
                         exit(0)
                     }
                     await library.start()
+                    await client.macLink?.check(force: true)
                     client.importDownload = { [library] transfer, url in
                         try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
                                                          album: transfer.album)

@@ -72,6 +72,11 @@ final class Transfer: Identifiable {
     /// The songs added together as one album (AlbumAdder): they all arrive, or none of them
     /// stay (see SoulseekClient.checkAddGroups).
     var addGroup: UUID?
+    /// Done by Seek on the Mac for this device (see MacLink): this one mirrors it.
+    @ObservationIgnored var onMac = false
+    /// The Mac's own id for it, once it's been seen there.
+    @ObservationIgnored var macID: UUID?
+    @ObservationIgnored let createdAt = Date.now
     /// A library download that's also being played: it leaves a copy in the stream cache for the
     /// player before moving into the library.
     @ObservationIgnored var alsoStreaming = false

@@ -20,6 +20,7 @@
 		1F2827E7FC130228F0D9C16F /* search-playboi-carti.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D5CC2DCE45E51F6022FF8DE /* search-playboi-carti.json */; };
 		1F6D0D1B6568BAA96495EC1C /* AlbumReferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B8607FB89916F603D8762B /* AlbumReferences.swift */; };
 		1FA6A5E1E8D3FFD08D5FE81A /* Upload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42141F89EEF6ADAD5B075812 /* Upload.swift */; };
+		233963AC38C6A3AFFA0F94A4 /* MacLinkTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06478C019EE161D759B6F10A /* MacLinkTypes.swift */; };
 		29F1F9576D6A80E7DA3DD988 /* BackgroundWork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86654379C73349786A952AD6 /* BackgroundWork.swift */; };
 		2ACDBC94953AA1032EF5BFAA /* Routes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ED324C0D36E1A93D85F4A54 /* Routes.swift */; platformFilters = (maccatalyst, ); };
 		2B6B2C71B4F57BB37C71906A /* BandcampStoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C53E1BBEE529DE703559915 /* BandcampStoreView.swift */; };
@@ -55,6 +56,7 @@
 		6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CC9811E43E6250AF81358F /* DiscoveryTests.swift */; };
 		6CB13B09DD1F738F7295FD61 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0B53D59997A13ECE24DCF6 /* SignInView.swift */; };
 		6EF8E40FE2D96DE76D674F51 /* SearchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2484EE2114073E282CE92C2F /* SearchSession.swift */; };
+		7028C881A89E3DC45295CBFD /* MacLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AB91809E5AAC23CA985A2FC /* MacLink.swift */; };
 		7105FC684143FCFA7545E53F /* SharedSong.swift in Sources */ = {isa = PBXBuildFile; fileRef = F117C7DEFDBF95F507A68ADD /* SharedSong.swift */; };
 		72390949612252F26213435B /* LibraryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1F21C0EC7A4C2D896A8533 /* LibraryViews.swift */; };
 		7481309C45E19A3544BD20F7 /* NewPlaylistPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0E309A8E488487F7CC7D27 /* NewPlaylistPrompt.swift */; };
@@ -77,6 +79,7 @@
 		95FF8F374DCDB53F213A8BE5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 6081BEE8E388ACD6A6F46094 /* ZIPFoundation */; };
 		99983F2E894CD7C2AC49BCF7 /* AlbumAbout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17740C12F4103D7CF6CCD61 /* AlbumAbout.swift */; };
 		99EBBCAF346FFEDAC8302299 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABABF5C9CB4F1BA6E6A9FE7F /* ShareViewController.swift */; };
+		A14F4E64749978D636CC2694 /* AppAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 875588F0BCE7DE68B3F929D2 /* AppAPI.swift */; platformFilters = (maccatalyst, ); };
 		A244D4623C875AB09091A92B /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5737ED89FD81A122A93C375C /* Log.swift */; };
 		A26E2F4678CB152398058B27 /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C654364489C8D9D4C375CE5 /* RemoteImage.swift */; };
 		A39B78DFC6C0E2D2E43EBC05 /* WebServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F89FE88CF4182CFC99839A12 /* WebServer.swift */; platformFilters = (maccatalyst, ); };
@@ -152,6 +155,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		06478C019EE161D759B6F10A /* MacLinkTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLinkTypes.swift; sourceTree = "<group>"; };
 		087FFD400AA97E45493959EE /* PaypalOnlyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaypalOnlyTests.swift; sourceTree = "<group>"; };
 		09AAFBE63215B797C5BD5A20 /* CopyFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyFilter.swift; sourceTree = "<group>"; };
 		0A5F1293D5D9C824B69492A5 /* PageBuilding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageBuilding.swift; sourceTree = "<group>"; };
@@ -199,6 +203,7 @@
 		51769C4A62C28841B6D7E81A /* BandcampAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampAPI.swift; sourceTree = "<group>"; };
 		52B8607FB89916F603D8762B /* AlbumReferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumReferences.swift; sourceTree = "<group>"; };
 		5737ED89FD81A122A93C375C /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		5AB91809E5AAC23CA985A2FC /* MacLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacLink.swift; sourceTree = "<group>"; };
 		5AFB6FC542D0D4806A735CF9 /* PlayerViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerViews.swift; sourceTree = "<group>"; };
 		60742B64DE6D28D20140F0BE /* LibraryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViews.swift; sourceTree = "<group>"; };
 		63E0A4CC586BC109FC84CAFE /* Router.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Router.swift; sourceTree = "<group>"; };
@@ -218,6 +223,7 @@
 		832927A227E2E6F4B4D0CD15 /* SeekApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekApp.swift; sourceTree = "<group>"; };
 		86654379C73349786A952AD6 /* BackgroundWork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWork.swift; sourceTree = "<group>"; };
 		86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
+		875588F0BCE7DE68B3F929D2 /* AppAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAPI.swift; sourceTree = "<group>"; };
 		8DC462038046EC3F2D2BCB33 /* AlbumAddFailureAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumAddFailureAlert.swift; sourceTree = "<group>"; };
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		9EA4953C44E8DD74B463CA20 /* AlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumView.swift; sourceTree = "<group>"; };
@@ -285,6 +291,7 @@
 		0E48A0357323BC806020878C /* WebServer */ = {
 			isa = PBXGroup;
 			children = (
+				875588F0BCE7DE68B3F929D2 /* AppAPI.swift */,
 				0A5F1293D5D9C824B69492A5 /* PageBuilding.swift */,
 				BC028A35F78295B9D0FF93FB /* Pairing.swift */,
 				FD336EAB1DDEE4DC4181C8E5 /* Passkeys.swift */,
@@ -485,6 +492,8 @@
 				86654379C73349786A952AD6 /* BackgroundWork.swift */,
 				3672CE712E02D29420084726 /* Credentials.swift */,
 				5737ED89FD81A122A93C375C /* Log.swift */,
+				5AB91809E5AAC23CA985A2FC /* MacLink.swift */,
+				06478C019EE161D759B6F10A /* MacLinkTypes.swift */,
 				D815CEE3D27AFC38A664F128 /* Messages.swift */,
 				7CD23EC63796D66E07C92751 /* RetryPolicy.swift */,
 				75C8A82DC797528466349191 /* SameRip.swift */,
@@ -722,6 +731,7 @@
 				8094B21FF4DD9A8EC7A9FA2C /* AlbumIdentity.swift in Sources */,
 				1F6D0D1B6568BAA96495EC1C /* AlbumReferences.swift in Sources */,
 				CF1F300458721BB4AD80152E /* AlbumRows.swift in Sources */,
+				A14F4E64749978D636CC2694 /* AppAPI.swift in Sources */,
 				5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */,
 				45B102CEB4E47440AB7FA1E4 /* AppleCovers.swift in Sources */,
 				829DBB029B43343DD9A65902 /* ArtistCatalog.swift in Sources */,
@@ -748,6 +758,8 @@
 				5B58ABF76A91A668EED6FA11 /* LibraryStore.swift in Sources */,
 				80B832ADD9D497578B42A3BC /* LibraryViews.swift in Sources */,
 				A244D4623C875AB09091A92B /* Log.swift in Sources */,
+				7028C881A89E3DC45295CBFD /* MacLink.swift in Sources */,
+				233963AC38C6A3AFFA0F94A4 /* MacLinkTypes.swift in Sources */,
 				B6F1A0111E20532F829C43C7 /* Messages.swift in Sources */,
 				CFD8A875E9F3BB52097DE132 /* Metadata.swift in Sources */,
 				F363701A2DF64983C8BC6EB0 /* Models.swift in Sources */,

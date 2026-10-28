@@ -41,6 +41,8 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
     }
     router.middlewares.add(FileMiddleware(site, searchForIndexHtml: true))
 
+    addAppRoutes(to: router, core: core)
+
     router.get("/api/status") { _, _ in try json(await core.status) }
 
     router.post("/api/search") { request, context in

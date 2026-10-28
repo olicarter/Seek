@@ -149,7 +149,7 @@ struct DownloadsView: View {
                     }
                 }
                 if !transfersShown.isEmpty {
-                    Section("Soulseek") {
+                    Section(client.usingMac ? "Soulseek · on your Mac" : "Soulseek") {
                         ForEach(transfersShown) { transfer in
                             TransferRow(transfer: transfer)
                                 .swipeActions {
@@ -298,7 +298,10 @@ struct SettingsView: View {
                     }
                 }
                 Section {
-                    if let saved = client.savedUsername {
+                    if client.usingMac {
+                        LabeledContent("Status", value: statusText)
+                        if let host = client.macLink?.host { LabeledContent("Mac", value: host) }
+                    } else if let saved = client.savedUsername {
                         LabeledContent("Username", value: saved)
                         LabeledContent("Status", value: statusText)
                         if client.status == .connected, let port = client.listeningPort {
@@ -330,7 +333,9 @@ struct SettingsView: View {
                 } header: {
                     Text("Soulseek Account")
                 } footer: {
-                    Text(client.savedUsername == nil
+                    Text(client.usingMac
+                        ? "Seek on your Mac searches and downloads for this device, so albums keep coming with Seek closed. When the Mac can't be reached, this device signs in to Soulseek itself."
+                        : client.savedUsername == nil
                         ? "Signing in with a new username creates the account. Your login is saved in iCloud Keychain, so your other devices can use it too."
                         : "Seek connects only while you're using the Soulseek tab or downloading, and disconnects when you leave the app with nothing downloading. Soulseek allows one connection per account, so the device you're using takes over.")
                 }
@@ -458,7 +463,8 @@ struct SettingsView: View {
     }
 
     private var statusText: String {
-        switch client.status {
+        if client.usingMac { return "Through Seek on your Mac" }
+        return switch client.status {
         case .disconnected: "Not connected"
         case .connecting: "Connecting…"
         case .connected: "Connected"
@@ -493,6 +499,7 @@ private struct WebAccessSection: View {
     let web: WebServer
     @Environment(\.openURL) private var openURL
     @State private var confirmingReset = false
+    @AppStorage(AppKey.addressKey) private var address = ""
 
     var body: some View {
         Section {
@@ -502,6 +509,12 @@ private struct WebAccessSection: View {
             }
             if web.state == .running {
                 LabeledContent("On This Mac", value: "localhost:\(WebServer.port)")
+                TextField("Public Address", text: $address, prompt: Text("https://…ts.net"))
+                    .textContentType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .onSubmit { AppKey.publish() }
+                    .onChange(of: address) { AppKey.publish() }
                 LabeledContent("Passkeys", value: web.passkeyCount == 0 ? "None yet" : "\(web.passkeyCount)")
                 Button("Open Seek on the Web", systemImage: "safari") { openURL(WebServer.site) }
                 if web.passkeyCount == 0 {
@@ -516,9 +529,9 @@ private struct WebAccessSection: View {
             Text("Web")
         } footer: {
             Text("""
-            While Seek is open on this Mac, 4n.studio/seek/web uses it: this Mac's library, Soulseek and Bandcamp, from any \
-            browser. Tailscale Funnel makes it reachable from anywhere; browsers sign in with a passkey (the first one is \
-            added from a paired browser).
+            While Seek is open on this Mac, your iPhone and iPad use it for Soulseek (it keeps going with them closed), and \
+            4n.studio/seek/web and the Apple TV use it for everything. The public address is this Mac's Tailscale Funnel \
+            one: your devices find it through iCloud Keychain. Browsers sign in with a passkey.
             """)
         }
         .task { await web.refreshPasskeys() }

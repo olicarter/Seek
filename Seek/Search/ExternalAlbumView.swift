@@ -49,7 +49,7 @@ struct ExternalAlbumView: View {
             if let candidate = await found, await storeVerifier.isGenuine(candidate, as: album.key, references: references) {
                 store = candidate
             }
-            if client.savedUsername != nil { copyFinder.find(album.key, expectedTracks: references.cached(album.key)?.tracks.count,
+            if client.canUseSoulseek { copyFinder.find(album.key, expectedTracks: references.cached(album.key)?.tracks.count,
                                                              client: client, quality: quality) }
         }
     }

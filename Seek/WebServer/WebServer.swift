@@ -43,6 +43,8 @@ final class WebServer {
         let app = Application(router: makeRouter(core: core, site: site),
                               configuration: .init(address: .hostname("127.0.0.1", port: Self.port), serverName: "Seek"))
         core.start()
+        // Where this Mac is, for the person's iPhone and iPad (through iCloud Keychain).
+        AppKey.publish()
         // Signed in to Soulseek even with the window closed: the web may want it any time.
         core.client.staysSignedIn = true
         state = .running

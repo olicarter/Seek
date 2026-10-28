@@ -16,6 +16,8 @@ final class Core {
     let streamer: StreamService
     /// The web's search, apart from the app's Search tab (both use the one Soulseek client).
     let search = SearchModel()
+    /// Searches run for an iPhone or iPad using this Mac (see AppAPI).
+    let appSearches = AppSearches()
     let quality = QualityPreference.cd
     /// Bumped whenever anything a page shows may have changed; pages refetch when it does.
     private(set) var version = 0

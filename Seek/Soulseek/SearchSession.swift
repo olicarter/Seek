@@ -42,6 +42,12 @@ final class SearchSession: Identifiable {
         self.query = query
     }
 
+    /// What the Mac has found for it so far (see MacLink).
+    func replaceFolders(_ found: [RemoteFolder]) {
+        folders = found
+        responseCount = Set(found.map(\.username)).count
+    }
+
     func add(_ response: SearchResponse) {
         let playable = response.files.filter { AudioFormats.playable.contains($0.fileExtension) }
         guard !playable.isEmpty else { return }

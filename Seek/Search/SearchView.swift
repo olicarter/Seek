@@ -167,7 +167,7 @@ struct SearchView: View {
 
     @ViewBuilder private var status: some View {
         if !submitted.isEmpty {
-            if client.savedUsername == nil {
+            if !client.canUseSoulseek {
                 Text("Sign in to Soulseek in Settings to include other people's music.")
                     .font(.subheadline).foregroundStyle(.secondary)
             } else if case .failed(let reason) = client.status {
