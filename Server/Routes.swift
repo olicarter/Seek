@@ -4,7 +4,9 @@ import HTTPTypes
 import NIOCore
 
 func json(_ value: some Encodable) throws -> Response {
-    let data = try JSONEncoder().encode(value)
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .iso8601
+    let data = try encoder.encode(value)
     return Response(status: .ok, headers: [.contentType: "application/json", .cacheControl: "no-store"],
                     body: ResponseBody(byteBuffer: ByteBuffer(data: data)))
 }
@@ -12,6 +14,13 @@ func json(_ value: some Encodable) throws -> Response {
 struct Login: Decodable { var username: String; var password: String }
 struct Query: Decodable { var query: String }
 struct AlbumRef: Decodable { var artist: String; var title: String; var release: String? }
+struct AuthInfo: Encodable { var passkeys: Bool; var signedIn: Bool; var local: Bool }
+struct SignInAnswer: Decodable { var id: String; var clientData: String; var authenticatorData: String; var signature: String }
+struct RegisterAnswer: Decodable {
+    var id: String; var clientData: String; var authenticatorData: String; var publicKey: String; var algorithm: Int; var name: String
+}
+struct PasskeyRef: Decodable { var id: String }
+struct PasskeyRow: Encodable { var id: String; var name: String; var created: Date; var lastUsed: Date? }
 
 /// Everything the site asks the server for.
 @MainActor
@@ -101,7 +110,74 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
         })
     }
 
-    router.get("/pair") { request, _ in try PairingPage.response(for: request) }
+    router.get("/pair") { request, _ in try await PairingPage.response(for: request) }
+
+    // MARK: Passkeys
+
+    /// Whether there are passkeys yet, and whether this browser is in.
+    router.get("/api/auth") { request, _ in
+        try json(AuthInfo(passkeys: await Passkeys.shared.hasPasskeys, signedIn: await Access.isTrusted(request),
+                          local: WebKey.isLocal(request)))
+    }
+
+    router.post("/api/auth/signin/begin") { _, _ in
+        try json(["challenge": Passkeys.base64url(await Passkeys.shared.challenge(for: .signIn)), "site": Passkeys.site])
+    }
+
+    router.post("/api/auth/signin/finish") { request, context in
+        let answer = try await request.decode(as: SignInAnswer.self, context: context)
+        guard let clientData = Passkeys.data(base64url: answer.clientData),
+              let authenticatorData = Passkeys.data(base64url: answer.authenticatorData),
+              let signature = Passkeys.data(base64url: answer.signature) else { throw HTTPError(.badRequest) }
+        do {
+            let session = try await Passkeys.shared.signIn(id: answer.id, clientData: clientData,
+                                                           authenticatorData: authenticatorData, signature: signature)
+            return try json(["session": session])
+        } catch let failure as Passkeys.Failure {
+            throw HTTPError(.unauthorized, message: failure.description)
+        }
+    }
+
+    router.post("/api/auth/register/begin") { _, _ in
+        try json([
+            "challenge": Passkeys.base64url(await Passkeys.shared.challenge(for: .register)),
+            "userID": Passkeys.base64url(await Passkeys.shared.userID), "site": Passkeys.site,
+        ])
+    }
+
+    router.post("/api/auth/register/finish") { request, context in
+        let answer = try await request.decode(as: RegisterAnswer.self, context: context)
+        guard let clientData = Passkeys.data(base64url: answer.clientData),
+              let authenticatorData = Passkeys.data(base64url: answer.authenticatorData),
+              let publicKey = Passkeys.data(base64url: answer.publicKey) else { throw HTTPError(.badRequest) }
+        do {
+            let session = try await Passkeys.shared.register(id: answer.id, clientData: clientData, authenticatorData: authenticatorData,
+                                                             publicKey: publicKey, algorithm: answer.algorithm, name: answer.name)
+            return try json(["session": session])
+        } catch let failure as Passkeys.Failure {
+            throw HTTPError(.badRequest, message: failure.description)
+        }
+    }
+
+    router.get("/api/auth/passkeys") { _, _ in
+        try json(await Passkeys.shared.passkeys.map { PasskeyRow(id: $0.id, name: $0.name, created: $0.created, lastUsed: $0.lastUsed) })
+    }
+
+    router.post("/api/auth/passkeys/remove") { request, context in
+        let passkey = try await request.decode(as: PasskeyRef.self, context: context)
+        await Passkeys.shared.remove(passkey: passkey.id)
+        return try json(["ok": true])
+    }
+
+    router.post("/api/auth/signout") { request, _ in
+        if let session = Access.credential(request) { await Passkeys.shared.signOut(session: session) }
+        return try json(["ok": true])
+    }
+
+    router.post("/api/auth/signout-everywhere") { _, _ in
+        await Passkeys.shared.signOutEverywhere()
+        return try json(["ok": true])
+    }
 
     router.get("/api/artist") { request, _ in
         guard let name = request.uri.queryParameters.get("name") else { throw HTTPError(.badRequest) }

@@ -96,6 +96,7 @@
 		A244D4623C875AB09091A92B /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5737ED89FD81A122A93C375C /* Log.swift */; };
 		A26E2F4678CB152398058B27 /* RemoteImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C654364489C8D9D4C375CE5 /* RemoteImage.swift */; };
 		A367C2E64830B0945F6EBD58 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A8B32F2D88ECB4B38C7B5CB /* Models.swift */; };
+		A3A5BB346EB156CAD134D714 /* Passkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F7143CE9419D2E14FDF3A96 /* Passkeys.swift */; };
 		A56058A9CA43BBE68419B02C /* Socket.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FDB5C53213D818261E3A4C /* Socket.swift */; };
 		A888B99F040547CD7805DD45 /* FolderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C24BD138B246FE044B8C8F38 /* FolderResolver.swift */; };
 		A952DB34872BF0D4BD2C11E4 /* ArtistCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DAF2D52610AB13C9CFB8952 /* ArtistCatalog.swift */; };
@@ -250,6 +251,7 @@
 		8DC462038046EC3F2D2BCB33 /* AlbumAddFailureAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumAddFailureAlert.swift; sourceTree = "<group>"; };
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		9F5017006373FDFDF0E03624 /* LibraryMemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryMemo.swift; sourceTree = "<group>"; };
+		9F7143CE9419D2E14FDF3A96 /* Passkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Passkeys.swift; sourceTree = "<group>"; };
 		A30FEB4461396E57E31B1B25 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A386E31E425646123D2B8E03 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A5FD190F215D9287B4545F5E /* PerfHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfHarness.swift; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 				5C6BA21FCF877073D087F1F3 /* main.swift */,
 				D6C2E6B5BBCFF75F7E5B6B95 /* Pages.swift */,
 				3732F5B487A426A6B2619D24 /* Pairing.swift */,
+				9F7143CE9419D2E14FDF3A96 /* Passkeys.swift */,
 				5F9C218A7826E473F9FFF83F /* Routes.swift */,
 				7F1BAC3222D7F1E16B29C183 /* serve.sh */,
 			);
@@ -831,6 +834,7 @@
 				A367C2E64830B0945F6EBD58 /* Models.swift in Sources */,
 				32B820111F871517988CD5D0 /* Pages.swift in Sources */,
 				D1BB18BD63CC13776FBF1A80 /* Pairing.swift in Sources */,
+				A3A5BB346EB156CAD134D714 /* Passkeys.swift in Sources */,
 				F53AE2AA2A60024C0D092851 /* ProgressiveLoader.swift in Sources */,
 				5DA5980FB341BB5F33EBEA25 /* ReleaseAction.swift in Sources */,
 				FF06B9E4C8DBAE7F7185E19F /* ReleaseMatching.swift in Sources */,

@@ -2,6 +2,7 @@ import { A } from "@solidjs/router";
 import { createEffect, createResource, createSignal, type ParentProps, Show } from "solid-js";
 import { api, changes, NotPaired, serverAddress } from "./api";
 import { PlayerBar } from "./PlayerBar";
+import { SignIn } from "./SignIn";
 
 /** The tabs, as in the app, the page, the player, and why an album wasn't added. */
 export function App(props: ParentProps) {
@@ -30,10 +31,7 @@ export function App(props: ParentProps) {
         <A href="/settings">Settings</A>
       </nav>
       <Show when={status.error instanceof NotPaired}>
-        <p class="offline">
-          This browser isn't paired with Seek yet. On the Mac running Seek, open <strong>localhost:8765/pair</strong>,
-          then scan its code with this device or open its link here.
-        </p>
+        <SignIn />
       </Show>
       <Show when={status.error && !(status.error instanceof NotPaired)}>
         <p class="offline">

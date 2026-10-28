@@ -102,6 +102,20 @@ if (pairing) {
 }
 const key = pairing ?? stored(PAIRING_KEY);
 
+/**
+ * Keeps what lets this browser in: its session after signing in with a passkey (or nothing,
+ * signing out), then reloads so everything asks with it.
+ */
+export function setCredential(credential: string | null) {
+  try {
+    if (credential) localStorage.setItem(PAIRING_KEY, credential);
+    else localStorage.removeItem(PAIRING_KEY);
+  } catch {
+    // Not kept: signed in until the page closes.
+  }
+  location.reload();
+}
+
 /** Whether this browser has the server's key (or doesn't need one: the Mac serving the page). */
 export const isPaired = () => key !== null || !serverAddress();
 
@@ -168,7 +182,19 @@ function albumQuery(ref: AlbumRef): string {
   return params.toString();
 }
 
+export type AuthInfo = { passkeys: boolean; signedIn: boolean; local: boolean };
+export type Passkey = { id: string; name: string; created: string; lastUsed?: string };
+
 export const api = {
+  auth: () => get<AuthInfo>("/api/auth"),
+  passkeys: () => get<Passkey[]>("/api/auth/passkeys"),
+  removePasskey: (id: string) => post<{ ok: boolean }>("/api/auth/passkeys/remove", { id }),
+  signOut: () => post<{ ok: boolean }>("/api/auth/signout"),
+  signOutEverywhere: () => post<{ ok: boolean }>("/api/auth/signout-everywhere"),
+  beginSignIn: () => post<{ challenge: string; site: string }>("/api/auth/signin/begin"),
+  finishSignIn: (answer: object) => post<{ session: string }>("/api/auth/signin/finish", answer),
+  beginRegister: () => post<{ challenge: string; userID: string; site: string }>("/api/auth/register/begin"),
+  finishRegister: (answer: object) => post<{ session: string }>("/api/auth/register/finish", answer),
   status: () => get<Status>("/api/status"),
   login: (username: string, password: string) => post<Status>("/api/login", { username, password }),
   logout: () => post<Status>("/api/logout"),

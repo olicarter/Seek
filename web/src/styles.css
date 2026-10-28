@@ -128,3 +128,9 @@ section > h2 + button { margin-bottom: 8px; }
 .offline { max-width: 1100px; margin: 12px auto 0; padding: 10px 14px; border-radius: 10px; background: rgba(255, 77, 109, 0.15);
   color: var(--text); font-size: 14px; }
 .offline a { color: var(--accent); }
+
+.signin { display: grid; gap: 10px; justify-items: start; }
+.signin p { margin: 0; }
+.signin button, section button.link { border: none; background: none; color: var(--accent); font-weight: 600; padding: 0; }
+.signin button { padding: 8px 14px; border-radius: 10px; background: var(--accent); color: #fff; }
+section button.link { margin-right: 16px; margin-top: 8px; }

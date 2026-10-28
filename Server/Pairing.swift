@@ -4,8 +4,8 @@ import Foundation
 import Hummingbird
 import HTTPTypes
 
-/// The key a browser needs to use the server from anywhere but this Mac. The server is on the
-/// public internet (Tailscale Funnel), so everything under /api and /files asks for it.
+/// The pairing key: how the first browser gets in from anywhere but this Mac, until there's a
+/// passkey (see Passkeys). Once there is one, it no longer works.
 enum WebKey {
     static let header = HTTPField.Name("X-Seek-Key")!
 
@@ -25,30 +25,49 @@ enum WebKey {
         return key
     }()
 
-    /// Straight from this Mac, not through Tailscale (whose proxy always adds X-Forwarded-For).
+    /// Straight from this Mac, not through Tailscale (whose proxy always adds X-Forwarded-For),
+    /// and not sent by another website open in a browser here (browsers say where a request
+    /// came from).
     static func isLocal(_ request: Request) -> Bool {
-        request.headers[HTTPField.Name("X-Forwarded-For")!] == nil
-            && ["localhost", "127.0.0.1", "[::1]"].contains { request.head.authority?.hasPrefix($0) == true }
+        let hosts = ["localhost", "127.0.0.1", "[::1]"]
+        let origin = request.headers[.origin]
+        return request.headers[HTTPField.Name("X-Forwarded-For")!] == nil
+            && hosts.contains { request.head.authority?.hasPrefix($0) == true }
+            && (origin == nil || hosts.contains { origin!.hasPrefix("http://\($0):") })
     }
 
-    /// The key, from the header (fetches) or `?key=` (audio, images and the event stream,
-    /// which can't send headers).
-    static func isPaired(_ request: Request) -> Bool {
-        let given = request.headers[header] ?? request.uri.queryParameters.get("key")
-        guard let given else { return false }
+    static func matches(_ given: String) -> Bool {
         // Compared in full every time, so timing doesn't give it away.
         let a = Array(given.utf8), b = Array(value.utf8)
         return a.count == b.count && zip(a, b).reduce(0) { $0 | ($1.0 ^ $1.1) } == 0
     }
 }
 
-/// Only paired browsers (and this Mac) get past /api and /files.
+/// Who may use the server: this Mac, a browser signed in with a passkey, or (until there's a
+/// passkey) one with the pairing key.
+enum Access {
+    /// The browser's session or pairing key, from the header (fetches) or `?key=` (audio,
+    /// images and the event stream, which can't send headers).
+    static func credential(_ request: Request) -> String? {
+        request.headers[WebKey.header] ?? request.uri.queryParameters.get("key")
+    }
+
+    static func isTrusted(_ request: Request) async -> Bool {
+        if WebKey.isLocal(request) { return true }
+        guard let given = credential(request) else { return false }
+        if await Passkeys.shared.isValid(session: given) { return true }
+        return await !Passkeys.shared.hasPasskeys && WebKey.matches(given)
+    }
+}
+
+/// Only trusted browsers get past /api and /files, apart from signing in.
 struct RequireKey<Context: RequestContext>: RouterMiddleware {
     func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
         let path = request.uri.path
         let guarded = path.hasPrefix("/api/") || path.hasPrefix("/files/")
-        if guarded, !WebKey.isLocal(request), !WebKey.isPaired(request) {
-            throw HTTPError(.unauthorized, message: "Pair this browser: open http://localhost:8765/pair on the Mac running Seek.")
+        let open = path == "/api/auth" || path.hasPrefix("/api/auth/signin/")
+        if guarded, !open, !(await Access.isTrusted(request)) {
+            throw HTTPError(.unauthorized, message: "Sign in with a passkey.")
         }
         return try await next(request, context)
     }
@@ -59,18 +78,31 @@ struct RequireKey<Context: RequestContext>: RouterMiddleware {
 enum PairingPage {
     static let site = "https://4n.studio/seek/web/"
 
-    static func response(for request: Request) throws -> Response {
+    static func response(for request: Request) async throws -> Response {
         guard WebKey.isLocal(request) else { throw HTTPError(.notFound) }
+        if await Passkeys.shared.hasPasskeys {
+            return page("""
+            <p>Pairing links are off now that you have a passkey. On a new device, open <a href="\(site)">Seek on 4n.studio</a>
+            and sign in with your passkey; a device without it can use your phone's.</p>
+            """)
+        }
         let link = "\(site)#key=\(WebKey.value)"
         let qr = qrCode(link).map { "<img src=\"data:image/png;base64,\($0.base64EncodedString())\" alt=\"\" width=\"240\" height=\"240\">" } ?? ""
+        return page("""
+        \(qr)
+        <p>Scan this with your phone's camera, or open the link in the browser you want to use Seek in. Then add a passkey
+        in Seek's Settings: after that, every device signs in with it, and this link stops working.</p>
+        <p><a href="\(link)">Open Seek on 4n.studio</a></p>
+        """)
+    }
+
+    private static func page(_ body: String) -> Response {
         let html = """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Pair with Seek</title><style>
         body{margin:0;min-height:100vh;display:grid;place-items:center;background:#000;color:#fff;font-family:-apple-system,system-ui,sans-serif;text-align:center}
         img{image-rendering:pixelated;background:#fff;padding:12px;border-radius:12px}a{color:#ff4d6d;word-break:break-all}p{max-width:420px;color:rgba(235,235,245,.6)}
-        </style></head><body><main><h1>Pair with Seek</h1>\(qr)
-        <p>Scan this with your phone's camera, or open the link in any browser you want to use Seek in. It keeps the key, so you only do this once per browser.</p>
-        <p><a href="\(link)">Open Seek on 4n.studio</a></p></main></body></html>
+        </style></head><body><main><h1>Pair with Seek</h1>\(body)</main></body></html>
         """
         return Response(status: .ok, headers: [.contentType: "text/html; charset=utf-8", .cacheControl: "no-store"],
                         body: ResponseBody(byteBuffer: .init(string: html)))
