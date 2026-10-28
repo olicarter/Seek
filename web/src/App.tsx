@@ -1,6 +1,6 @@
 import { A } from "@solidjs/router";
 import { createEffect, createResource, createSignal, type ParentProps, Show } from "solid-js";
-import { api, changes, serverAddress } from "./api";
+import { api, changes, NotPaired, serverAddress } from "./api";
 import { PlayerBar } from "./PlayerBar";
 
 /** The tabs, as in the app, the page, the player, and why an album wasn't added. */
@@ -29,10 +29,16 @@ export function App(props: ParentProps) {
         </A>
         <A href="/settings">Settings</A>
       </nav>
-      <Show when={status.error}>
+      <Show when={status.error instanceof NotPaired}>
         <p class="offline">
-          Can't reach Seek on your Mac{serverAddress() ? ` at ${serverAddress()}` : ""}. Check it's running, and that
-          Tailscale is on for this device. <A href="/settings">Change the address</A>
+          This browser isn't paired with Seek yet. On the Mac running Seek, open <strong>localhost:8765/pair</strong>,
+          then scan its code with this device or open its link here.
+        </p>
+      </Show>
+      <Show when={status.error && !(status.error instanceof NotPaired)}>
+        <p class="offline">
+          Can't reach Seek on your Mac{serverAddress() ? ` at ${serverAddress()}` : ""}. Check it's running.{" "}
+          <A href="/settings">Change the address</A>
         </p>
       </Show>
       <main>{props.children}</main>

@@ -1,5 +1,5 @@
 import { createSignal, Show } from "solid-js";
-import { api, changes, serverAddress, setServerAddress } from "../api";
+import { api, changes, isPaired, serverAddress, setServerAddress } from "../api";
 import { live } from "../live";
 
 export function Settings() {
@@ -28,6 +28,9 @@ export function Settings() {
         <input placeholder="This page's own address" value={address()} onInput={(e) => setAddress(e.currentTarget.value)} />
         <button>Save</button>
         <p class="empty">Seek on your Mac, at its Tailscale address (https://…ts.net). Leave empty when the Mac serves this page.</p>
+        <Show when={!isPaired()}>
+          <p class="empty">Not paired yet: open localhost:8765/pair on the Mac.</p>
+        </Show>
       </form>
       <h2>Soulseek</h2>
       <Show

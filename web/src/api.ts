@@ -80,19 +80,38 @@ export type Download = {
 export type AlbumRef = { artist: string; title: string; release?: string };
 
 const SERVER_KEY = "seek.server";
+const PAIRING_KEY = "seek.key";
+
+function stored(name: string): string | null {
+  try {
+    return localStorage.getItem(name);
+  } catch {
+    return null;
+  }
+}
+
+// The pairing link (from /pair on the Mac) ends #key=…: kept, then taken out of the address.
+const pairing = new URLSearchParams(location.hash.slice(1)).get("key");
+if (pairing) {
+  try {
+    localStorage.setItem(PAIRING_KEY, pairing);
+  } catch {
+    // Not kept: this page can still use it until it's closed.
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+const key = pairing ?? stored(PAIRING_KEY);
+
+/** Whether this browser has the server's key (or doesn't need one: the Mac serving the page). */
+export const isPaired = () => key !== null || !serverAddress();
 
 /**
  * Where the server on the Mac is. The Mac serves the site itself at its own address; the copy on
  * 4n.studio is built with the Mac's tailnet address, which Settings can change for this browser.
  */
 export function serverAddress(): string {
-  let saved: string | null = null;
-  try {
-    saved = localStorage.getItem(SERVER_KEY);
-  } catch {
-    // Storage can be off (a private window): the built-in address, then.
-  }
-  return (saved ?? import.meta.env.VITE_SEEK_SERVER ?? "").replace(/\/$/, "");
+  // Storage can be off (a private window): the built-in address, then.
+  return (stored(SERVER_KEY) ?? import.meta.env.VITE_SEEK_SERVER ?? "").replace(/\/$/, "");
 }
 
 export function setServerAddress(address: string) {
@@ -109,22 +128,37 @@ export function setServerAddress(address: string) {
 export function media(path: string): string;
 export function media(path?: string): string | undefined;
 export function media(path?: string): string | undefined {
-  return path?.startsWith("/") ? serverAddress() + path : path;
+  if (!path?.startsWith("/")) return path;
+  // Audio, images and the event stream can't send headers: the key goes in the address.
+  const withKey = key ? `${path}${path.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}` : path;
+  return serverAddress() + withKey;
+}
+
+/** The server said this browser isn't paired. */
+export class NotPaired extends Error {}
+
+function headers(extra: Record<string, string> = {}): Record<string, string> {
+  return key ? { ...extra, "X-Seek-Key": key } : extra;
+}
+
+function check(response: Response, path: string) {
+  if (response.status === 401) throw new NotPaired();
+  if (!response.ok) throw new Error(`${path}: ${response.status}`);
 }
 
 async function get<T>(path: string): Promise<T> {
-  const response = await fetch(media(path));
-  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  const response = await fetch(serverAddress() + path, { headers: headers() });
+  check(response, path);
   return response.json();
 }
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(media(path), {
+  const response = await fetch(serverAddress() + path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: headers({ "Content-Type": "application/json" }),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`${path}: ${response.status}`);
+  check(response, path);
   return response.json();
 }
 

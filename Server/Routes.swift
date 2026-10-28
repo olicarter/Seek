@@ -18,6 +18,16 @@ struct AlbumRef: Decodable { var artist: String; var title: String; var release:
 func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
     let router = Router()
 
+    // Before any route (a middleware only covers routes added after it): requests from the site
+    // on 4n.studio, the key, then the site's pages, the library's songs (with range requests,
+    // for seeking) and the site's files.
+    router.middlewares.add(SiteOrigins())
+    router.middlewares.add(RequireKey())
+    router.middlewares.add(SitePages(page: URL(filePath: site).appending(path: "index.html")))
+    router.middlewares.add(AudioTypes())
+    router.middlewares.add(FileMiddleware(Core.musicFolder.path, urlBasePath: "/files", searchForIndexHtml: false))
+    router.middlewares.add(FileMiddleware(site, searchForIndexHtml: true))
+
     router.get("/api/status") { _, _ in try json(await core.status) }
 
     router.post("/api/login") { request, context in
@@ -91,6 +101,8 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
         })
     }
 
+    router.get("/pair") { request, _ in try PairingPage.response(for: request) }
+
     router.get("/api/artist") { request, _ in
         guard let name = request.uri.queryParameters.get("name") else { throw HTTPError(.badRequest) }
         return try json(await core.artistPage(name))
@@ -138,13 +150,6 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
         await core.watchForPurchase()
         return try json(["ok": true])
     }
-
-    // Requests from the site on 4n.studio first, then the site's pages, the library's songs (with range requests, for seeking), then the site's files.
-    router.middlewares.add(SiteOrigins())
-    router.middlewares.add(SitePages(page: URL(filePath: site).appending(path: "index.html")))
-    router.middlewares.add(AudioTypes())
-    router.middlewares.add(FileMiddleware(Core.musicFolder.path, urlBasePath: "/files", searchForIndexHtml: false))
-    router.middlewares.add(FileMiddleware(site, searchForIndexHtml: true))
 
     return router
 }
@@ -223,9 +228,8 @@ struct SitePages<Context: RequestContext>: RouterMiddleware {
     }
 }
 
-/// Lets the site on 4n.studio (and the dev server) talk to this one from your browser. The
-/// server is only reachable on your tailnet, which is what keeps it private; this only says
-/// which pages may use it. Chrome also asks before a public page reaches a private address.
+/// Lets the site on 4n.studio (and the dev server) talk to this one from your browser. The key
+/// (RequireKey) is what keeps it private; this only says which pages may use it. Chrome also asks before a public page reaches a private address.
 struct SiteOrigins<Context: RequestContext>: RouterMiddleware {
     static var allowed: Set<String> { ["https://4n.studio", "http://localhost:5173"] }
 
@@ -236,7 +240,7 @@ struct SiteOrigins<Context: RequestContext>: RouterMiddleware {
         var headers: HTTPFields = [
             .accessControlAllowOrigin: origin,
             .accessControlAllowMethods: "GET, POST, OPTIONS",
-            .accessControlAllowHeaders: "Content-Type, Range",
+            .accessControlAllowHeaders: "Content-Type, Range, X-Seek-Key",
             .accessControlExposeHeaders: "Content-Range, Content-Length, Accept-Ranges",
             .vary: "Origin",
         ]
@@ -247,7 +251,13 @@ struct SiteOrigins<Context: RequestContext>: RouterMiddleware {
             headers[.accessControlMaxAge] = "600"
             return Response(status: .noContent, headers: headers)
         }
-        var response = try await next(request, context)
+        var response: Response
+        do {
+            response = try await next(request, context)
+        } catch let error as HTTPError {
+            // An error the site needs to read (e.g. not paired yet), with the headers it needs to read it.
+            response = Response(status: error.status, body: ResponseBody(byteBuffer: ByteBuffer(string: error.body ?? "")))
+        }
         for field in headers { response.headers[field.name] = field.value }
         return response
     }

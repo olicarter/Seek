@@ -31,7 +31,7 @@ final class Core {
     }
 
     /// The server's own song index, apart from the app's (which lives on the phone).
-    static var storeFolder: URL {
+    nonisolated static var storeFolder: URL {
         let folder = URL.applicationSupportDirectory.appending(path: "Seek Server", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder

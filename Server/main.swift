@@ -2,7 +2,8 @@ import AppKit
 import Hummingbird
 
 // Seek on the web: the app's own core on this Mac, the site in web/dist, both served from
-// one port. Only this Mac can reach it unless started with --lan.
+// one port. Only this Mac can reach it unless started with --lan, or Tailscale serves it;
+// from anywhere but this Mac, a browser needs pairing first (see Pairing.swift).
 //
 // It runs as a Mac app with no Dock icon, so it can show Bandcamp's sign-in page in a window.
 
@@ -21,6 +22,7 @@ MainActor.assumeIsolated {
                               configuration: .init(address: .hostname(host, port: port), serverName: "Seek"))
         print("Seek is at http://\(host == "0.0.0.0" ? "<this Mac's address>" : "localhost"):\(port)")
         print("Library: \(Core.musicFolder.path)")
+        print("Pair a browser: http://localhost:\(port)/pair")
         do {
             try await app.runService()
         } catch {
