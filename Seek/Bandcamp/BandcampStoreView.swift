@@ -543,7 +543,7 @@ struct PurchaseProgressView: View {
         let (stage, stopped) = progress
         ScrollView {
             VStack(spacing: 18) {
-                ReleaseArtwork(url: result.artworkURL.map(ReleaseDetailView.large), size: 200)
+                ReleaseArtwork(url: result.artworkURL.map(BandcampAPI.largeArtwork), size: 200)
                     .shadow(radius: 10, y: 5)
                 VStack(spacing: 4) {
                     Text(result.title).font(.title2.bold()).multilineTextAlignment(.center)
@@ -650,7 +650,7 @@ private struct PurchaseConfirmation: View {
     @State private var appeared = false
 
     var body: some View {
-        let cover = result.artworkURL.map(ReleaseDetailView.large)
+        let cover = result.artworkURL.map(BandcampAPI.largeArtwork)
         VStack(spacing: 0) {
             HStack {
                 Spacer()

@@ -339,7 +339,7 @@ struct AlbumDetailView: View {
             artist: key.artist, album: key.title, folders: missing.isEmpty ? [] : (copies?.folders ?? []),
             bandcampPage: bandcampRelease?.url, artworkURL: nil, artwork: album.artwork
         ).map { ($0.reference, $0.track) }, uniquingKeysWith: { first, _ in first })
-        let rows = albumRows(album, missing: missing, arriving: arrivingDownloads(album, missing: missing))
+        let rows = AlbumRows.rows(album, missing: missing, arriving: AlbumRows.arriving(album, missing: missing, client: client))
         // The whole album, with songs not in the library streamed when their turn comes.
         let queue: [Track] = rows.compactMap { row in
             switch row {
@@ -397,7 +397,7 @@ struct AlbumDetailView: View {
                 case .missing(let reference):
                     // A download of the song from any copy counts, not just the copy listed first.
                     MissingTrackRow(track: reference,
-                                    file: MissingTracks.download(for: reference, in: albumDownloads(album))?.file
+                                    file: MissingTracks.download(for: reference, in: AlbumRows.downloads(for: album, client: client))?.file
                                         ?? copies?.folders.lazy.compactMap { MissingTracks.file(for: reference, in: $0.files) }.first,
                                     isSearching: copies?.status == .searching,
                                     playing: streams[reference])
@@ -539,76 +539,11 @@ private func duplicatesTitle(_ tracks: [Track]) -> String {
 }
 
 extension AlbumDetailView {
-    enum AlbumRow: Identifiable {
-        case have(Int, Track)
-        case missing(ReferenceTrack)
-        /// A song on its way that the tracklist doesn't list (a bonus track, or no tracklist).
-        case arriving(Transfer)
-
-        var id: String {
-            switch self {
-            case .have(_, let track): "have-\(track.persistentModelID.hashValue)"
-            case .missing(let track): "missing-\(track.disc)-\(track.number)-\(track.title)"
-            case .arriving(let transfer): "arriving-\(transfer.id)"
-            }
-        }
-
-        var order: (Int, Int) {
-            switch self {
-            case .have(_, let track): (max(track.discNumber, 1), track.trackNumber > 0 ? track.trackNumber : 999)
-            case .missing(let track): (max(track.disc, 1), track.number > 0 ? track.number : 999)
-            case .arriving(let transfer): (1, ArrivingTrackRow.number(transfer.file.name) ?? 999)
-            }
-        }
-    }
-
-    /// The album's songs with the ones it's missing, and ones still downloading, slotted in by
-    /// track number.
-    func albumRows(_ album: Album, missing: [ReferenceTrack], arriving: [Transfer] = []) -> [AlbumRow] {
-        let have = album.tracks.enumerated().map { AlbumRow.have($0.offset, $0.element) }
-        let gaps = missing.map(AlbumRow.missing)
-        return (have + gaps + arriving.map(AlbumRow.arriving)).enumerated().sorted { a, b in
-            a.element.order == b.element.order ? a.offset < b.offset : a.element.order < b.element.order
-        }.map(\.element)
-    }
-
     /// A lossless Soulseek copy, for an album that isn't lossless yet.
     func upgradeCopy(_ album: Album, copies: CopyFinder.Copies?) -> RemoteFolder? {
         guard !album.tracks.isEmpty, !album.tracks.contains(where: { AudioQuality($0).isLossless }),
-              !isBeingAdded(album) else { return nil }
+              !AlbumRows.isBeingAdded(album, client: client) else { return nil }
         return copies?.folders.first { $0.isLossless && $0.files.count >= album.tracks.count }
-    }
-
-    /// Downloads going now for songs that have no row yet: not a gap in the tracklist (those show
-    /// their own progress) and not already in the library.
-    private func arrivingDownloads(_ album: Album, missing: [ReferenceTrack]) -> [Transfer] {
-        let downloads = albumDownloads(album)
-        let claimed = Set(missing.compactMap { MissingTracks.download(for: $0, in: downloads)?.id })
-        let paths = Set(album.tracks.map(\.path))
-        return downloads.filter {
-            client.isOnItsWay($0) && !claimed.contains($0.id) && !($0.plannedPath.map(paths.contains) ?? false)
-        }
-    }
-
-    /// This album's Soulseek downloads, from whichever copies, going or done or failed.
-    private func albumDownloads(_ album: Album) -> [Transfer] {
-        // A finished download whose song was since deleted doesn't count.
-        client.transfers.filter {
-            !$0.forStreaming && $0.state != .cancelled && ($0.state != .completed || client.isDone($0))
-                && Self.isFor(album, $0)
-        }
-    }
-
-    /// Songs for this album still arriving from Soulseek: judge its quality once they're in.
-    private func isBeingAdded(_ album: Album) -> Bool {
-        client.transfers.contains { $0.state.isActive && !$0.forStreaming && Self.isFor(album, $0) }
-    }
-
-    /// A download for this album: filed under it when added from its page, otherwise from a folder
-    /// named for it (and not for a remaster or live recording of it).
-    private static func isFor(_ album: Album, _ transfer: Transfer) -> Bool {
-        if let target = transfer.album { return AlbumIdentity.releaseKey(target) == AlbumIdentity.releaseKey(album.key) }
-        return AlbumIdentity.folder(transfer.file.folder, holds: album.title)
     }
 
     /// The album's Bandcamp page when it came from there: the files' own link, or the purchase.
@@ -1016,8 +951,8 @@ struct ArrivingTrackRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            TrackNumberColumn(number: Self.number(transfer.file.name) ?? 0, isCurrent: false, isFavorite: false)
-            Text(Self.title(transfer.file.name)).lineLimit(1)
+            TrackNumberColumn(number: ReleaseText.songNumber(transfer.file.name) ?? 0, isCurrent: false, isFavorite: false)
+            Text(ReleaseText.songTitle(transfer.file.name)).lineLimit(1)
                 .foregroundStyle(.secondary)
             Spacer()
             ProgressRing(progress: transfer.ringProgress)
@@ -1026,27 +961,6 @@ struct ArrivingTrackRow: View {
         .contextMenu {
             Button("Cancel Download", systemImage: "xmark", role: .destructive) { client.cancel(transfer) }
         }
-    }
-
-    /// "The Killers - Sam's Town - 15 - Where…" and "15 Where…" → 15.
-    static func number(_ fileName: String) -> Int? {
-        let parts = parts(fileName)
-        if let part = parts.first(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }) { return Int(part) }
-        return MissingTracks.leadingNumber(parts.last ?? fileName)
-    }
-
-    /// The song's name, after any artist, album and number in front of it.
-    static func title(_ fileName: String) -> String {
-        let parts = parts(fileName)
-        if let index = parts.lastIndex(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }), index < parts.count - 1 {
-            return parts[(index + 1)...].joined(separator: " - ")
-        }
-        return ReleaseDetailView.trackName(fileName)
-    }
-
-    private static func parts(_ fileName: String) -> [String] {
-        let stem = (fileName as NSString).deletingPathExtension
-        return stem.split(separator: /\s+[-–—]\s+/).map { $0.trimmingCharacters(in: .whitespaces) }
     }
 }
 
@@ -1058,7 +972,7 @@ struct PendingSongRow: View {
 
     var body: some View {
         let transfer = client.transfers.first { !$0.forStreaming && $0.plannedPath == path }
-        let name = ReleaseDetailView.trackName((path as NSString).lastPathComponent)
+        let name = ReleaseText.trackName((path as NSString).lastPathComponent)
         let folders = path.split(separator: "/").dropLast().map(String.init)
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {

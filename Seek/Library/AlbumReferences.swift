@@ -241,7 +241,7 @@ enum MissingTracks {
 
     static func matchName(of file: RemoteFile) -> String {
         if let cached = names.object(forKey: file.id as NSString) { return cached as String }
-        let name = ReleaseText.fold(ReleaseDetailView.trackName(file.name))
+        let name = ReleaseText.fold(ReleaseText.trackName(file.name))
         names.setObject(name as NSString, forKey: file.id as NSString)
         return name
     }
@@ -251,7 +251,7 @@ enum MissingTracks {
     /// The name with everything in brackets dropped: "The Eternal (Live)" → "the eternal".
     static func bareName(of file: RemoteFile) -> String {
         if let cached = bareNames.object(forKey: file.id as NSString) { return cached as String }
-        let name = ReferenceTitles.bare(ReleaseDetailView.trackName(file.name))
+        let name = ReferenceTitles.bare(ReleaseText.trackName(file.name))
         bareNames.setObject(name as NSString, forKey: file.id as NSString)
         return name
     }

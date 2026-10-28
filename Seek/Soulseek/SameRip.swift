@@ -40,7 +40,7 @@ nonisolated enum SameRip {
     /// then same name. Names are read once per file (reading them is the slow part).
     private static func paired(_ mine: [RemoteFile], in theirs: [RemoteFile]) -> [String: RemoteFile] {
         func key(_ file: RemoteFile) -> (name: String, number: Int?) {
-            (ReleaseText.fold(ReleaseDetailView.trackName(file.name)), MissingTracks.leadingNumber(file.name))
+            (ReleaseText.fold(ReleaseText.trackName(file.name)), MissingTracks.leadingNumber(file.name))
         }
         let candidates = theirs.map { (file: $0, key: key($0)) }
         var used = Set<String>()

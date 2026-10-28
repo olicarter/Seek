@@ -1,87 +1,6 @@
 import SwiftData
 import SwiftUI
 
-/// The current search grouped into releases. Regrouped (throttled) as Soulseek results arrive,
-/// and again when Claude answers about folders Seek wasn't sure of.
-@MainActor
-@Observable
-final class SearchResults {
-    enum Timing {
-        /// Straight away, dropping any regroup on its way.
-        case now
-        /// Once typing pauses.
-        case afterTyping
-        /// At most every 300 ms, for Soulseek results that keep arriving: waiting for a pause
-        /// would show nothing until a busy search went quiet.
-        case throttled
-    }
-
-    private struct Inputs {
-        let query: String
-        let owned: [BandcampItem]
-        let store: [BandcampAPI.StoreResult]
-        let folders: [RemoteFolder]
-        let library: LibraryIndex
-        let wishlist: Set<Int>
-        let quality: QualityPreference
-        let catalog: [CatalogRelease]
-    }
-
-    private(set) var result = ReleaseGrouper.Result(releases: [], songs: [], unsure: [])
-    @ObservationIgnored private var pending: Task<Void, Never>?
-    @ObservationIgnored private var pendingTiming: Timing?
-    @ObservationIgnored private var resolveLater: Task<Void, Never>?
-    @ObservationIgnored private var latest: Inputs?
-    @ObservationIgnored private var generation = 0
-
-    func release(_ id: SearchRelease.ID) -> SearchRelease? {
-        result.releases.first { $0.id == id }
-    }
-
-    func update(query: String, owned: [BandcampItem], store: [BandcampAPI.StoreResult], folders: [RemoteFolder],
-                resolver: FolderResolver, library: LibraryIndex, wishlist: Set<Int>, quality: QualityPreference,
-                catalog: [CatalogRelease] = [], timing: Timing = .now) {
-        latest = Inputs(query: query, owned: owned, store: store, folders: folders,
-                        library: library, wishlist: wishlist, quality: quality, catalog: catalog)
-        generation += 1
-        // A throttled regroup already on its way picks up these inputs when it runs.
-        if timing == .throttled, pending != nil, pendingTiming == .throttled { return }
-        schedule(timing, resolver: resolver)
-    }
-
-    private func schedule(_ timing: Timing, resolver: FolderResolver) {
-        pending?.cancel()
-        pendingTiming = timing
-        pending = Task {
-            if timing != .now { try? await Task.sleep(for: .milliseconds(300)) }
-            guard !Task.isCancelled, let inputs = latest else { return }
-            let started = generation
-            let hints = resolver.hints
-            // All the matching happens off the main thread, so typing stays smooth.
-            let grouped = await Task.detached {
-                ReleaseGrouper.group(query: inputs.query, owned: inputs.owned, store: inputs.store,
-                                     folders: inputs.folders, hints: hints, library: inputs.library,
-                                     wishlist: inputs.wishlist, quality: inputs.quality, catalog: inputs.catalog)
-            }.value
-            guard !Task.isCancelled else { return }
-            pending = nil
-            pendingTiming = nil
-            result = grouped
-            // More arrived while grouping: go again shortly.
-            if generation != started { schedule(.throttled, resolver: resolver) }
-            // Once Soulseek goes quiet for a few seconds, ask Claude about the folders left unsure.
-            resolveLater?.cancel()
-            if !grouped.unsure.isEmpty {
-                resolveLater = Task {
-                    try? await Task.sleep(for: .seconds(3))
-                    guard !Task.isCancelled else { return }
-                    resolver.resolve(grouped.unsure, releases: grouped.releases)
-                }
-            }
-        }
-    }
-}
-
 /// Search across your Bandcamp purchases, the Bandcamp store and Soulseek, shown as one row per
 /// release with the best way to get it.
 struct SearchView: View {
@@ -94,83 +13,45 @@ struct SearchView: View {
     private var tracks: [Track] { library.allTracks }
     @Environment(LibraryStore.self) private var library
     @State private var query = ""
-    @State private var submitted = ""
-    @State private var losslessOnly = false
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
-    @State private var freeSlotsOnly = false
     @State private var showAllFolders = false
-    @State private var storeFound: [BandcampAPI.StoreResult] = []
-    /// The artist's Apple Music catalogue, when the search is an artist's name.
-    @State private var catalogFound: [CatalogRelease] = []
-    /// What the store and catalogue results above are for, and how many songs the library index
-    /// was built from. Coming back from a result reruns the tasks below; with these they keep
-    /// what they have, so the list doesn't briefly reorder without them.
-    @State private var storeLoadedFor: String?
-    @State private var indexedTrackCount: Int?
-    @State private var results = SearchResults()
+    /// The search itself, shared with the server (see SearchModel).
+    @State private var model = SearchModel()
     /// Pages opened from the results, all by value (see `openArtist`).
     @State private var path = NavigationPath()
     @State private var buying: StorePurchase?
-    /// Rebuilt only when the library changes, never while typing.
-    @State private var libraryIndex = LibraryIndex(albums: [])
+
+    private var submitted: String { model.submitted }
+    private var results: SearchResults { model.results }
+    private var catalogFound: [CatalogRelease] { model.catalogFound }
 
     private var search: SearchSession? {
         client.currentSearch.flatMap { $0.query == submitted ? $0 : nil }
     }
 
-    private var folders: [RemoteFolder] {
-        // Folders opened since the search show every file, not just the ones that matched.
-        (search?.folders ?? []).map(client.complete).filter { (!losslessOnly || $0.isLossless) && (!freeSlotsOnly || $0.hasFreeSlot) }
-    }
+    private var folders: [RemoteFolder] { model.folders(client: client) }
 
     var body: some View {
         NavigationStack(path: $path) {
             resultsList
                 .navigationTitle("Search")
                 .searchable(text: $query, prompt: "Artists, albums, songs")
-                .onSubmit(of: .search) {
-                    submitted = query.trimmingCharacters(in: .whitespacesAndNewlines)
-                    client.search(submitted)
-                }
+                .onSubmit(of: .search) { model.submit(query, client: client) }
                 .onChange(of: router.pendingSearch, initial: true) { _, text in
                     guard let text else { return }
                     router.pendingSearch = nil
                     path = NavigationPath()
                     query = text
-                    submitted = text
-                    client.search(text)
+                    model.submit(text, client: client)
                 }
                 .toolbar { filterMenu }
                 .modifier(ReleaseDestinations(compact: sizeClass == .compact, results: results, buying: $buying))
-                .task(id: submitted) {
-                    guard storeLoadedFor != submitted else { return }
-                    storeFound = []
-                    catalogFound = []
-                    guard !submitted.isEmpty else { return }
-                    async let catalog = ArtistCatalog.releases(for: submitted)
-                    let found = await bandcamp.storeSearch(submitted)
-                    let releases = await catalog
-                    guard !Task.isCancelled else { return }
-                    storeFound = found
-                    catalogFound = releases
-                    storeLoadedFor = submitted
-                }
-                // Not an artist's name: the catalogues of the artists found, for the releases named.
-                .task(id: resultArtists) {
-                    guard storeLoadedFor == submitted, !submitted.isEmpty, !resultArtists.isEmpty,
-                          catalogFound.allSatisfy({ !ReleaseText.artistsMatch($0.artist, submitted) }) else { return }
-                    let named = await ArtistCatalog.releases(named: submitted, by: resultArtists)
-                    guard !Task.isCancelled, !named.isEmpty else { return }
-                    let known = Set(catalogFound.map { "\($0.artist)|\($0.title)|\($0.released)" })
-                    catalogFound += named.filter { !known.contains("\($0.artist)|\($0.title)|\($0.released)") }
-                }
+                .task(id: submitted) { await model.loadSources(bandcamp: bandcamp) }
+                .task(id: model.resultArtists) { await model.loadNamedReleases() }
                 .modifier(regroupTriggers)
                 .task(id: tracks.count) {
-                    guard indexedTrackCount != tracks.count else { return }
-                    let count = tracks.count
-                    let keys = Array(Set(tracks.map(\.albumKey)))
-                    libraryIndex = await Task.detached { LibraryIndex(albums: keys) }.value
-                    indexedTrackCount = count
+                    guard model.needsIndex(trackCount: tracks.count) else { return }
+                    await model.indexLibrary(tracks)
                     regroup()
                 }
                 .fullScreenCover(item: $buying) { BandcampStoreView(result: $0.result, buyNow: $0.price, replacing: $0.replacing) }
@@ -197,9 +78,10 @@ struct SearchView: View {
     }
 
     private var filterMenu: some View {
-        Menu("Filter", systemImage: "line.3.horizontal.decrease") {
-            Toggle("Lossless Only", isOn: $losslessOnly)
-            Toggle("Free Slots Only", isOn: $freeSlotsOnly)
+        @Bindable var model = model
+        return Menu("Filter", systemImage: "line.3.horizontal.decrease") {
+            Toggle("Lossless Only", isOn: $model.losslessOnly)
+            Toggle("Free Slots Only", isOn: $model.freeSlotsOnly)
             Divider()
             Toggle("Show All Folders", isOn: $showAllFolders)
         }
@@ -208,38 +90,16 @@ struct SearchView: View {
     /// Regroups whenever any source changes.
     private var regroupTriggers: RegroupTriggers {
         RegroupTriggers(
-            query: query, submitted: submitted, storeCount: storeFound.count - storeVerifier.rejected.count, catalogCount: catalogFound.count,
+            query: query, submitted: submitted, storeCount: model.storeFound.count - storeVerifier.rejected.count, catalogCount: catalogFound.count,
             folderCount: search?.folders.count ?? 0,
-            hintCount: resolver.hints.count, losslessOnly: losslessOnly, freeSlotsOnly: freeSlotsOnly, quality: quality,
+            hintCount: resolver.hints.count, losslessOnly: model.losslessOnly, freeSlotsOnly: model.freeSlotsOnly, quality: quality,
             purchaseCount: bandcamp.items.count, fetchedFolders: client.folderContents.count, regroup: regroup
         )
     }
 
-    /// The artists of the top few releases found, whose catalogues can tell their editions apart.
-    private var resultArtists: [String] {
-        var artists: [String] = []
-        for release in results.result.releases where !release.folders.isEmpty && release.artist != "Unknown Artist" {
-            if !artists.contains(where: { ReleaseText.artistsMatch($0, release.artist) }) { artists.append(release.artist) }
-            if artists.count == 3 { break }
-        }
-        return artists
-    }
-
     private func regroup(_ timing: SearchResults.Timing = .now) {
-        let text = submitted.isEmpty ? query : submitted
-        results.update(
-            query: text,
-            owned: bandcamp.search(query.isEmpty ? submitted : query),
-            store: bandcamp.storeResults(for: submitted, found: storeFound).filter { !storeVerifier.rejected.contains($0.id) },
-            folders: folders,
-            resolver: resolver,
-            library: libraryIndex,
-            wishlist: Set(bandcamp.wishlist.map(\.id)),
-            quality: quality,
-            // Only for the search it was looked up for, not one being typed.
-            catalog: query.isEmpty || query == submitted ? catalogFound : [],
-            timing: timing
-        )
+        model.regroup(timing, typing: query, client: client, bandcamp: bandcamp, resolver: resolver,
+                      storeVerifier: storeVerifier, quality: quality)
     }
 
     private var emptyPrompt: String {
@@ -372,60 +232,6 @@ struct SearchView: View {
 }
 
 // MARK: - Getting a release
-
-/// The best way to get a release right now, in order: it's in the library; it's a Bandcamp
-/// purchase (downloading or ready to download); it's free on Soulseek; it's for sale on Bandcamp.
-@MainActor
-struct ReleaseAction {
-    enum Kind {
-        case inLibrary(AlbumKey)
-        case downloadingBandcamp(Double?)
-        case downloadBandcamp(BandcampItem)
-        case downloadingSoulseek(Double?)
-        case downloadSoulseek(RemoteFolder)
-        case buy(BandcampAPI.StoreResult, BandcampAPI.Price?)
-        case none
-    }
-
-    let kind: Kind
-
-    init(release: SearchRelease, inLibrary: AlbumKey?, client: SoulseekClient, bandcamp: BandcampClient) {
-        if let inLibrary {
-            kind = .inLibrary(inLibrary)
-        } else if let item = release.owned, let download = bandcamp.download(for: item), download.state.isActive {
-            kind = .downloadingBandcamp(download.ringProgress)
-        } else if let item = release.owned, item.redownloadURL != nil {
-            // Already bought: the official files, at no cost, beat any Soulseek copy.
-            kind = .downloadBandcamp(item)
-        } else if let progress = Self.soulseekProgress(release, client: client) {
-            kind = .downloadingSoulseek(progress)
-        } else if let folder = release.bestFolder {
-            kind = .downloadSoulseek(folder)
-        } else if let store = release.store {
-            kind = .buy(store, bandcamp.prices[store.id])
-        } else {
-            kind = .none
-        }
-    }
-
-    /// Progress of any of the release's Soulseek folders being downloaded.
-    static func soulseekProgress(_ release: SearchRelease, client: SoulseekClient) -> Double? {
-        // Any song from the release's copies: adding it takes each from its copy's full folder,
-        // not only the files the search listed.
-        let folderIDs = Set(release.folders.map(\.id))
-        guard !release.fileIDs.isEmpty || !folderIDs.isEmpty else { return nil }
-        // Finished songs still count, so the ring doesn't fall back each time one completes.
-        // Finished ones only while their songs are still in the library: once all are in, the
-        // album still reads as added (a check) rather than offering to add it again.
-        let transfers = client.transfers.filter {
-            (client.isOnItsWay($0) || client.isDone($0)) && !$0.forStreaming
-                && (release.fileIDs.contains($0.file.id) || folderIDs.contains("\($0.file.username)\u{0}\($0.file.folder)"))
-        }
-        guard !transfers.isEmpty else { return nil }
-        let size = transfers.reduce(0) { $0 + $1.size }
-        return size > 0 ? Double(transfers.reduce(0) { $0 + $1.bytesReceived }) / Double(size) : 0
-    }
-}
 
 /// One release: cover, name, where it's available, and one button for the best way to get it.
 struct ReleaseRow: View {
@@ -731,7 +537,7 @@ struct ReleaseDetailView: View {
             artist: release.artist, album: release.title,
             folders: release.folders.map(client.complete),
             bandcampPage: release.store?.url ?? release.owned?.itemURL,
-            artworkURL: release.artworkURL.map(Self.large)
+            artworkURL: release.artworkURL.map(BandcampAPI.largeArtwork)
         )
     }
 
@@ -766,7 +572,7 @@ struct ReleaseDetailView: View {
                     onPlay: { player.play(queue.map(\.track), startingAt: 0) },
                     onShuffle: { player.playShuffled(queue.map(\.track)) }
                 ) {
-                    ReleaseArtwork(url: release.artworkURL.map(Self.large), size: 300)
+                    ReleaseArtwork(url: release.artworkURL.map(BandcampAPI.largeArtwork), size: 300)
                         .aspectRatio(1, contentMode: .fit)
                 } accessory: {
                     HStack(spacing: 14) {
@@ -809,7 +615,7 @@ struct ReleaseDetailView: View {
                     ForEach(Array(folder.files.enumerated()), id: \.element.id) { index, file in
                         HStack(spacing: 12) {
                             Text("\(index + 1)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 22, alignment: .trailing)
-                            Text(Self.trackName(file.name)).lineLimit(1)
+                            Text(ReleaseText.trackName(file.name)).lineLimit(1)
                             Spacer()
                         }
                     }
@@ -888,32 +694,11 @@ struct ReleaseDetailView: View {
         }
     }
 
-    /// Bandcamp's 350-pixel thumbnails as 700-pixel art for the header.
-    static func large(_ url: URL) -> URL {
-        URL(string: url.absoluteString.replacingOccurrences(of: "_2.jpg", with: "_16.jpg")) ?? url
-    }
-
     func openArtistPage(_ name: String) {
         let artist = ArtistKey(name: name)
         if let openArtist { openArtist(artist) } else { router.show(artist) }
     }
 
-    /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
-    static func trackName(_ fileName: String) -> String {
-        let stem = (fileName as NSString).deletingPathExtension
-        var parts = stem.split(separator: /\s+[-–—]\s+/).map(String.init)
-        // "Artist - Album - 02 - Song" or "Artist - Album - 02 Song": the song comes after its number.
-        if let index = parts.lastIndex(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }), index > 0, index < parts.count - 1 {
-            return parts[(index + 1)...].joined(separator: " - ")
-        }
-        if parts.count > 2, let last = parts.last, last.firstMatch(of: /^\d{1,3}[\s.\-_]+\D/) != nil {
-            return last.replacing(/^\d{1,3}[\s.\-_]+/, with: "")
-        }
-        if let first = parts.first, first.allSatisfy(\.isNumber), parts.count > 1 { parts.removeFirst() }
-        if parts.count > 1 { parts.removeFirst() }
-        let name = parts.joined(separator: " - ")
-        return name.replacing(/^\d{1,3}[\s.\-_]+/, with: "")
-    }
 }
 
 private struct RegroupTriggers: ViewModifier {
@@ -985,36 +770,6 @@ struct AnyLabelStyle: LabelStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         make(configuration)
-    }
-}
-
-/// Which Soulseek copies to show first: the ones at the preferred quality that can be downloaded
-/// right now (a free slot). The rest stay a tap away.
-enum CopyFilter {
-    static func meetsTarget(_ folder: RemoteFolder, quality: QualityPreference) -> Bool {
-        quality == .cd ? folder.isLossless && !folder.isHiRes : folder.isLossless
-    }
-
-    /// Has (nearly) all the album: at least 80% of its songs, allowing for a bonus track missing
-    /// or a stray extra. Some users share a single song in a folder named for the album.
-    static func isComplete(_ folder: RemoteFolder, expectedTracks: Int?) -> Bool {
-        guard let expectedTracks, expectedTracks > 1 else { return true }
-        return folder.files.count * 5 >= expectedTracks * 4
-    }
-
-    /// One song isn't a copy of a release with several, however it's named: it's the single
-    /// of the same name (a 2-song EP's title track on its own), or one song shared alone.
-    static func isCopy(_ folder: RemoteFolder, expectedTracks: Int?) -> Bool {
-        guard let expectedTracks, expectedTracks > 1 else { return true }
-        return folder.files.count > 1
-    }
-
-    /// The preferred copies, or nil when none qualify (then everything is shown).
-    static func preferred(_ folders: [RemoteFolder], quality: QualityPreference, expectedTracks: Int? = nil) -> [RemoteFolder]? {
-        let good = folders.filter {
-            $0.hasFreeSlot && meetsTarget($0, quality: quality) && isComplete($0, expectedTracks: expectedTracks)
-        }
-        return good.isEmpty ? nil : good
     }
 }
 

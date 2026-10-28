@@ -5,12 +5,12 @@ import Testing
 struct ArrivingTrackTests {
     @Test func readsNumberAndTitleFromFileNames() {
         let name = "The Killers - Sam's Town  - 15 - Where the White Boys Dance.flac"
-        #expect(ArrivingTrackRow.number(name) == 15)
-        #expect(ArrivingTrackRow.title(name) == "Where the White Boys Dance")
-        #expect(ArrivingTrackRow.number("15 Where the White Boys Dance.flac") == 15)
-        #expect(ArrivingTrackRow.number("03 - Bones.mp3") == 3)
-        #expect(ArrivingTrackRow.title("03 - Bones.mp3") == "Bones")
-        #expect(ArrivingTrackRow.number("Bones.mp3") == nil)
+        #expect(ReleaseText.songNumber(name) == 15)
+        #expect(ReleaseText.songTitle(name) == "Where the White Boys Dance")
+        #expect(ReleaseText.songNumber("15 Where the White Boys Dance.flac") == 15)
+        #expect(ReleaseText.songNumber("03 - Bones.mp3") == 3)
+        #expect(ReleaseText.songTitle("03 - Bones.mp3") == "Bones")
+        #expect(ReleaseText.songNumber("Bones.mp3") == nil)
     }
 }
 
@@ -18,10 +18,10 @@ struct ArrivingTrackTests {
 struct RemasterFileNameTests {
     @Test func songNamesAfterArtistAndAlbum() {
         let name = "Knuckle Puck - Copacetic (Remixed-Remastered) - 02 Disdain (Remixed-Remastered).flac"
-        #expect(ReleaseDetailView.trackName(name) == "Disdain (Remixed-Remastered)")
-        #expect(ReleaseDetailView.trackName("Knuckle Puck - Copacetic - 02 - Disdain.flac") == "Disdain")
-        #expect(ReleaseDetailView.trackName("02 - Disdain.flac") == "Disdain")
-        #expect(ReleaseDetailView.trackName("Knuckle Puck - Disdain.flac") == "Disdain")
+        #expect(ReleaseText.trackName(name) == "Disdain (Remixed-Remastered)")
+        #expect(ReleaseText.trackName("Knuckle Puck - Copacetic - 02 - Disdain.flac") == "Disdain")
+        #expect(ReleaseText.trackName("02 - Disdain.flac") == "Disdain")
+        #expect(ReleaseText.trackName("Knuckle Puck - Disdain.flac") == "Disdain")
         #expect(MissingTracks.leadingNumber(name) == 2)
 
         let file = RemoteFile(username: "u", path: "Music\\Knuckle Puck\\\(name)", size: 1)

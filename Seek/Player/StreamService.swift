@@ -352,7 +352,7 @@ enum StreamQueue {
     static func build(reference: AlbumReference?, artist: String, album: String, folders: [RemoteFolder],
                       bandcampPage: URL?, artworkURL: URL?) -> [(reference: ReferenceTrack, track: Track)] {
         let tracklist = reference?.tracks ?? (folders.first?.files ?? []).enumerated().map { index, file in
-            ReferenceTrack(number: index + 1, disc: 1, title: ReleaseDetailView.trackName(file.name), duration: file.duration.map(Double.init))
+            ReferenceTrack(number: index + 1, disc: 1, title: ReleaseText.trackName(file.name), duration: file.duration.map(Double.init))
         }
         return tracklist.compactMap { reference in
             let candidates = folders.compactMap { MissingTracks.file(for: reference, in: $0.files) }

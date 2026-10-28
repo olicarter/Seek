@@ -36,6 +36,10 @@ struct SeekApp: App {
         sharing.onChange = { [weak client] in client?.shareCountsChanged() }
         library.onLibraryChanged = { [weak sharing] in sharing?.libraryChanged() }
         _sharing = State(initialValue: sharing)
+        AppleCovers.shared.onCoversChanged = { ArtworkImages.invalidate() }
+        library.onArtworkChanged = { keys in
+            if let keys { ArtworkImages.forget(keys) } else { ArtworkImages.invalidate() }
+        }
     }
 
     var body: some Scene {

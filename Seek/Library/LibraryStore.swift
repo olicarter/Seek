@@ -2,7 +2,11 @@ import CoreData
 import Foundation
 import Observation
 import SwiftData
+import ImageIO
+import UniformTypeIdentifiers
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// Owns the music folder (in iCloud Drive when available) and keeps the Track index in step with it.
 @MainActor
@@ -15,7 +19,13 @@ final class LibraryStore {
     static let automaticDownloadsKey = "automaticDownloads"
     /// On for iPhone, where music you've just added is usually what you'll play next; off for
     /// iPad and Mac.
-    static var defaultAutomaticDownloads: Bool { UIDevice.current.userInterfaceIdiom == .phone }
+    static var defaultAutomaticDownloads: Bool {
+        #if canImport(UIKit)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
     static var automaticDownloads: Bool {
         UserDefaults.standard.object(forKey: automaticDownloadsKey) as? Bool ?? defaultAutomaticDownloads
     }
@@ -46,8 +56,10 @@ final class LibraryStore {
     /// Songs' details (and maybe artwork) changed.
     private func contentChanged(artwork: Bool = false) {
         contentChanges += 1
-        if artwork { ArtworkImages.invalidate() }
+        if artwork { onArtworkChanged?(nil) }
     }
+    /// Artwork drawn for these keys (nil: any) is out of date: the app's image cache.
+    @ObservationIgnored var onArtworkChanged: (([String]?) -> Void)?
     /// Whether a file is open right now (e.g. playing), so it isn't removed from under the player.
     @ObservationIgnored var isInUse: ((String) -> Bool)?
     /// Told when the set of songs or their files change, e.g. to update what's shared.
@@ -207,6 +219,21 @@ final class LibraryStore {
             }
         })
         refreshFavorites()
+    }
+
+    /// Runs from a plain folder, read again with `rescan()`: on a Mac running the server, that's
+    /// the app's own iCloud folder as iCloud Drive keeps it, so both see the same music.
+    func start(folder: URL) {
+        guard root == nil else { return }
+        useFolder(folder)
+        rescanLocalFolder()
+        refreshFavorites()
+    }
+
+    /// Reads the folder again for songs added, removed or changed since.
+    func rescan() {
+        guard !usesICloud else { return }
+        rescanLocalFolder()
     }
 
     /// Uses a plain folder, without iCloud or watching for changes (for tests).
@@ -567,12 +594,12 @@ final class LibraryStore {
         let prefix = folder + "/"
         let descriptor = FetchDescriptor<Track>(predicate: #Predicate { $0.path.starts(with: prefix) })
         guard let tracks = try? context.fetch(descriptor), !tracks.isEmpty else { return false }
-        let name = ReleaseText.fold(ReleaseDetailView.trackName(fileName))
+        let name = ReleaseText.fold(ReleaseText.trackName(fileName))
         guard !name.isEmpty else { return false }
         return tracks.contains { track in
             // Only songs directly in the folder, not a disc folder below it.
             guard !track.path.dropFirst(prefix.count).contains("/") else { return false }
-            let other = ReleaseText.fold(ReleaseDetailView.trackName((track.path as NSString).lastPathComponent))
+            let other = ReleaseText.fold(ReleaseText.trackName((track.path as NSString).lastPathComponent))
             // "Artist - Album - 12 - Song" and "12 Song" leave different amounts before the title.
             return other == name || other.hasSuffix(" " + name) || name.hasSuffix(" " + other)
         }
@@ -656,7 +683,7 @@ final class LibraryStore {
         // Only this song's album and label covers can have changed: clearing every cover made
         // each song arriving redraw all artwork on screen.
         contentChanged()
-        ArtworkImages.forget(["album|\(track.albumKey.artist)|\(track.albumKey.title)", "label|\(track.label)", path])
+        onArtworkChanged?(["album|\(track.albumKey.artist)|\(track.albumKey.title)", "label|\(track.label)", path])
         scheduleInfoSync()
         if !track.isDeleted, track.modelContext != nil { onAlbumImported?(track.albumKey) }
         return path
@@ -1180,11 +1207,17 @@ final class LibraryStore {
     }
 
     nonisolated static func cover(from artwork: Data) -> Data? {
-        guard let image = UIImage(data: artwork) else { return nil }
-        let side: CGFloat = 600
-        let scale = min(1, side / max(image.size.width, image.size.height))
-        let size = CGSize(width: (image.size.width * scale).rounded(), height: (image.size.height * scale).rounded())
-        return (image.preparingThumbnail(of: size) ?? image).jpegData(compressionQuality: 0.8)
+        // At most 600 pixels a side, as a JPEG.
+        guard let source = CGImageSourceCreateWithData(artwork as CFData, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+                  kCGImageSourceThumbnailMaxPixelSize: 600,
+              ] as CFDictionary) else { return nil }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, image, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+        return CGImageDestinationFinalize(destination) ? data as Data : nil
     }
 
     private func insertTrack(_ path: String) -> Track {

@@ -216,10 +216,10 @@ struct FolderResolverTests {
 @MainActor
 struct TrackNameTests {
     @Test func stripsNumbersAndArtists() {
-        #expect(ReleaseDetailView.trackName("01 - Cryogeyser - Glitch.flac") == "Glitch")
-        #expect(ReleaseDetailView.trackName("01 Glitch.flac") == "Glitch")
-        #expect(ReleaseDetailView.trackName("02. Love Is Land.mp3") == "Love Is Land")
-        #expect(ReleaseDetailView.trackName("Glitch.flac") == "Glitch")
+        #expect(ReleaseText.trackName("01 - Cryogeyser - Glitch.flac") == "Glitch")
+        #expect(ReleaseText.trackName("01 Glitch.flac") == "Glitch")
+        #expect(ReleaseText.trackName("02. Love Is Land.mp3") == "Love Is Land")
+        #expect(ReleaseText.trackName("Glitch.flac") == "Glitch")
     }
 }
 

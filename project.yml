@@ -8,6 +8,9 @@ packages:
   ZIPFoundation:
     url: https://github.com/weichsel/ZIPFoundation
     from: 0.9.19
+  Hummingbird:
+    url: https://github.com/hummingbird-project/hummingbird
+    from: 2.5.0
 settings:
   base:
     DEVELOPMENT_TEAM: MPCJ63V5P5
@@ -85,6 +88,34 @@ targets:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsText: true
+  # Seek's core (Soulseek, search, tracklists, library) as a server on a Mac, for the web
+  # version in web/. It compiles the app's own files: nothing here is a copy.
+  SeekServer:
+    type: tool
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - Server
+      - Seek/Soulseek
+      - path: Seek/Search
+        excludes: [SearchView.swift, ExternalAlbumView.swift, SearchDump.swift]
+      - path: Seek/Library
+        excludes: [Discovery.swift, AlbumAbout.swift]
+      - Seek/Bandcamp/BandcampAPI.swift
+      - Seek/Bandcamp/BandcampClient.swift
+      - Seek/Bandcamp/StoreVerifier.swift
+      - Seek/Player/StreamService.swift
+      - Seek/Player/ProgressiveLoader.swift
+    dependencies:
+      - package: ZIPFoundation
+      - package: Hummingbird
+        product: Hummingbird
+    settings:
+      base:
+        PRODUCT_NAME: seek-server
+        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.server
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
   SeekTests:
     type: bundle.unit-test
     platform: iOS
@@ -96,6 +127,10 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tests
 schemes:
+  SeekServer:
+    build:
+      targets:
+        SeekServer: all
   Seek:
     build:
       targets:

@@ -26,6 +26,8 @@ final class AppleCovers {
     /// Artists already asked about this session: the catalogue answers those from memory.
     @ObservationIgnored private var askedArtists: Set<String> = []
     @ObservationIgnored private var refresh: Task<Void, Never>?
+    /// Drops images drawn from the old covers (the app's image cache).
+    @ObservationIgnored var onCoversChanged: (() -> Void)?
     @ObservationIgnored private let images: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
         cache.countLimit = 60
@@ -128,7 +130,7 @@ final class AppleCovers {
         refresh = Task {
             try? await Task.sleep(for: .seconds(1))
             refresh = nil
-            ArtworkImages.invalidate()
+            onCoversChanged?()
             version += 1
         }
     }

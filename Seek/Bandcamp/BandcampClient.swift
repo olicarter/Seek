@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import UIKit
+import WebKit
 import ZIPFoundation
 
 @MainActor
@@ -126,7 +126,7 @@ final class BandcampClient {
 
     /// The login cookie syncs through iCloud Keychain, so signing in once covers every device.
     @ObservationIgnored private let keychain = KeychainItem(service: "dev.olicarter.seek.bandcamp")
-    @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    @ObservationIgnored private var backgroundTask = BackgroundWork()
     @ObservationIgnored private var fanId: Int?
     @ObservationIgnored private var purchaseWatches: [Int: Task<Void, Never>] = [:]
 
@@ -243,7 +243,17 @@ final class BandcampClient {
         lastRefresh = nil
         try? FileManager.default.removeItem(at: Self.cacheURL)
         try? FileManager.default.removeItem(at: Self.wishlistCacheURL)
-        Task { await BandcampLoginView.clearCookies() }
+        Task { await Self.clearLoginCookies() }
+    }
+
+    /// The sign-in page's cookies, so the next sign-in starts afresh.
+    private static func clearLoginCookies() async {
+        let store = WKWebsiteDataStore.default()
+        let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
+        await store.removeData(
+            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
+            for: records.filter { $0.displayName.contains("bandcamp") }
+        )
     }
 
     // MARK: - Collection
@@ -596,19 +606,15 @@ final class BandcampClient {
 
     private func updateBackgroundWork() {
         let busy = downloads.contains(where: \.state.isActive)
-        if busy, backgroundTask == .invalid {
-            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Bandcamp downloads") { [weak self] in
-                MainActor.assumeIsolated { self?.endBackgroundWork() }
-            }
+        if busy {
+            backgroundTask.begin("Bandcamp downloads") { [weak self] in self?.endBackgroundWork() }
         } else if !busy {
             endBackgroundWork()
         }
     }
 
     private func endBackgroundWork() {
-        guard backgroundTask != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTask)
-        backgroundTask = .invalid
+        backgroundTask.end()
     }
 }
 

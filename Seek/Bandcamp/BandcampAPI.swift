@@ -467,3 +467,11 @@ enum BandcampAPI {
         return Status(result: json["result"] as? String, downloadURL: url)
     }
 }
+
+extension BandcampAPI {
+    /// Bandcamp's 350-pixel thumbnails as 700-pixel art for the header.
+    static func largeArtwork(_ url: URL) -> URL {
+        URL(string: url.absoluteString.replacingOccurrences(of: "_2.jpg", with: "_16.jpg")) ?? url
+    }
+
+}

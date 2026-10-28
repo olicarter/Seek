@@ -1,7 +1,6 @@
 import Foundation
 import Network
 import Observation
-import UIKit
 
 enum PeerError: LocalizedError {
     case offline
@@ -93,7 +92,7 @@ final class SoulseekClient {
     @ObservationIgnored private var connecting: [String: Task<PeerConnection, Error>] = [:]
     @ObservationIgnored private var addressWaiters: [String: [CheckedContinuation<PeerAddress, Error>]] = [:]
     @ObservationIgnored private var pierceWaiters: [UInt32: CheckedContinuation<Socket, Error>] = [:]
-    @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
+    @ObservationIgnored private var backgroundTask = BackgroundWork()
 
     var activeTransferCount: Int { transfers.filter { $0.state.isActive && !$0.forStreaming }.count }
 
@@ -1082,9 +1081,9 @@ final class SoulseekClient {
         let audio = files.filter { AudioFormats.playable.contains($0.fileExtension) }
         var result: [String: RemoteFile] = [:]
         for song in songs {
-            let name = ReleaseText.fold(ReleaseDetailView.trackName(song.name))
+            let name = ReleaseText.fold(ReleaseText.trackName(song.name))
             let number = MissingTracks.leadingNumber(song.name)
-            if let match = audio.first(where: { ReleaseText.fold(ReleaseDetailView.trackName($0.name)) == name })
+            if let match = audio.first(where: { ReleaseText.fold(ReleaseText.trackName($0.name)) == name })
                 ?? number.flatMap({ n in audio.first { MissingTracks.leadingNumber($0.name) == n } }) {
                 result[song.id] = match
             }
@@ -1256,10 +1255,8 @@ final class SoulseekClient {
 
     private func updateBackgroundWork() {
         let busy = transfers.contains { $0.state == .downloading || $0.state == .importing }
-        if busy, backgroundTask == .invalid {
-            backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Soulseek downloads") { [weak self] in
-                MainActor.assumeIsolated { self?.endBackgroundWork() }
-            }
+        if busy {
+            backgroundTask.begin("Soulseek downloads") { [weak self] in self?.endBackgroundWork() }
         } else if !busy {
             endBackgroundWork()
         }
@@ -1267,9 +1264,7 @@ final class SoulseekClient {
     }
 
     private func endBackgroundWork() {
-        guard backgroundTask != .invalid else { return }
-        UIApplication.shared.endBackgroundTask(backgroundTask)
-        backgroundTask = .invalid
+        backgroundTask.end()
     }
 
     // MARK: - Peers

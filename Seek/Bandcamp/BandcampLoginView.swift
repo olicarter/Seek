@@ -38,14 +38,6 @@ struct BandcampLoginView: View {
         }
     }
 
-    static func clearCookies() async {
-        let store = WKWebsiteDataStore.default()
-        let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
-        await store.removeData(
-            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(),
-            for: records.filter { $0.displayName.contains("bandcamp") }
-        )
-    }
 }
 
 private struct LoginWebView: UIViewRepresentable {

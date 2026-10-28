@@ -50,7 +50,12 @@ struct KeychainItem {
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
             kSecValueData as String: data,
         ]
-        SecItemAdd(item as CFDictionary, nil)
+        // A command-line tool (the Mac server) can't use iCloud Keychain: this Mac's own keychain then.
+        if SecItemAdd(item as CFDictionary, nil) == errSecMissingEntitlement {
+            var local = item
+            local[kSecAttrSynchronizable as String] = false
+            SecItemAdd(local as CFDictionary, nil)
+        }
     }
 
     func clear() {

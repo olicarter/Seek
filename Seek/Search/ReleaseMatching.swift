@@ -642,3 +642,43 @@ struct LibraryIndex: Sendable {
         }
     }
 }
+
+extension ReleaseText {
+    /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
+    static func trackName(_ fileName: String) -> String {
+        let stem = (fileName as NSString).deletingPathExtension
+        var parts = stem.split(separator: /\s+[-–—]\s+/).map(String.init)
+        // "Artist - Album - 02 - Song" or "Artist - Album - 02 Song": the song comes after its number.
+        if let index = parts.lastIndex(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }), index > 0, index < parts.count - 1 {
+            return parts[(index + 1)...].joined(separator: " - ")
+        }
+        if parts.count > 2, let last = parts.last, last.firstMatch(of: /^\d{1,3}[\s.\-_]+\D/) != nil {
+            return last.replacing(/^\d{1,3}[\s.\-_]+/, with: "")
+        }
+        if let first = parts.first, first.allSatisfy(\.isNumber), parts.count > 1 { parts.removeFirst() }
+        if parts.count > 1 { parts.removeFirst() }
+        let name = parts.joined(separator: " - ")
+        return name.replacing(/^\d{1,3}[\s.\-_]+/, with: "")
+    }
+
+    /// "The Killers - Sam's Town - 15 - Where…" and "15 Where…" → 15.
+    static func songNumber(_ fileName: String) -> Int? {
+        let parts = songParts(fileName)
+        if let part = parts.first(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }) { return Int(part) }
+        return MissingTracks.leadingNumber(parts.last ?? fileName)
+    }
+
+    /// The song's name, after any artist, album and number in front of it.
+    static func songTitle(_ fileName: String) -> String {
+        let parts = songParts(fileName)
+        if let index = parts.lastIndex(where: { $0.count <= 3 && $0.allSatisfy(\.isNumber) }), index < parts.count - 1 {
+            return parts[(index + 1)...].joined(separator: " - ")
+        }
+        return ReleaseText.trackName(fileName)
+    }
+
+    private static func songParts(_ fileName: String) -> [String] {
+        let stem = (fileName as NSString).deletingPathExtension
+        return stem.split(separator: /\s+[-–—]\s+/).map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+}
