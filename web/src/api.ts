@@ -9,7 +9,6 @@ export type Status = {
   downloading: number;
   failure?: string;
   bandcamp?: string;
-  bandcampSigningIn: boolean;
 };
 
 export type Release = {
@@ -196,8 +195,6 @@ export const api = {
   beginRegister: () => post<{ challenge: string; userID: string; site: string }>("/api/auth/register/begin"),
   finishRegister: (answer: object) => post<{ session: string }>("/api/auth/register/finish", answer),
   status: () => get<Status>("/api/status"),
-  login: (username: string, password: string) => post<Status>("/api/login", { username, password }),
-  logout: () => post<Status>("/api/logout"),
   search: (query: string) => post<SearchPage>("/api/search", { query }),
   searchPage: () => get<SearchPage>("/api/search"),
   album: (ref: AlbumRef) => get<AlbumPage>(`/api/album?${albumQuery(ref)}`),
@@ -206,8 +203,6 @@ export const api = {
   downloads: () => get<Download[]>("/api/downloads"),
   takeFailure: () => post<{ message?: string }>("/api/failure/take"),
   artist: (name: string) => get<ArtistPage>(`/api/artist?name=${encodeURIComponent(name)}`),
-  bandcampSignIn: () => post<Status>("/api/bandcamp/signin"),
-  bandcampSignOut: () => post<Status>("/api/bandcamp/signout"),
   buying: () => post<{ ok: boolean }>("/api/bandcamp/buying"),
 };
 

@@ -5,10 +5,7 @@ import { For } from "solid-js";
 import { live } from "../live";
 
 export function Settings() {
-  const [status, { mutate }] = live(changes, api.status);
-  const [username, setUsername] = createSignal("");
-  const [password, setPassword] = createSignal("");
-  const [busy, setBusy] = createSignal(false);
+  const [status] = live(changes, api.status);
   const [address, setAddress] = createSignal(serverAddress());
   const [auth] = live(changes, api.auth);
   const [passkeys, { refetch: refetchPasskeys }] = live(changes, () => api.passkeys().catch(() => []));
@@ -23,16 +20,6 @@ export function Settings() {
     }
   };
 
-  const signIn = async (e: SubmitEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      mutate(await api.login(username(), password()));
-    } finally {
-      setBusy(false);
-      setPassword("");
-    }
-  };
 
   return (
     <section>
@@ -79,41 +66,12 @@ export function Settings() {
         <button class="link" onClick={async () => { await api.signOutEverywhere(); setCredential(null); }}>Sign Out Everywhere</button>
       </Show>
 
-      <h2>Soulseek</h2>
-      <Show
-        when={status()?.signedIn}
-        fallback={
-          <form class="login" onSubmit={signIn}>
-            <input placeholder="Username" autocomplete="username" value={username()} onInput={(e) => setUsername(e.currentTarget.value)} />
-            <input type="password" placeholder="Password" autocomplete="current-password" value={password()} onInput={(e) => setPassword(e.currentTarget.value)} />
-            <button disabled={busy() || !username() || !password()}>{busy() ? "Signing In…" : "Sign In"}</button>
-            <Show when={status()?.failure}><p class="error">{status()?.failure}</p></Show>
-            <p class="empty">Kept in this Mac's keychain. Soulseek allows one sign-in per account, so the phone and this server take turns.</p>
-          </form>
-        }
-      >
-        <p>Signed in as <strong>{status()?.username}</strong> ({status()?.soulseek}).</p>
-        <button onClick={async () => mutate(await api.logout())}>Sign Out</button>
-      </Show>
-
-      <h2>Bandcamp</h2>
-      <Show
-        when={status()?.bandcamp}
-        fallback={
-          <>
-            <button disabled={status()?.bandcampSigningIn} onClick={async () => mutate(await api.bandcampSignIn())}>
-              {status()?.bandcampSigningIn ? "Waiting for Sign-In…" : "Sign In"}
-            </button>
-            <p class="empty">
-              Bandcamp's sign-in page opens in a window on the Mac running the server. Seek keeps Bandcamp's session there,
-              never your password, so your purchases show up in Search and add from Bandcamp.
-            </p>
-          </>
-        }
-      >
-        <p>Signed in as <strong>{status()?.bandcamp}</strong>.</p>
-        <button onClick={async () => mutate(await api.bandcampSignOut())}>Sign Out</button>
-      </Show>
+      <h2>Soulseek and Bandcamp</h2>
+      <p class="empty">
+        {status()?.username ? `Soulseek: ${status()?.username}. ` : "Soulseek isn't signed in. "}
+        {status()?.bandcamp ? `Bandcamp: ${status()?.bandcamp}. ` : ""}
+        Seek on your Mac signs in to these: change them in its Settings.
+      </p>
     </section>
   );
 }

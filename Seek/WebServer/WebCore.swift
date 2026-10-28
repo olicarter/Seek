@@ -1,95 +1,63 @@
 import Foundation
 import SwiftData
 
-/// The app's own objects, wired together as SeekApp wires them, for the web version: the same
-/// Soulseek client, search, tracklists, copy finding, adding and library.
+/// Seek on the web, served by the Mac app: the app's own objects (its Soulseek client, library,
+/// tracklists, copy finding and adding), with a search of the web's own.
 @MainActor
 final class Core {
-    let container: ModelContainer
     let library: LibraryStore
-    let client = SoulseekClient()
-    let bandcamp = BandcampClient()
-    let references = AlbumReferences()
-    let copyFinder = CopyFinder()
-    let storeVerifier = StoreVerifier()
-    let resolver = FolderResolver()
-    let adder = AlbumAdder()
-    let search = SearchModel()
+    let client: SoulseekClient
+    let bandcamp: BandcampClient
+    let references: AlbumReferences
+    let copyFinder: CopyFinder
+    let storeVerifier: StoreVerifier
+    let resolver: FolderResolver
+    let adder: AlbumAdder
     let streamer: StreamService
-    private(set) lazy var bandcampLogin = BandcampLogin(bandcamp: bandcamp)
+    /// The web's search, apart from the app's Search tab (both use the one Soulseek client).
+    let search = SearchModel()
     let quality = QualityPreference.cd
     /// Bumped whenever anything a page shows may have changed; pages refetch when it does.
     private(set) var version = 0
+    private var watching: Task<Void, Never>?
 
-    /// The app's iCloud folder as iCloud Drive keeps it on this Mac, so the web and the phone
-    /// share one library. A plain folder when this Mac doesn't have it.
-    static var musicFolder: URL {
-        let icloud = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/Mobile Documents/iCloud~dev~olicarter~seek/Documents/Music", directoryHint: .isDirectory)
-        if FileManager.default.fileExists(atPath: icloud.path) { return icloud }
-        return FileManager.default.homeDirectoryForCurrentUser.appending(path: "Music/Seek", directoryHint: .isDirectory)
-    }
-
-    /// The server's own song index, apart from the app's (which lives on the phone).
+    /// Keys and passkeys for the web, kept with the app's data.
     nonisolated static var storeFolder: URL {
         let folder = URL.applicationSupportDirectory.appending(path: "Seek Server", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         return folder
     }
 
-    init() {
-        let schema = Schema([Track.self, Playlist.self, TrackInfo.self, Discovery.self, Favorite.self])
-        let config = ModelConfiguration("Server", schema: schema, url: Self.storeFolder.appending(path: "Library.store"),
-                                        cloudKitDatabase: .none)
-        do {
-            container = try ModelContainer(for: schema, configurations: config)
-        } catch {
-            fatalError("Couldn't open the library index: \(error)")
-        }
-        library = LibraryStore(container: container)
-        streamer = StreamService(client: client)
+    init(library: LibraryStore, client: SoulseekClient, bandcamp: BandcampClient, references: AlbumReferences,
+         copyFinder: CopyFinder, storeVerifier: StoreVerifier, resolver: FolderResolver, adder: AlbumAdder, streamer: StreamService) {
+        self.library = library
+        self.client = client
+        self.bandcamp = bandcamp
+        self.references = references
+        self.copyFinder = copyFinder
+        self.storeVerifier = storeVerifier
+        self.resolver = resolver
+        self.adder = adder
+        self.streamer = streamer
     }
 
-    func start() async {
-        library.start(folder: Self.musicFolder)
-        client.importDownload = { [library] transfer, url in
-            try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
-                                             album: transfer.album)
-        }
-        client.reservePath = { [library] transfer in library.reservePath(forRemotePath: transfer.path) }
-        client.keepReserved = { [library] path in library.keepReserved(path) }
-        client.libraryHas = { [library] path in library.hasTrack(path: path) }
-        client.libraryHasSong = { [library] name, path in library.hasSong(named: name, besides: path) }
-        client.releaseReserved = { [library] path, abandoned in library.releaseReserved(path, abandoned: abandoned) }
-        library.onAlbumsDeleted = { [client] folders in client.cancelDownloads(into: folders) }
-        client.cacheStream = { [streamer] transfer, url in try streamer.store(transfer, from: url) }
-        client.cachedFile = { [streamer] file in streamer.cachedURL(for: file) }
-        bandcamp.importFile = { [library] url, folders, name in
-            try await library.importFile(at: url, folders: folders, name: name)
-        }
-        bandcamp.replaceFiles = { [library] item, paths in
-            library.replace(paths, withPurchaseFrom: item.itemURL)
-        }
-        client.restoreDownloads()
-        bandcamp.restoreDownloads()
-        Task { await bandcamp.refreshIfStale() }
-        // Signed in for as long as the server runs: there's no app going into the background.
-        client.searchViewAppeared()
-        Task { await watch() }
-        Task { await rescanNow() }
+    /// The library's folder, for serving its songs.
+    var musicFolder: URL? { library.root }
+
+    func start() {
+        guard watching == nil else { return }
+        watching = Task { await watch() }
     }
 
-    /// iCloud Drive brings the phone's additions here as files; read the folder for them now and then.
-    private func rescanNow() async {
-        while true {
-            try? await Task.sleep(for: .seconds(60))
-            library.rescan()
-        }
+    func stop() {
+        watching?.cancel()
+        watching = nil
     }
 
     // MARK: - Search
 
-    func search(_ query: String) {
+    func search(_ query: String) async {
+        await client.connectIfNeeded()
         search.submit(query, client: client)
         regroup()
         Task {
@@ -145,7 +113,7 @@ final class Core {
             "\(references.references.count)", "\(AppleCovers.shared.version)",
             bandcamp.username ?? "", "\(bandcamp.items.count)", "\(bandcamp.prices.count)",
             bandcamp.downloads.map { "\($0.state)\(Int(($0.ringProgress ?? 0) * 50))" }.joined(separator: ","),
-            "\(streamer.progress.count)", "\(bandcampLogin.isOpen)",
+            "\(streamer.progress.count)",
         ]
     }
 
@@ -153,7 +121,7 @@ final class Core {
         var lastInputs: [String] = []
         var lastShown: [String] = []
         var lastArtists: [String] = []
-        while true {
+        while !Task.isCancelled {
             let inputs = searchInputs
             if inputs != lastInputs {
                 // A library change rebuilds the index of what's already there first.

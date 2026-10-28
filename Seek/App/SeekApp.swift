@@ -19,6 +19,10 @@ struct SeekApp: App {
     @State private var storeVerifier = StoreVerifier()
     @State private var streamer: StreamService
     @State private var sharing: SharingService
+    #if targetEnvironment(macCatalyst)
+    /// Seek on the web, served from this Mac (see WebServer).
+    @State private var web: WebServer?
+    #endif
 
     init() {
         let container = LibraryStore.makeContainer()
@@ -87,6 +91,16 @@ struct SeekApp: App {
                         Task { await PerfHarness.run(PerfHarness.requestedImports, library: library) }
                     }
                     #endif
+                    #if targetEnvironment(macCatalyst)
+                    if web == nil {
+                        let server = WebServer(core: Core(
+                            library: library, client: client, bandcamp: bandcamp, references: albumReferences,
+                            copyFinder: copyFinder, storeVerifier: storeVerifier, resolver: folderResolver,
+                            adder: albumAdder, streamer: streamer))
+                        web = server
+                        server.start()
+                    }
+                    #endif
                     // Only once the library can take the files.
                     client.restoreDownloads()
                     bandcamp.restoreDownloads()
@@ -109,6 +123,9 @@ struct SeekApp: App {
         .environment(streamer)
         .environment(sharing)
         .environment(albumAdder)
+        #if targetEnvironment(macCatalyst)
+        .environment(web)
+        #endif
         .commands {
             PlaybackCommands(player: player, router: router)
         }

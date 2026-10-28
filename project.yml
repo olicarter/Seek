@@ -22,10 +22,28 @@ targets:
   Seek:
     type: application
     platform: iOS
-    sources: [Seek]
+    sources:
+      - path: Seek
+        excludes: [WebServer]
+      # Seek on the web, served by the Mac app (see WebServer.swift): the Mac only.
+      - path: Seek/WebServer
+        destinationFilters: [macCatalyst]
     dependencies:
       - package: ZIPFoundation
       - target: SeekShare
+      - package: Hummingbird
+        product: Hummingbird
+        destinationFilters: [macCatalyst]
+    postCompileScripts:
+      # The site (web/), bundled into the Mac app, which serves it.
+      - name: Bundle the web site
+        basedOnDependencyAnalysis: false
+        script: |
+          [ "$IS_MACCATALYST" = "YES" ] || exit 0
+          export PATH="$HOME/.nvm/versions/node/$(ls "$HOME/.nvm/versions/node" 2>/dev/null | tail -1)/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          cd "$SRCROOT/web"
+          [ -d node_modules ] || npm ci --no-audit --no-fund
+          npx vite build --logLevel warn --outDir "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/web" --emptyOutDir
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek
@@ -34,6 +52,8 @@ targets:
         DERIVE_MACCATALYST_PRODUCT_BUNDLE_IDENTIFIER: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # The web site's build script reads web/ and writes into the app.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
     info:
       path: Seek/Info.plist
       properties:
@@ -88,34 +108,6 @@ targets:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsText: true
-  # Seek's core (Soulseek, search, tracklists, library) as a server on a Mac, for the web
-  # version in web/. It compiles the app's own files: nothing here is a copy.
-  SeekServer:
-    type: tool
-    platform: macOS
-    deploymentTarget: "26.0"
-    sources:
-      - Server
-      - Seek/Soulseek
-      - path: Seek/Search
-        excludes: [SearchView.swift, ExternalAlbumView.swift, SearchDump.swift]
-      - path: Seek/Library
-        excludes: [Discovery.swift, AlbumAbout.swift]
-      - Seek/Bandcamp/BandcampAPI.swift
-      - Seek/Bandcamp/BandcampClient.swift
-      - Seek/Bandcamp/StoreVerifier.swift
-      - Seek/Player/StreamService.swift
-      - Seek/Player/ProgressiveLoader.swift
-    dependencies:
-      - package: ZIPFoundation
-      - package: Hummingbird
-        product: Hummingbird
-    settings:
-      base:
-        PRODUCT_NAME: seek-server
-        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.server
-        SWIFT_VERSION: "5.0"
-        CODE_SIGN_STYLE: Automatic
   SeekTests:
     type: bundle.unit-test
     platform: iOS
@@ -127,10 +119,6 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tests
 schemes:
-  SeekServer:
-    build:
-      targets:
-        SeekServer: all
   Seek:
     build:
       targets:

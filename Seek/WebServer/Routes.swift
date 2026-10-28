@@ -11,21 +11,20 @@ func json(_ value: some Encodable) throws -> Response {
                     body: ResponseBody(byteBuffer: ByteBuffer(data: data)))
 }
 
-struct Login: Decodable { var username: String; var password: String }
-struct Query: Decodable { var query: String }
-struct AlbumRef: Decodable { var artist: String; var title: String; var release: String? }
-struct AuthInfo: Encodable { var passkeys: Bool; var signedIn: Bool; var local: Bool }
-struct SignInAnswer: Decodable { var id: String; var clientData: String; var authenticatorData: String; var signature: String }
-struct RegisterAnswer: Decodable {
+private struct SearchQuery: Decodable { var query: String }
+private struct AlbumRef: Decodable { var artist: String; var title: String; var release: String? }
+private struct AuthInfo: Encodable { var passkeys: Bool; var signedIn: Bool; var local: Bool }
+private struct SignInAnswer: Decodable { var id: String; var clientData: String; var authenticatorData: String; var signature: String }
+private struct RegisterAnswer: Decodable {
     var id: String; var clientData: String; var authenticatorData: String; var publicKey: String; var algorithm: Int; var name: String
 }
-struct PasskeyRef: Decodable { var id: String }
-struct PasskeyRow: Encodable { var id: String; var name: String; var created: Date; var lastUsed: Date? }
+private struct PasskeyRef: Decodable { var id: String }
+private struct PasskeyRow: Encodable { var id: String; var name: String; var created: Date; var lastUsed: Date? }
 
 /// Everything the site asks the server for.
 @MainActor
-func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
-    let router = Router()
+func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestContext> {
+    let router = Hummingbird.Router()
 
     // Before any route (a middleware only covers routes added after it): requests from the site
     // on 4n.studio, the key, then the site's pages, the library's songs (with range requests,
@@ -34,24 +33,15 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
     router.middlewares.add(RequireKey())
     router.middlewares.add(SitePages(page: URL(filePath: site).appending(path: "index.html")))
     router.middlewares.add(AudioTypes())
-    router.middlewares.add(FileMiddleware(Core.musicFolder.path, urlBasePath: "/files", searchForIndexHtml: false))
+    if let music = core.musicFolder {
+        router.middlewares.add(FileMiddleware(music.path, urlBasePath: "/files", searchForIndexHtml: false))
+    }
     router.middlewares.add(FileMiddleware(site, searchForIndexHtml: true))
 
     router.get("/api/status") { _, _ in try json(await core.status) }
 
-    router.post("/api/login") { request, context in
-        let login = try await request.decode(as: Login.self, context: context)
-        await core.client.signIn(username: login.username, password: login.password)
-        return try json(await core.status)
-    }
-
-    router.post("/api/logout") { _, _ in
-        await core.client.signOut()
-        return try json(await core.status)
-    }
-
     router.post("/api/search") { request, context in
-        let query = try await request.decode(as: Query.self, context: context)
+        let query = try await request.decode(as: SearchQuery.self, context: context)
         await core.search(query.query)
         return try json(await core.searchPage)
     }
@@ -209,16 +199,6 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
         case nil:
             throw HTTPError(.notFound)
         }
-    }
-
-    router.post("/api/bandcamp/signin") { _, _ in
-        await core.bandcampLogin.open()
-        return try json(await core.status)
-    }
-
-    router.post("/api/bandcamp/signout") { _, _ in
-        await core.bandcamp.signOut()
-        return try json(await core.status)
     }
 
     /// The site opened an album's Bandcamp page to buy it there.

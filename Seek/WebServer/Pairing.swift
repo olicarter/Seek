@@ -1,4 +1,3 @@
-import AppKit
 import CoreImage
 import Foundation
 import Hummingbird
@@ -113,8 +112,6 @@ enum PairingPage {
         filter.setValue(Data(text.utf8), forKey: "inputMessage")
         filter.setValue("M", forKey: "inputCorrectionLevel")
         guard let image = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)) else { return nil }
-        let context = CIContext()
-        guard let cg = context.createCGImage(image, from: image.extent) else { return nil }
-        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+        return CIContext().pngRepresentation(of: image, format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
     }
 }

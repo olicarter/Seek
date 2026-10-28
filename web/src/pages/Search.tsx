@@ -31,7 +31,7 @@ export function Search() {
       </form>
       <Show when={status() && !status()!.signedIn}>
         <p class="empty">
-          <A href="/settings">Sign in to Soulseek</A> to include other people's music.
+          Sign in to Soulseek in Seek on your Mac to include other people's music.
         </p>
       </Show>
       <Show when={page()?.query}>

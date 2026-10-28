@@ -10,7 +10,6 @@ enum Pages {
         var downloading: Int
         var failure: String?
         var bandcamp: String?
-        var bandcampSigningIn: Bool
     }
 
     struct Release: Encodable {
@@ -122,7 +121,7 @@ extension Core {
             soulseek: "\(client.status)".components(separatedBy: "(").first ?? "",
             username: client.savedUsername, signedIn: client.savedUsername != nil,
             downloading: client.activeTransferCount + bandcamp.activeDownloadCount, failure: failure,
-            bandcamp: bandcamp.username, bandcampSigningIn: bandcampLogin.isOpen
+            bandcamp: bandcamp.username
         )
     }
 

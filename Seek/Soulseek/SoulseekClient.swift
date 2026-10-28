@@ -217,8 +217,11 @@ final class SoulseekClient {
         }
     }
 
+    /// Kept signed in in the background: on a Mac serving the web, which may want it any time.
+    @ObservationIgnored var staysSignedIn = false
+
     private func signOutIfIdle() {
-        guard isInBackground, status == .connected, !transfers.contains(where: \.state.isActive), quietSearches.isEmpty else { return }
+        guard !staysSignedIn, isInBackground, status == .connected, !transfers.contains(where: \.state.isActive), quietSearches.isEmpty else { return }
         Log.debug("idle in background, signing out of Soulseek")
         disconnect()
     }

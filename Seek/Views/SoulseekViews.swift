@@ -283,6 +283,9 @@ struct SettingsView: View {
     @AppStorage(LibraryStore.automaticDownloadsKey) private var automaticDownloads = LibraryStore.defaultAutomaticDownloads
     @State private var username = ""
     @State private var password = ""
+    #if targetEnvironment(macCatalyst)
+    @Environment(WebServer.self) private var web: WebServer?
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -331,6 +334,12 @@ struct SettingsView: View {
                         ? "Signing in with a new username creates the account. Your login is saved in iCloud Keychain, so your other devices can use it too."
                         : "Seek connects only while you're using the Soulseek tab or downloading, and disconnects when you leave the app with nothing downloading. Soulseek allows one connection per account, so the device you're using takes over.")
                 }
+
+                #if targetEnvironment(macCatalyst)
+                if let web {
+                    WebAccessSection(web: web)
+                }
+                #endif
 
                 Section {
                     if let name = bandcamp.username {
@@ -477,3 +486,48 @@ struct UploadRow: View {
         }
     }
 }
+
+#if targetEnvironment(macCatalyst)
+/// Seek on the web, served from this Mac while Seek is open: on and off, and who can get in.
+private struct WebAccessSection: View {
+    let web: WebServer
+    @Environment(\.openURL) private var openURL
+    @State private var confirmingReset = false
+
+    var body: some View {
+        Section {
+            Toggle("Serve Seek on the Web", isOn: Binding(get: { web.state == .running }, set: { web.setEnabled($0) }))
+            if case .failed(let reason) = web.state {
+                Text(reason).foregroundStyle(.red)
+            }
+            if web.state == .running {
+                LabeledContent("On This Mac", value: "localhost:\(WebServer.port)")
+                LabeledContent("Passkeys", value: web.passkeyCount == 0 ? "None yet" : "\(web.passkeyCount)")
+                Button("Open Seek on the Web", systemImage: "safari") { openURL(WebServer.site) }
+                if web.passkeyCount == 0 {
+                    Button("Pair a Browser", systemImage: "qrcode") {
+                        openURL(URL(string: "http://localhost:\(WebServer.port)/pair")!)
+                    }
+                } else {
+                    Button("Reset Web Sign-In", systemImage: "key.slash", role: .destructive) { confirmingReset = true }
+                }
+            }
+        } header: {
+            Text("Web")
+        } footer: {
+            Text("""
+            While Seek is open on this Mac, 4n.studio/seek/web uses it: this Mac's library, Soulseek and Bandcamp, from any \
+            browser. Tailscale Funnel makes it reachable from anywhere; browsers sign in with a passkey (the first one is \
+            added from a paired browser).
+            """)
+        }
+        .task { await web.refreshPasskeys() }
+        .confirmationDialog("Reset web sign-in?", isPresented: $confirmingReset, titleVisibility: .visible) {
+            Button("Remove Passkeys and Sign Out Everywhere", role: .destructive) { Task { await web.resetAccess() } }
+        } message: {
+            Text("Every browser is signed out and your passkeys for Seek stop working. Pair a browser again to add a new one.")
+        }
+    }
+}
+#endif
+
