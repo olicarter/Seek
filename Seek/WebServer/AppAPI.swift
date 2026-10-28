@@ -40,28 +40,54 @@ enum AppKey {
 private struct FolderBody: Decodable { var folder: RemoteFolder }
 private struct FileBody: Decodable { var file: RemoteFile }
 private struct IDBody: Decodable { var id: UUID }
-private struct SearchBody: Decodable { var query: String; var seconds: Int? }
+private struct SearchBody: Decodable { var query: String; var seconds: Int?; var group: Bool? }
 
-/// Searches run for devices, by id, while they poll for what's been found.
+/// Searches run for devices, by id, while they poll for what's been found. Grouped into
+/// releases here when the device asks (its Search tab), with the same SearchModel the app
+/// groups with, so the device needn't.
 @MainActor
 final class AppSearches {
-    private var searches: [UUID: (search: MacLinkWire.Search, started: Date)] = [:]
+    private var searches: [UUID: (search: MacLinkWire.Search, started: Date, model: SearchModel?)] = [:]
 
-    func start(_ query: String, seconds: Int, client: SoulseekClient) -> UUID {
+    func start(_ query: String, seconds: Int, group: Bool, core: Core) -> UUID {
         let id = UUID()
         searches = searches.filter { $0.value.started.timeIntervalSinceNow > -600 }
-        searches[id] = (MacLinkWire.Search(folders: [], done: false), .now)
+        let model = group ? SearchModel() : nil
+        searches[id] = (MacLinkWire.Search(folders: [], done: false), .now, model)
+        if let model {
+            model.begin(query)
+            Task {
+                if model.needsIndex(trackCount: core.library.allTracks.count) { await model.indexLibrary(core.library.allTracks) }
+                await model.loadSources(bandcamp: core.bandcamp)
+                regroup(id, core: core)
+                await model.loadNamedReleases()
+                regroup(id, core: core)
+            }
+        }
         Task {
-            let found = await client.quietSearch(query, for: .seconds(max(5, min(seconds, 30)))) { [weak self] soFar in
+            let found = await core.client.quietSearch(query, for: .seconds(max(5, min(seconds, 30)))) { [weak self] soFar in
                 self?.searches[id]?.search.folders = soFar
+                self?.regroup(id, core: core)
                 return false
             }
-            searches[id]?.search = MacLinkWire.Search(folders: found ?? searches[id]?.search.folders ?? [], done: true)
+            searches[id]?.search.folders = found ?? searches[id]?.search.folders ?? []
+            searches[id]?.search.done = true
+            regroup(id, core: core)
         }
         return id
     }
 
-    func result(_ id: UUID) -> MacLinkWire.Search? { searches[id]?.search }
+    private func regroup(_ id: UUID, core: Core) {
+        guard let entry = searches[id], let model = entry.model else { return }
+        model.regroup(.throttled, client: core.client, bandcamp: core.bandcamp, resolver: core.resolver,
+                      storeVerifier: core.storeVerifier, quality: core.quality, folders: entry.search.folders)
+    }
+
+    func result(_ id: UUID) -> MacLinkWire.Search? {
+        guard var entry = searches[id] else { return nil }
+        entry.search.grouped = entry.model?.results.result
+        return entry.search
+    }
 }
 
 /// What an iPhone or iPad asks this Mac for while it does their Soulseek work (see MacLink):
@@ -76,7 +102,7 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
 
     router.post("/api/app/search") { request, context in
         let body = try await request.decode(as: SearchBody.self, context: context)
-        let id = await core.appSearches.start(body.query, seconds: body.seconds ?? 15, client: client)
+        let id = await core.appSearches.start(body.query, seconds: body.seconds ?? 15, group: body.group ?? false, core: core)
         return try json(["id": id.uuidString])
     }
 

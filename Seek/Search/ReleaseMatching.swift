@@ -303,7 +303,7 @@ struct FolderHint: Codable, Equatable, Sendable {
 }
 
 /// One release in search results, with every place it can come from.
-struct SearchRelease: Identifiable, Equatable {
+struct SearchRelease: Identifiable, Equatable, Codable {
     var id: String
     var artist: String
     var title: String
@@ -344,7 +344,7 @@ struct SearchRelease: Identifiable, Equatable {
 
 /// Merges Bandcamp purchases, Bandcamp store results and Soulseek folders into one list of releases.
 enum ReleaseGrouper {
-    struct Result: Equatable {
+    struct Result: Equatable, Codable {
         var releases: [SearchRelease]
         /// Files from folders that aren't a single release (e.g. "2025 Singles") but match the search.
         var songs: [RemoteFile]

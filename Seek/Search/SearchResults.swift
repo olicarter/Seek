@@ -12,7 +12,8 @@ final class SearchResults {
         /// Once typing pauses.
         case afterTyping
         /// At most every 300 ms, for Soulseek results that keep arriving: waiting for a pause
-        /// would show nothing until a busy search went quiet.
+        /// would show nothing until a busy search went quiet. The first after a quiet moment
+        /// goes straight away.
         case throttled
     }
 
@@ -33,9 +34,19 @@ final class SearchResults {
     @ObservationIgnored private var resolveLater: Task<Void, Never>?
     @ObservationIgnored private var latest: Inputs?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var lastGrouped = Date.distantPast
 
     func release(_ id: SearchRelease.ID) -> SearchRelease? {
         result.releases.first { $0.id == id }
+    }
+
+    /// Releases grouped elsewhere (by Seek on the Mac, from the same inputs): shown as they are.
+    func show(_ grouped: ReleaseGrouper.Result) {
+        pending?.cancel()
+        pending = nil
+        pendingTiming = nil
+        latest = nil
+        if result != grouped { result = grouped }
     }
 
     func update(query: String, owned: [BandcampItem], store: [BandcampAPI.StoreResult], folders: [RemoteFolder],
@@ -53,7 +64,8 @@ final class SearchResults {
         pending?.cancel()
         pendingTiming = timing
         pending = Task {
-            if timing != .now { try? await Task.sleep(for: .milliseconds(300)) }
+            let quiet = Date.now.timeIntervalSince(lastGrouped) >= 0.3
+            if timing == .afterTyping || timing == .throttled && !quiet { try? await Task.sleep(for: .milliseconds(300)) }
             guard !Task.isCancelled, let inputs = latest else { return }
             let started = generation
             let hints = resolver.hints
@@ -66,6 +78,7 @@ final class SearchResults {
             guard !Task.isCancelled else { return }
             pending = nil
             pendingTiming = nil
+            lastGrouped = .now
             result = grouped
             // More arrived while grouping: go again shortly.
             if generation != started { schedule(.throttled, resolver: resolver) }

@@ -39,6 +39,8 @@ enum MacLinkWire {
     struct Search: Codable, Sendable {
         var folders: [RemoteFolder]
         var done: Bool
+        /// Grouped into releases by the Mac, when the device asked it to.
+        var grouped: ReleaseGrouper.Result?
     }
 
     struct Download: Codable, Sendable {

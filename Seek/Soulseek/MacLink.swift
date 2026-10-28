@@ -78,20 +78,32 @@ final class MacLink {
 
     // MARK: - Soulseek, on the Mac
 
-    /// A search, with what's been found so far as it comes in.
-    func search(_ query: String, seconds: Int, onUpdate: (([RemoteFolder]) async -> Bool)? = nil) async -> [RemoteFolder]? {
-        struct Body: Encodable { var query: String; var seconds: Int }
-        guard let started: [String: String] = try? await post("/api/app/search", Body(query: query, seconds: seconds)),
+    /// A search, with what's been found so far as it comes in. `onGrouped`: the Mac groups the
+    /// results into releases too (for the Search tab), so this device needn't.
+    func search(_ query: String, seconds: Int, onUpdate: (([RemoteFolder]) async -> Bool)? = nil,
+                onGrouped: ((ReleaseGrouper.Result) -> Void)? = nil) async -> [RemoteFolder]? {
+        struct Body: Encodable { var query: String; var seconds: Int; var group: Bool }
+        guard let started: [String: String] = try? await post("/api/app/search", Body(query: query, seconds: seconds, group: onGrouped != nil)),
               let id = started["id"] else { return nil }
         var reported = -1
-        for _ in 0..<(seconds + 15) {
+        var lastGrouped: ReleaseGrouper.Result?
+        // Grouping keeps going a moment after Soulseek goes quiet (Bandcamp, Apple's catalogue).
+        var settled = 0
+        for _ in 0..<(seconds + 20) {
             try? await Task.sleep(for: .seconds(1))
             guard let found: MacLinkWire.Search = try? await get("/api/app/search?id=\(id)") else { continue }
+            if let grouped = found.grouped, grouped != lastGrouped {
+                lastGrouped = grouped
+                onGrouped?(grouped)
+                settled = 0
+            } else if found.done {
+                settled += 1
+            }
             if found.folders.count != reported {
                 reported = found.folders.count
                 if let onUpdate, await onUpdate(found.folders) { return found.folders }
             }
-            if found.done { return found.folders }
+            if found.done, onGrouped == nil || settled >= 3 { return found.folders }
         }
         return nil
     }

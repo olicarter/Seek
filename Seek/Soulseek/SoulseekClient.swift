@@ -436,10 +436,12 @@ final class SoulseekClient {
             let session = SearchSession(token: Self.makeToken(), query: query)
             currentSearch = session
             Task {
-                _ = await mac.search(query, seconds: 20) { found in
+                _ = await mac.search(query, seconds: 20, onUpdate: { found in
                     session.replaceFolders(found)
                     return false
-                }
+                }, onGrouped: { grouped in
+                    session.grouped = grouped
+                })
             }
             return
         }

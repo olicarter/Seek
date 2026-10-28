@@ -55,6 +55,8 @@ struct SearchView: View {
                 .task(id: submitted) { await model.loadSources(bandcamp: bandcamp) }
                 .task(id: model.resultArtists) { await model.loadNamedReleases() }
                 .modifier(regroupTriggers)
+                // Grouped by the Mac (see SearchModel.regroup): shown as it changes.
+                .onChange(of: search?.grouped) { regroup() }
                 .task(id: tracks.count) {
                     guard model.needsIndex(trackCount: tracks.count) else { return }
                     await model.indexLibrary(tracks)

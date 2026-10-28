@@ -35,6 +35,8 @@ final class SearchSession: Identifiable {
     let query: String
     let startedAt = Date()
     private(set) var folders: [RemoteFolder] = []
+    /// The releases Seek on the Mac grouped these into, when it ran the search (see MacLink).
+    var grouped: ReleaseGrouper.Result?
     private(set) var responseCount = 0
 
     init(token: UInt32, query: String) {

@@ -24,8 +24,14 @@ final class SearchModel {
     @ObservationIgnored private var libraryIndex = LibraryIndex(albums: [])
 
     func submit(_ text: String, client: SoulseekClient) {
-        submitted = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        begin(text)
         client.search(submitted)
+    }
+
+    /// The search to group, without starting it: for the Mac grouping a device's search, whose
+    /// folders arrive by another way (see AppSearches).
+    func begin(_ text: String) {
+        submitted = text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Soulseek's results for the search run, opened folders showing every file.
@@ -87,12 +93,19 @@ final class SearchModel {
     /// found so far until it's submitted.
     func regroup(_ timing: SearchResults.Timing = .now, typing: String = "", client: SoulseekClient,
                  bandcamp: BandcampClient, resolver: FolderResolver, storeVerifier: StoreVerifier,
-                 quality: QualityPreference) {
+                 quality: QualityPreference, folders found: [RemoteFolder]? = nil) {
+        // Grouped by Seek on the Mac already, from the same sources: shown as it is, unless a
+        // different search is being typed or the filters (which the Mac doesn't apply) are on.
+        if found == nil, client.usingMac, !losslessOnly, !freeSlotsOnly, typing.isEmpty || typing == submitted,
+           let grouped = client.currentSearch.flatMap({ $0.query == submitted ? $0.grouped : nil }) {
+            results.show(grouped)
+            return
+        }
         results.update(
             query: submitted.isEmpty ? typing : submitted,
             owned: bandcamp.search(typing.isEmpty ? submitted : typing),
             store: bandcamp.storeResults(for: submitted, found: storeFound).filter { !storeVerifier.rejected.contains($0.id) },
-            folders: folders(client: client),
+            folders: found ?? folders(client: client),
             resolver: resolver,
             library: libraryIndex,
             wishlist: Set(bandcamp.wishlist.map(\.id)),
