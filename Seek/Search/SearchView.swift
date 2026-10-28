@@ -13,6 +13,7 @@ struct SearchView: View {
     private var tracks: [Track] { library.allTracks }
     @Environment(LibraryStore.self) private var library
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
     @State private var showAllFolders = false
     /// The search itself, shared with the server (see SearchModel).
@@ -36,6 +37,11 @@ struct SearchView: View {
             resultsList
                 .navigationTitle("Search")
                 .searchable(text: $query, prompt: "Artists, albums, songs")
+                .searchFocused($searchFocused)
+                // Opening the tab with nothing typed is for typing: straight into the field.
+                .onChange(of: router.selection, initial: true) { _, tab in
+                    if tab == .soulseek, query.isEmpty { searchFocused = true }
+                }
                 .onSubmit(of: .search) { model.submit(query, client: client) }
                 .onChange(of: router.pendingSearch, initial: true) { _, text in
                     guard let text else { return }

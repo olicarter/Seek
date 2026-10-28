@@ -1,6 +1,6 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
-import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createSignal, For, on, onMount, Show } from "solid-js";
 import { albumHref, api, changes } from "../api";
 
 export function Search() {
@@ -15,6 +15,13 @@ export function Search() {
     if (q && q !== page()?.query) void api.search(q);
   }));
 
+  // Opening Search with nothing typed is for typing: straight into the field (autofocus only
+  // works on a page's first load, not on moving between the site's pages).
+  let field: HTMLInputElement | undefined;
+  onMount(() => {
+    if (!text()) field?.focus();
+  });
+
   const submit = (e: SubmitEvent) => {
     e.preventDefault();
     const q = text().trim();
@@ -27,7 +34,7 @@ export function Search() {
     <section>
       <h1>Search</h1>
       <form class="search" onSubmit={submit}>
-        <input type="search" placeholder="Artists, albums, songs" value={text()} onInput={(e) => setText(e.currentTarget.value)} autofocus />
+        <input ref={field} type="search" placeholder="Artists, albums, songs" value={text()} onInput={(e) => setText(e.currentTarget.value)} />
       </form>
       <Show when={status() && !status()!.signedIn}>
         <p class="empty">
