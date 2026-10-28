@@ -214,3 +214,37 @@ struct ExpandableText: View {
             }
     }
 }
+
+/// The album page, for albums in the library and ones that aren't alike: the header, the
+/// songs, the footer, other versions and similar albums, in that order. Only what fills them
+/// differs, so the two pages can't drift apart.
+struct AlbumPage<Header: View, Songs: View>: View {
+    let artist: String
+    let title: String
+    let footer: AlbumFooter
+    let versions: [CatalogRelease]
+    @ViewBuilder let header: () -> Header
+    @ViewBuilder let songs: () -> Songs
+
+    var body: some View {
+        List {
+            header()
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
+                .padding(.bottom, 8)
+            songs()
+            footer
+                .listRowSeparator(.hidden)
+            OtherVersionsRow(versions: versions)
+                .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
+                .listRowSeparator(.hidden)
+            if !artist.isEmpty, artist != "Unknown Artist" {
+                DiscoveryRow(subject: .album(artist: artist, title: title))
+                    .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 20, trailing: 0))
+                    .listRowSeparator(.hidden)
+            }
+        }
+        .listStyle(.plain)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}

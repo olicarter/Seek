@@ -694,6 +694,9 @@ struct ReleaseDetailView: View {
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
     @State private var loadingFolder: String?
+    @State private var showingCopies = false
+    @Environment(\.openArtist) private var openArtist
+    @Environment(Router.self) private var router
     /// The artist's releases in Apple Music: this one's date and ℗ line, and its other versions.
     @State private var catalog: [CatalogRelease]?
     @Environment(AlbumReferences.self) private var references
@@ -730,11 +733,23 @@ struct ReleaseDetailView: View {
             let expected = references.cached(AlbumKey(artist: found.artist, title: found.title))?.tracks.count ?? found.catalog?.trackCount
             let release = Self.completeFirst(found, expectedTracks: expected, client: client, quality: quality)
             let inLibrary = release.inLibrary
-            List {
-                let queue = streamQueue(release)
-                let key = AlbumKey(artist: release.artist, title: release.title)
+            let queue = streamQueue(release)
+            let key = AlbumKey(artist: release.artist, title: release.title)
+            let reference = references.cached(key)
+            let listed = catalog.flatMap { CatalogRelease.release(of: release.title, in: $0) } ?? release.catalog
+            AlbumPage(
+                artist: release.artist, title: release.title,
+                footer: AlbumFooter(released: listed?.released, year: release.year ?? reference?.year,
+                                    songs: reference?.tracks.count ?? release.bestFolder?.files.count ?? 0,
+                                    duration: reference.map { $0.tracks.reduce(0) { $0 + ($1.duration ?? 0) } }
+                                        ?? Double(release.bestFolder?.files.reduce(0) { $0 + ($1.duration ?? 0) } ?? 0),
+                                    copyright: listed?.copyright),
+                versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? []
+            ) {
                 AlbumHeader(
-                    title: release.title, artist: release.artist, year: release.year ?? references.cached(key)?.year,
+                    title: release.title, artist: release.artist,
+                    onArtist: release.artist == "Unknown Artist" ? nil : { openArtistPage(release.artist) },
+                    year: release.year ?? reference?.year,
                     isLossless: release.isLossless, description: about.text(for: key),
                     isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
                     isPreparing: soulseekStatus == .searching || client.currentSearch != nil && release.folders.isEmpty,
@@ -759,11 +774,8 @@ struct ReleaseDetailView: View {
                         }
                     }
                 }
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .padding(.bottom, 8)
-
-                if let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) {
+            } songs: {
+                if let reference {
                     // The real tracklist, each song downloadable from whichever copy has it.
                     let files = release.folders.map(client.complete).flatMap(\.files)
                     // Adding the album may take each song from a different copy than the one
@@ -772,81 +784,58 @@ struct ReleaseDetailView: View {
                     let downloads = client.transfers.filter {
                         !$0.forStreaming && $0.state != .cancelled && folderIDs.contains("\($0.file.username)\u{0}\($0.file.folder)")
                     }
-                    Section {
-                        ForEach(reference.tracks, id: \.self) { track in
-                            let stream = queue.firstIndex { $0.reference == track }
-                            MissingTrackRow(track: track,
-                                            file: MissingTracks.download(for: track, in: downloads)?.file
-                                                ?? MissingTracks.file(for: track, in: files),
-                                            isSearching: false,
-                                            playing: stream.map { queue[$0].track })
-                                .contentShape(.rect)
-                                .onTapGesture {
-                                    if let stream { player.play(queue.map(\.track), startingAt: stream) }
-                                }
-                        }
+                    ForEach(reference.tracks, id: \.self) { track in
+                        let stream = queue.firstIndex { $0.reference == track }
+                        MissingTrackRow(track: track,
+                                        file: MissingTracks.download(for: track, in: downloads)?.file
+                                            ?? MissingTracks.file(for: track, in: files),
+                                        isSearching: false,
+                                        playing: stream.map { queue[$0].track })
+                            .contentShape(.rect)
+                            .onTapGesture {
+                                if let stream { player.play(queue.map(\.track), startingAt: stream) }
+                            }
                     }
                 } else if let folder = release.bestFolder {
-                    Section {
-                        ForEach(Array(folder.files.enumerated()), id: \.element.id) { index, file in
-                            HStack(spacing: 12) {
-                                Text("\(index + 1)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 22, alignment: .trailing)
-                                Text(Self.trackName(file.name)).lineLimit(1)
-                                Spacer()
-                            }
-                        }
-                    } header: {
-                        HStack {
-                            Text("Tracks")
-                            if loadingFolder == folder.id {
-                                ProgressView().controlSize(.small)
-                                Text("Getting the full folder…").textCase(nil)
-                            }
+                    // No tracklist: the best copy's songs, by their file names.
+                    ForEach(Array(folder.files.enumerated()), id: \.element.id) { index, file in
+                        HStack(spacing: 12) {
+                            Text("\(index + 1)").font(.subheadline.monospacedDigit()).foregroundStyle(.secondary).frame(width: 22, alignment: .trailing)
+                            Text(Self.trackName(file.name)).lineLimit(1)
+                            Spacer()
                         }
                     }
-                    .task(id: folder.id) {
-                        // Searches only list matching files; ask the user for the rest.
-                        guard client.folderContents[folder.id] == nil else { return }
-                        loadingFolder = folder.id
-                        _ = try? await client.contents(of: folder)
-                        if loadingFolder == folder.id { loadingFolder = nil }
-                    }
-                }
-                let listed = catalog.flatMap { CatalogRelease.release(of: release.title, in: $0) } ?? release.catalog
-                let reference = references.cached(key)
-                let songs = reference?.tracks.count ?? release.bestFolder?.files.count ?? 0
-                AlbumFooter(released: listed?.released, year: release.year ?? reference?.year, songs: songs,
-                            duration: reference.map { $0.tracks.reduce(0) { $0 + ($1.duration ?? 0) } }
-                                ?? Double(release.bestFolder?.files.reduce(0) { $0 + ($1.duration ?? 0) } ?? 0),
-                            copyright: listed?.copyright)
-                    .listRowSeparator(.hidden)
-                if release.owned != nil || release.store != nil {
-                    Section("Bandcamp") { bandcampRows(release) }
-                }
-                // Copies list as they're found, matching the add buttons above, which use them.
-                if !release.folders.isEmpty {
-                    SoulseekCopiesSection(folders: release.folders, expectedTracks: expected,
-                                          isLooking: soulseekStatus == .searching)
-                } else if soulseekStatus == .searching {
-                    Section("Soulseek") {
-                        Label { Text("Looking on Soulseek…") } icon: { ProgressView() }
+                    if loadingFolder == folder.id {
+                        Label { Text("Getting the full folder…") } icon: { ProgressView().controlSize(.small) }
                             .font(.subheadline).foregroundStyle(.secondary)
                     }
                 }
-                OtherVersionsRow(versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? [])
-                    .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
-                    .listRowSeparator(.hidden)
-                if !release.artist.isEmpty, release.artist != "Unknown Artist" {
-                    DiscoveryRow(subject: .album(artist: release.artist, title: release.title))
-                        .listRowInsets(EdgeInsets(top: 16, leading: 0, bottom: 16, trailing: 0))
-                        .listRowSeparator(.hidden)
+            }
+            .sheet(isPresented: $showingCopies) {
+                NavigationStack {
+                    List {
+                        if release.folders.isEmpty {
+                            Text(soulseekStatus == .searching ? "Looking on Soulseek…" : "No copies found on Soulseek.")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            SoulseekCopiesSection(folders: release.folders, expectedTracks: expected,
+                                                  isLooking: soulseekStatus == .searching)
+                        }
+                    }
+                    .navigationTitle("Copies on Soulseek")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        Button("Done", systemImage: "xmark") { showingCopies = false }
+                    }
+                    .libraryDestinations()
                 }
             }
-            .listStyle(.plain)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 Menu("More", systemImage: "ellipsis") {
                     ReleaseMenuItems(release: release, buying: $buying)
+                    if !release.folders.isEmpty || soulseekStatus == .searching {
+                        Button("Copies on Soulseek", systemImage: "square.stack.3d.down.right") { showingCopies = true }
+                    }
                 }
                 // White like Apple Music's, not the accent colour.
                 .tint(.primary)
@@ -890,42 +879,16 @@ struct ReleaseDetailView: View {
         }
     }
 
-    @ViewBuilder private func bandcampRows(_ release: SearchRelease) -> some View {
-        if let item = release.owned {
-            HStack {
-                Label("In your Bandcamp collection", systemImage: "bag.fill")
-                Spacer()
-                if let download = bandcamp.download(for: item), download.state.isActive {
-                    ProgressRing(progress: download.ringProgress)
-                } else if item.redownloadURL != nil {
-                    Button("Add to Library") {
-                        if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-        } else if let store = release.store {
-            let price = bandcamp.prices[store.id]
-            let free = price.map { $0.amount <= 0 } ?? false
-            HStack {
-                Label(free ? "Free download, or pay what you like" : price.map { "For sale · \($0.formatted) or more" } ?? "For sale",
-                      systemImage: free ? "gift" : "cart")
-                Spacer()
-                Button(free ? "Get" : price.map { "Buy · \($0.shortFormatted)" } ?? "Buy") {
-                    buying = StorePurchase(result: store, price: free ? nil : price)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-            Button("Open on Bandcamp", systemImage: "safari") { buying = StorePurchase(result: store) }
-        }
-    }
-
     /// Bandcamp's 350-pixel thumbnails as 700-pixel art for the header.
     static func large(_ url: URL) -> URL {
         URL(string: url.absoluteString.replacingOccurrences(of: "_2.jpg", with: "_16.jpg")) ?? url
     }
 
-    /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
+    func openArtistPage(_ name: String) {
+        let artist = ArtistKey(name: name)
+        if let openArtist { openArtist(artist) } else { router.show(artist) }
+    }
+
     /// With a tracklist, the album as it names it: what songs added from this page are filed under.
     func listedAlbum(_ release: SearchRelease) -> AlbumKey? {
         guard let reference = references.cached(AlbumKey(artist: release.artist, title: release.title)) else { return nil }
@@ -939,6 +902,7 @@ struct ReleaseDetailView: View {
         return reference.tracks.compactMap { MissingTracks.file(for: $0, in: files) }
     }
 
+    /// "01 - Cryogeyser - Glitch.flac" → "Glitch".
     static func trackName(_ fileName: String) -> String {
         let stem = (fileName as NSString).deletingPathExtension
         var parts = stem.split(separator: /\s+[-–—]\s+/).map(String.init)

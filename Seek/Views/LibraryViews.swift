@@ -332,23 +332,30 @@ struct AlbumDetailView: View {
 
     var body: some View {
         let album = library.albumsByKey[key] ?? Album(key: key, tracks: [])
-        List {
-            let copies = copyFinder.copies(of: key)
-            let missing = references.cached(key).map { MissingTracks.missing(from: $0, have: album.tracks) } ?? []
-            let streams = Dictionary(streamer.queue(
-                reference: missing.isEmpty ? nil : AlbumReference(source: .itunes, artist: key.artist, title: key.title, tracks: missing),
-                artist: key.artist, album: key.title, folders: missing.isEmpty ? [] : (copies?.folders ?? []),
-                bandcampPage: bandcampRelease?.url, artworkURL: nil, artwork: album.artwork
-            ).map { ($0.reference, $0.track) }, uniquingKeysWith: { first, _ in first })
-            let rows = albumRows(album, missing: missing, arriving: arrivingDownloads(album, missing: missing))
-            // The whole album, with songs not in the library streamed when their turn comes.
-            let queue: [Track] = rows.compactMap { row in
-                switch row {
-                case .have(_, let track): track
-                case .missing(let reference): streams[reference]
-                case .arriving: nil
-                }
+        let copies = copyFinder.copies(of: key)
+        let missing = references.cached(key).map { MissingTracks.missing(from: $0, have: album.tracks) } ?? []
+        let streams = Dictionary(streamer.queue(
+            reference: missing.isEmpty ? nil : AlbumReference(source: .itunes, artist: key.artist, title: key.title, tracks: missing),
+            artist: key.artist, album: key.title, folders: missing.isEmpty ? [] : (copies?.folders ?? []),
+            bandcampPage: bandcampRelease?.url, artworkURL: nil, artwork: album.artwork
+        ).map { ($0.reference, $0.track) }, uniquingKeysWith: { first, _ in first })
+        let rows = albumRows(album, missing: missing, arriving: arrivingDownloads(album, missing: missing))
+        // The whole album, with songs not in the library streamed when their turn comes.
+        let queue: [Track] = rows.compactMap { row in
+            switch row {
+            case .have(_, let track): track
+            case .missing(let reference): streams[reference]
+            case .arriving: nil
             }
+        }
+        let listed = catalog.flatMap { CatalogRelease.release(of: key.title, in: $0) }
+        AlbumPage(
+            artist: key.artist, title: key.title,
+            footer: AlbumFooter(released: listed?.released, year: album.year, songs: rows.count,
+                                duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
+                                copyright: listed?.copyright, label: album.label),
+            versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? []
+        ) {
             AlbumHeader(
                 title: album.title, artist: album.artist, onArtist: { openArtistPage() }, year: album.year,
                 isLossless: Self.isLossless(album.tracks), description: about.text(for: key),
@@ -371,10 +378,7 @@ struct AlbumDetailView: View {
                     }
                 }
             }
-            .listRowSeparator(.hidden)
-            .listRowBackground(Color.clear)
-            .padding(.bottom, 8)
-
+        } songs: {
             if let upgrade = upgradeCopy(album, copies: copies) {
                 UpgradeBanner(folder: upgrade, isUpgrading: copyFinder.upgrading.contains(AlbumReferences.key(key))) {
                     confirmingUpgrade = true
@@ -405,23 +409,7 @@ struct AlbumDetailView: View {
                         }
                 }
             }
-
-            let listed = catalog.flatMap { CatalogRelease.release(of: key.title, in: $0) }
-            AlbumFooter(released: listed?.released, year: album.year, songs: rows.count,
-                        duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
-                        copyright: listed?.copyright, label: album.label)
-                .listRowSeparator(.hidden)
-
-            OtherVersionsRow(versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? [])
-                .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
-                .listRowSeparator(.hidden)
-
-            DiscoveryRow(subject: .album(artist: key.artist, title: key.title))
-                .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 20, trailing: 0))
-                .listRowSeparator(.hidden)
         }
-        .listStyle(.plain)
-        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCopies) {
             NavigationStack {
                 List {
