@@ -1,6 +1,6 @@
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
-import { createEffect, createResource, createSignal, For, on, Show } from "solid-js";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
 import { albumHref, api, changes } from "../api";
 
 export function Search() {
@@ -8,7 +8,7 @@ export function Search() {
   const navigate = useNavigate();
   const [text, setText] = createSignal(params.q ?? "");
   const [page] = live(changes, api.searchPage);
-  const [status] = createResource(changes, api.status);
+  const [status] = live(changes, api.status);
 
   // A search in the address (a link, or coming back) runs unless it's the one on the server.
   createEffect(on(() => params.q, (q) => {

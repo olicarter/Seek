@@ -124,3 +124,7 @@ h2 { font-size: 20px; margin: 24px 0 8px; }
   color: var(--bandcamp); font-weight: 600; font-size: 15px; }
 .song.missing.playable:hover { color: var(--text); }
 section > h2 + button { margin-bottom: 8px; }
+
+.offline { max-width: 1100px; margin: 12px auto 0; padding: 10px 14px; border-radius: 10px; background: rgba(255, 77, 109, 0.15);
+  color: var(--text); font-size: 14px; }
+.offline a { color: var(--accent); }

@@ -1,7 +1,7 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
 import { For, Show } from "solid-js";
-import { api, artistHref, changes, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { current, play, type QueueItem } from "../player";
 
@@ -13,12 +13,12 @@ export function Album() {
 
   const queue = (album: AlbumPage): QueueItem[] =>
     album.songs.filter((s) => s.file).map((s) => ({
-      file: s.file!, title: s.title, artist: s.artist ?? album.artist, album: album.title, artwork: album.artwork,
+      file: media(s.file!), title: s.title, artist: s.artist ?? album.artist, album: album.title, artwork: media(album.artwork),
     }));
 
   const playFrom = (album: AlbumPage, song?: Song) => {
     const items = queue(album);
-    const start = song ? items.findIndex((i) => i.file === song.file) : 0;
+    const start = song ? items.findIndex((i) => i.file === media(song.file)) : 0;
     if (items.length) play(items, Math.max(start, 0));
   };
 
@@ -39,7 +39,7 @@ export function Album() {
         <section class="album">
           <header class="album-header">
             <Show when={album().artwork} fallback={<div class="album-art" />}>
-              <img class="album-art" src={album().artwork} alt="" />
+              <img class="album-art" src={media(album().artwork)} alt="" />
             </Show>
             <h1 class="album-title">{album().title}</h1>
             <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
@@ -80,7 +80,7 @@ export function Album() {
             <For each={album().songs}>
               {(song) => (
                 <li
-                  classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: !!song.file && current()?.file === song.file }}
+                  classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: !!song.file && current()?.file === media(song.file) }}
                   title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
                   onClick={() => song.file && playFrom(album(), song)}
                 >

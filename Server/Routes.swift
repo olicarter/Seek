@@ -1,5 +1,6 @@
 import Foundation
 import Hummingbird
+import HTTPTypes
 import NIOCore
 
 func json(_ value: some Encodable) throws -> Response {
@@ -138,7 +139,8 @@ func makeRouter(core: Core, site: String) -> Router<BasicRequestContext> {
         return try json(["ok": true])
     }
 
-    // The site's pages, the library's songs (with range requests, for seeking), then the site's files.
+    // Requests from the site on 4n.studio first, then the site's pages, the library's songs (with range requests, for seeking), then the site's files.
+    router.middlewares.add(SiteOrigins())
     router.middlewares.add(SitePages(page: URL(filePath: site).appending(path: "index.html")))
     router.middlewares.add(AudioTypes())
     router.middlewares.add(FileMiddleware(Core.musicFolder.path, urlBasePath: "/files", searchForIndexHtml: false))
@@ -220,3 +222,34 @@ struct SitePages<Context: RequestContext>: RouterMiddleware {
         }
     }
 }
+
+/// Lets the site on 4n.studio (and the dev server) talk to this one from your browser. The
+/// server is only reachable on your tailnet, which is what keeps it private; this only says
+/// which pages may use it. Chrome also asks before a public page reaches a private address.
+struct SiteOrigins<Context: RequestContext>: RouterMiddleware {
+    static var allowed: Set<String> { ["https://4n.studio", "http://localhost:5173"] }
+
+    func handle(_ request: Request, context: Context, next: (Request, Context) async throws -> Response) async throws -> Response {
+        guard let origin = request.headers[.origin], Self.allowed.contains(origin) else {
+            return try await next(request, context)
+        }
+        var headers: HTTPFields = [
+            .accessControlAllowOrigin: origin,
+            .accessControlAllowMethods: "GET, POST, OPTIONS",
+            .accessControlAllowHeaders: "Content-Type, Range",
+            .accessControlExposeHeaders: "Content-Range, Content-Length, Accept-Ranges",
+            .vary: "Origin",
+        ]
+        if request.method == .options {
+            if request.headers[HTTPField.Name("Access-Control-Request-Private-Network")!] == "true" {
+                headers[HTTPField.Name("Access-Control-Allow-Private-Network")!] = "true"
+            }
+            headers[.accessControlMaxAge] = "600"
+            return Response(status: .noContent, headers: headers)
+        }
+        var response = try await next(request, context)
+        for field in headers { response.headers[field.name] = field.value }
+        return response
+    }
+}
+

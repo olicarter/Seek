@@ -11,7 +11,7 @@ import "./styles.css";
 
 render(
   () => (
-    <Router root={App}>
+    <Router root={App} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Route path="/" component={Library} />
       <Route path="/search" component={Search} />
       <Route path="/album" component={Album} />

@@ -1,5 +1,5 @@
 import { createSignal, Show } from "solid-js";
-import { api, changes } from "../api";
+import { api, changes, serverAddress, setServerAddress } from "../api";
 import { live } from "../live";
 
 export function Settings() {
@@ -7,6 +7,7 @@ export function Settings() {
   const [username, setUsername] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const [address, setAddress] = createSignal(serverAddress());
 
   const signIn = async (e: SubmitEvent) => {
     e.preventDefault();
@@ -22,6 +23,12 @@ export function Settings() {
   return (
     <section>
       <h1>Settings</h1>
+      <h2>Server</h2>
+      <form class="login" onSubmit={(e) => { e.preventDefault(); setServerAddress(address()); }}>
+        <input placeholder="This page's own address" value={address()} onInput={(e) => setAddress(e.currentTarget.value)} />
+        <button>Save</button>
+        <p class="empty">Seek on your Mac, at its Tailscale address (https://…ts.net). Leave empty when the Mac serves this page.</p>
+      </form>
       <h2>Soulseek</h2>
       <Show
         when={status()?.signedIn}

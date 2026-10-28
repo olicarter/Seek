@@ -1,6 +1,6 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { albumHref, api, changes } from "../api";
+import { albumHref, api, changes, media } from "../api";
 import { live } from "../live";
 
 /** An artist's page, as in the app: their albums here, then what else they've released. */
@@ -16,7 +16,7 @@ export function Artist() {
             <For each={artist().albums}>
               {(album) => (
                 <A class="tile" href={albumHref(album)}>
-                  <img src={album.artwork} alt="" loading="lazy" onError={(e) => e.currentTarget.classList.add("missing")} />
+                  <img src={media(album.artwork)} alt="" loading="lazy" onError={(e) => e.currentTarget.classList.add("missing")} />
                   <div class="tile-title">{album.title}</div>
                   <div class="tile-sub">{album.year ?? ""}</div>
                 </A>
