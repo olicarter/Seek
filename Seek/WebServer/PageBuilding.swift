@@ -84,6 +84,8 @@ extension Core {
             artist: key.artist, title: key.title,
             year: album.year > 0 ? album.year : (found?.year ?? reference?.year),
             artwork: artwork, songs: songs, footer: footer,
+            released: (reference?.released).map { $0.ISO8601Format(.iso8601.year().month().day().dateSeparator(.dash)) },
+            copyright: reference?.copyright,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
             canAdd: (!folders.isEmpty || owned?.redownloadURL != nil) && (album.tracks.isEmpty || !missing.isEmpty) && !adding,
             adding: adding,

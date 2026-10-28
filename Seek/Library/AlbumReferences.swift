@@ -28,6 +28,11 @@ struct AlbumReference: Codable, Equatable, Sendable {
     var year: Int?
     var artworkURL: URL?
     var tracks: [ReferenceTrack]
+    /// The release date (Apple's or Bandcamp's), for the album page's footer when the artist's
+    /// catalogue can't be found (e.g. credited to "A & B", which Apple has under A).
+    var released: Date? = nil
+    /// Apple's ℗ line ("℗ 2026 Pure Life Records").
+    var copyright: String? = nil
 }
 
 /// Finds and keeps reference tracklists: Bandcamp first (its pages list the exact release),
@@ -67,6 +72,8 @@ final class AlbumReferences {
         AlbumIdentity.recordingKey(album)
     }
 
+    @ObservationIgnored private var redated: Set<String> = []
+
     func cached(_ album: AlbumKey) -> AlbumReference? {
         references[Self.key(album)]
     }
@@ -76,7 +83,18 @@ final class AlbumReferences {
     /// tracklist describes their files and comes first; otherwise Apple's catalogue does.
     func reference(for album: AlbumKey, page: URL? = nil, purchased: Bool = false, trackCount: Int = 0) async -> AlbumReference? {
         let key = Self.key(album)
-        if let found = references[key] { return found }
+        if let found = references[key] {
+            // Kept before tracklists had dates: looked up again once, quietly, for one.
+            if found.released == nil, redated.insert(key).inserted {
+                Task {
+                    if let fresh = await Self.lookUp(album, page: page, purchased: purchased, trackCount: trackCount), fresh.released != nil {
+                        references[key] = fresh
+                        save()
+                    }
+                }
+            }
+            return found
+        }
         if let missed = misses[key], missed.timeIntervalSinceNow > -7 * 86400 { return nil }
         if let pending = loading[key] { return await pending.value }
         let task = Task { await Self.lookUp(album, page: page, purchased: purchased, trackCount: trackCount) }
@@ -115,7 +133,7 @@ final class AlbumReferences {
         }
         guard let url, let info = try? await BandcampAPI.release(at: url), !info.tracks.isEmpty else { return nil }
         return AlbumReference(source: .bandcamp, artist: info.artist ?? album.artist, title: album.title,
-                              year: info.year, artworkURL: nil, tracks: info.tracks)
+                              year: info.year, artworkURL: nil, tracks: info.tracks, released: info.released)
     }
 
     nonisolated private static func iTunes(_ album: AlbumKey, trackCount: Int) async -> AlbumReference? {
@@ -154,7 +172,9 @@ final class AlbumReferences {
             year: (match["releaseDate"] as? String).flatMap { Int($0.prefix(4)) },
             artworkURL: (match["artworkUrl100"] as? String)
                 .map { $0.replacingOccurrences(of: "100x100bb", with: "600x600bb") }.flatMap(URL.init(string:)),
-            tracks: tracks
+            tracks: tracks,
+            released: (match["releaseDate"] as? String).flatMap { ISO8601DateFormatter().date(from: $0) },
+            copyright: match["copyright"] as? String
         )
     }
 

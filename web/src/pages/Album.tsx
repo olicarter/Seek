@@ -96,7 +96,18 @@ export function Album() {
               )}
             </For>
           </ol>
-          <p class="album-footer">{album().footer}</p>
+          <p class="album-footer">
+            <Show when={album().released}>
+              {/* Apple dates releases at midnight in California: the day is the UTC one. */}
+              {new Date(`${album().released}T00:00:00Z`).toLocaleDateString(undefined, { dateStyle: "long", timeZone: "UTC" })}
+              <br />
+            </Show>
+            {album().footer}
+            <Show when={album().copyright}>
+              <br />
+              {album().copyright}
+            </Show>
+          </p>
         </section>
       )}
     </Show>

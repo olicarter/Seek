@@ -62,7 +62,15 @@ struct AlbumView: View {
                 Text(album.lookingForCopies ? "Looking on Soulseek…" : "No copies on Soulseek right now.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            Text(album.footer).font(.callout).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                if let released = album.released, let date = try? Date(released + "T00:00:00Z", strategy: .iso8601) {
+                    // Apple dates releases at midnight in California: the day is the UTC one.
+                    Text(date.formatted(Date.FormatStyle(date: .long, time: .omitted, timeZone: .gmt)))
+                }
+                Text(album.footer)
+                if let copyright = album.copyright { Text(copyright) }
+            }
+            .font(.callout).foregroundStyle(.secondary)
         }
     }
 

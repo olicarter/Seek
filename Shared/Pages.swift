@@ -58,6 +58,9 @@ enum Pages {
         var artwork: String?
         var songs: [Song]
         var footer: String
+        /// "2026-07-31", the release day (UTC, as Apple dates them), and the ℗ line.
+        var released: String?
+        var copyright: String?
         /// Has a tracklist (Apple's or Bandcamp's): adding adds exactly it.
         var listed: Bool
         var inLibrary: Bool

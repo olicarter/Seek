@@ -351,9 +351,10 @@ struct AlbumDetailView: View {
         let listed = catalog.flatMap { CatalogRelease.release(of: key.title, in: $0) }
         AlbumPage(
             artist: key.artist, title: key.title,
-            footer: AlbumFooter(released: listed?.released, year: album.year, songs: rows.count,
+            // The artist's catalogue first, then the tracklist's own (when the artist isn't found).
+            footer: AlbumFooter(released: listed?.released ?? references.cached(key)?.released, year: album.year, songs: rows.count,
                                 duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
-                                copyright: listed?.copyright, label: album.label),
+                                copyright: listed?.copyright ?? references.cached(key)?.copyright, label: album.label),
             versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? []
         ) {
             AlbumHeader(

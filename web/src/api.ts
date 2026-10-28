@@ -47,6 +47,9 @@ export type AlbumPage = {
   artwork?: string;
   songs: Song[];
   footer: string;
+  /** "2026-07-31" and the ℗ line, when Apple or Bandcamp give them. */
+  released?: string;
+  copyright?: string;
   listed: boolean;
   inLibrary: boolean;
   canAdd: boolean;

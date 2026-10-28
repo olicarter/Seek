@@ -560,11 +560,11 @@ struct ReleaseDetailView: View {
             let listed = catalog.flatMap { CatalogRelease.release(of: release.title, in: $0) } ?? release.catalog
             AlbumPage(
                 artist: release.artist, title: release.title,
-                footer: AlbumFooter(released: listed?.released, year: release.year ?? reference?.year,
+                footer: AlbumFooter(released: listed?.released ?? reference?.released, year: release.year ?? reference?.year,
                                     songs: reference?.tracks.count ?? release.bestFolder?.files.count ?? 0,
                                     duration: reference.map { $0.tracks.reduce(0) { $0 + ($1.duration ?? 0) } }
                                         ?? Double(release.bestFolder?.files.reduce(0) { $0 + ($1.duration ?? 0) } ?? 0),
-                                    copyright: listed?.copyright),
+                                    copyright: listed?.copyright ?? reference?.copyright),
                 versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? []
             ) {
                 AlbumHeader(

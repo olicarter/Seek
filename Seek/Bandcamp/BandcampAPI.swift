@@ -250,6 +250,8 @@ enum BandcampAPI {
         var artist: String?
         var label: String?
         var year: Int?
+        /// "02 Jul 2021 00:00:00 GMT" on the page.
+        var released: Date?
         /// Per-track artists on compilations, keyed by track number.
         var trackArtists: [Int: String] = [:]
         /// The lowest price for the digital release; nil when it isn't for sale.
@@ -300,6 +302,10 @@ enum BandcampAPI {
             info.label = (json["publisher"] as? [String: Any])?["name"] as? String
             if let date = json["datePublished"] as? String {
                 info.year = MetadataReader.leadingNumber(String(date.split(separator: " ").first { $0.count == 4 } ?? ""))
+                let format = DateFormatter()
+                format.locale = Locale(identifier: "en_US_POSIX")
+                format.dateFormat = "dd MMM yyyy HH:mm:ss zzz"
+                info.released = format.date(from: date)
             }
         }
         if let start = html.range(of: "data-tralbum=\""),
