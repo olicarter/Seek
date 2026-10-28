@@ -515,7 +515,11 @@ enum ReleaseGrouper {
 
         var scores: [SearchRelease.ID: Double] = [:]
         for i in releases.indices {
-            releases[i].folders = sortedBest(releases[i].folders, quality: quality, expectedTracks: releases[i].catalog?.trackCount)
+            // A single song among a longer release's copies is listed as a song instead.
+            let expected = releases[i].catalog?.trackCount
+            songs += releases[i].folders.filter { !CopyFilter.isCopy($0, expectedTracks: expected) }.flatMap(\.files)
+            releases[i].folders.removeAll { !CopyFilter.isCopy($0, expectedTracks: expected) }
+            releases[i].folders = sortedBest(releases[i].folders, quality: quality, expectedTracks: expected)
             let text = ReleaseText.fold("\(releases[i].artist) \(releases[i].title) \(releases[i].seller ?? "")")
             releases[i].relevance = words.isEmpty ? 0 : Double(words.filter { text.contains($0) }.count) / Double(words.count)
             releases[i].inLibrary = library.album(for: releases[i])

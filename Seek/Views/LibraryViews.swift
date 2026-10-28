@@ -438,7 +438,7 @@ struct AlbumDetailView: View {
                 if client.savedUsername != nil {
                     Button("Other Copies on Soulseek", systemImage: "square.stack.3d.down.right") {
                         showingCopies = true
-                        copyFinder.find(key, client: client, quality: quality)
+                        copyFinder.find(key, expectedTracks: references.cached(key)?.tracks.count, client: client, quality: quality)
                     }
                 }
                 if let release = bandcampRelease {
@@ -472,7 +472,7 @@ struct AlbumDetailView: View {
             let reference = await references.reference(for: key, page: page, purchased: page != nil, trackCount: album.tracks.count)
             let missing = reference.map { MissingTracks.missing(from: $0, have: album.tracks) } ?? []
             if (!missing.isEmpty || !Self.isLossless(album.tracks)), client.savedUsername != nil {
-                copyFinder.find(key, client: client, quality: quality)
+                copyFinder.find(key, expectedTracks: reference?.tracks.count, client: client, quality: quality)
             }
         }
         .confirmationDialog("Upgrade to the lossless copy?", isPresented: $confirmingUpgrade, titleVisibility: .visible) {

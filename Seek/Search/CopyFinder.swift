@@ -30,7 +30,9 @@ final class CopyFinder {
     }
 
     /// Looks for the album on Soulseek, at most every half hour.
-    func find(_ album: AlbumKey, client: SoulseekClient, quality: QualityPreference) {
+    /// `expectedTracks`, the album's song count when its tracklist is known, keeps out folders
+    /// that can't be it (see `CopyFilter.isCopy`).
+    func find(_ album: AlbumKey, expectedTracks: Int? = nil, client: SoulseekClient, quality: QualityPreference) {
         let key = AlbumReferences.key(album)
         if let existing = copies[key], existing.status == .searching || existing.searchedAt.timeIntervalSinceNow > -1800 { return }
         copies[key] = Copies(status: .searching)
@@ -38,7 +40,7 @@ final class CopyFinder {
             let query = Self.query(for: album)
             // Copies show (and can play) as they're found, rather than after the whole search.
             let found = await client.quietSearch(query) { [weak self] soFar in
-                let matched = await Self.matching(album, query: query, in: soFar, quality: quality)
+                let matched = await Self.matching(album, query: query, in: soFar, expectedTracks: expectedTracks, quality: quality)
                 self?.copies[key] = Copies(status: .searching, folders: matched)
                 // Plenty of good copies with a free slot: no need to wait for the rest.
                 return (CopyFilter.preferred(matched, quality: quality)?.count ?? 0) >= Self.enoughCopies
@@ -47,7 +49,7 @@ final class CopyFinder {
                 copies[key] = Copies(status: .unavailable)
                 return
             }
-            var folders = await Self.matching(album, query: query, in: found, quality: quality)
+            var folders = await Self.matching(album, query: query, in: found, expectedTracks: expectedTracks, quality: quality)
             copies[key] = Copies(status: .found, folders: folders)
             // A search only lists matching files; fetch the rest for the best few copies.
             for folder in folders.prefix(3) { _ = try? await client.contents(of: folder) }
@@ -71,7 +73,7 @@ final class CopyFinder {
 
     /// The folders that are this album, best first.
     nonisolated static func matching(_ album: AlbumKey, query: String, in folders: [RemoteFolder],
-                                 quality: QualityPreference) async -> [RemoteFolder] {
+                                     expectedTracks: Int? = nil, quality: QualityPreference) async -> [RemoteFolder] {
         let grouped = await Task.detached {
             ReleaseGrouper.group(query: query, owned: [], store: [], folders: folders, quality: quality)
         }.value
@@ -84,6 +86,7 @@ final class CopyFinder {
                         || sides.count > 1 && ReleaseText.titlesMatch(release.title, sides[0]))
             }
             .flatMap(\.folders)
+            .filter { CopyFilter.isCopy($0, expectedTracks: expectedTracks) }
             .sorted { ReleaseGrouper.better($0, $1, quality: quality) }
     }
 

@@ -99,7 +99,8 @@ struct MixedFolderTests {
 struct ParentArtistTests {
     private func folder(_ path: String) -> RemoteFolder {
         RemoteFolder(username: "u", path: path,
-                     files: [RemoteFile(username: "u", path: "\(path)\\01 POP OUT.flac", size: 1000)],
+                     // Two songs: one alone would be a single, not a copy of the album.
+                     files: ["01 POP OUT.flac", "02 crush.flac"].map { RemoteFile(username: "u", path: "\(path)\\\($0)", size: 1000) },
                      hasFreeSlot: true, averageSpeed: 100, queueLength: 0)
     }
 
