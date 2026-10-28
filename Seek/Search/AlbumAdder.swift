@@ -4,7 +4,9 @@ import Observation
 /// Adds an album from Soulseek. With its tracklist known (Apple's or Bandcamp's), that's
 /// exactly the songs on it: each from the best copy that has it (one copy when one has them
 /// all), never a copy's bonus tracks or other editions' extras, and nothing at all when some
-/// song isn't in any copy. Without a tracklist, the best copy whole.
+/// song isn't in any copy. The songs are added as one group: if one can't be downloaded from
+/// anywhere, the rest stop and any that arrived go again (SoulseekClient.checkAddGroups).
+/// Without a tracklist, the best copy whole.
 @MainActor
 @Observable
 final class AlbumAdder {
@@ -34,8 +36,10 @@ final class AlbumAdder {
             }
             // Filed under the tracklist's name, whatever each copy's tags call it.
             let listed = AlbumKey(artist: reference.artist, title: CatalogRelease.cleanTitle(reference.title))
+            // One group: if any song can't come from anywhere, none of them stay.
+            let group = UUID()
             for (folder, songs) in picks {
-                client.download(songs, in: folder, album: listed, others: folders)
+                client.download(songs, in: folder, album: listed, others: folders, group: group)
             }
         }
     }
@@ -53,7 +57,13 @@ final class AlbumAdder {
                     group.addTask { _ = try? await client.contents(of: folder) }
                 }
             }
-            if let picks = Self.songs(of: reference, in: folders.prefix(checked).map(client.complete)) { return picks }
+            // Leaving out files their user has refused, though listed.
+            let usable = folders.prefix(checked).map(client.complete).map { folder in
+                var folder = folder
+                folder.files.removeAll { client.refused.contains($0.id) }
+                return folder
+            }
+            if let picks = Self.songs(of: reference, in: usable) { return picks }
         }
         return nil
     }

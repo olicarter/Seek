@@ -147,6 +147,7 @@ final class SoulseekClient {
                 try? await Task.sleep(for: .seconds(2))
             }
         }
+        checkAddGroups()
     }
 
     func saveTransfers() {
@@ -494,6 +495,7 @@ final class SoulseekClient {
                 transfer.bytesReceived = transfer.size
                 transfer.libraryPath = try await importDownload?(transfer, copy)
                 transfer.state = .completed
+                checkAddGroups()
             } catch {
                 transfer.state = .failed(error.localizedDescription)
             }
@@ -519,9 +521,13 @@ final class SoulseekClient {
 
     /// Downloads just these songs from a folder: an album's listed tracks, not its extras.
     /// `others`: the album's other copies, where helpers with the same rip may be.
-    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil, others: [RemoteFolder] = []) {
+    /// `group`: songs added as one album, which all arrive or none stay (see checkAddGroups).
+    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil, others: [RemoteFolder] = [],
+                  group: UUID? = nil) {
         for file in files {
-            if let transfer = download(file), let album, transfer.state != .completed { transfer.album = album }
+            guard let transfer = download(file), transfer.state != .completed else { continue }
+            if let album { transfer.album = album }
+            if let group { transfer.addGroup = group }
         }
         var chosen = folder
         chosen.files = files
@@ -758,6 +764,9 @@ final class SoulseekClient {
         if takeBack(transfer, reason) { return }
         transfer.state = .failed(reason)
         if reason.lowercased().contains("banned") { BannedUsers.insert(transfer.username) }
+        // Refused ("File not shared."): that copy isn't offered again, though it was listed.
+        if RetryPolicy.isPermanent(reason), !reason.lowercased().contains("cancel") { refused.insert(transfer.file.id) }
+        defer { checkAddGroups() }
         let rescuing = !transfer.forStreaming && Self.looksElsewhere(after: reason, retries: transfer.retries)
         if rescuing { rescue(from: transfer) }
         guard !transfer.forStreaming, let delay = RetryPolicy.delay(after: transfer.retries, reason: reason) else {
@@ -852,7 +861,11 @@ final class SoulseekClient {
         let key = "\(failed.username)\u{0}\(folderPath)"
         guard rescuing.insert(key).inserted else { return }
         Task {
-            defer { rescuing.remove(key) }
+            defer {
+                rescuing.remove(key)
+                // However it ended, an album added as one may now have lost a song for good.
+                checkAddGroups()
+            }
             // Everything from that folder not done yet (one going right now is left to finish).
             let stalled = transfers.filter {
                 !$0.forStreaming && $0.username == failed.username && $0.file.folder == folderPath
@@ -914,6 +927,7 @@ final class SoulseekClient {
     private func move(_ old: Transfer, to file: RemoteFile) -> Transfer {
         let replacement = Transfer(file: file)
         replacement.album = old.album
+        replacement.addGroup = old.addGroup
         replacement.plannedPath = old.plannedPath
         replacement.replacesExisting = old.replacesExisting
         old.plannedPath = nil
@@ -925,6 +939,64 @@ final class SoulseekClient {
         transfers.insert(replacement, at: 0)
         requestUpload(replacement)
         return replacement
+    }
+
+    // MARK: - Adding an album as one
+
+    /// Files a user refused ("File not shared."), though their share listed them: not picked
+    /// again (AlbumAdder leaves them out).
+    @ObservationIgnored private(set) var refused: Set<String> = []
+    /// An album added as one couldn't be: its songs that had arrived (library paths) go again,
+    /// and the app says so.
+    @ObservationIgnored var onAddGroupFailed: ((_ album: AlbumKey?, _ songs: Int, _ arrived: [String]) -> Void)?
+    @ObservationIgnored private var failedGroups: Set<UUID> = []
+
+    /// An album added as one (AlbumAdder) is all or nothing: once any of its songs has given up
+    /// for good (failed, with no retry to come and no other copy being looked for), the rest are
+    /// stopped and the songs that already arrived are taken out of the library again. Never
+    /// one song of two.
+    func checkAddGroups() {
+        for group in Set(transfers.compactMap(\.addGroup)) {
+            let members = transfers.filter { $0.addGroup == group && !$0.forStreaming }
+            if failedGroups.contains(group) {
+                // Arrived after the album was given up (it was already being imported).
+                let late = members.compactMap { $0.state == .completed ? $0.libraryPath : nil }
+                if !late.isEmpty {
+                    for member in members where member.state == .completed { member.state = .cancelled }
+                    onAddGroupFailed?(nil, 0, late)
+                }
+                continue
+            }
+            let dead = Self.hasLostSong(members.map {
+                (state: $0.state, retryAt: $0.retryAt, beingRescued: rescuing.contains("\($0.username)\u{0}\($0.file.folder)"))
+            })
+            guard dead else { continue }
+            failedGroups.insert(group)
+            SoulseekEvents.record("an album added as one lost a song for good; stopping its other \(members.count - 1) songs")
+            let arrived = members.compactMap { $0.state == .completed ? $0.libraryPath : nil }
+            for member in members {
+                if member.state.isActive {
+                    cancel(member)
+                } else if case .failed = member.state {
+                    member.retryAt = nil
+                    member.state = .cancelled
+                    if let path = member.plannedPath { releaseReserved?(path, true) }
+                } else if member.state == .completed {
+                    // Gone from the library with the rest: not "Done" in Activity.
+                    member.state = .cancelled
+                }
+            }
+            onAddGroupFailed?(members.first(where: { $0.album != nil })?.album, members.count, arrived)
+            saveTransfers()
+        }
+    }
+
+    /// A song given up for good: failed, with no retry to come and no other copy being looked for.
+    nonisolated static func hasLostSong(_ members: [(state: Transfer.State, retryAt: Date?, beingRescued: Bool)]) -> Bool {
+        members.contains { member in
+            guard case .failed = member.state, member.retryAt == nil else { return false }
+            return !member.beingRescued
+        }
     }
 
     // MARK: - Sharing an album between users
@@ -1217,6 +1289,7 @@ final class SoulseekClient {
                 transfer.libraryPath = try await importDownload?(transfer, url)
             }
             transfer.state = .completed
+            checkAddGroups()
             lentSongFinished(transfer)
         } catch {
             socket.close()

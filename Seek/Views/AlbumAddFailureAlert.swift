@@ -17,7 +17,7 @@ private struct AlbumAddFailureAlert: ViewModifier {
             Button("OK") {}
         } message: {
             if let failure = adder.failure {
-                Text("Not all \(failure.songs) songs of “\(failure.album.title)” are on Soulseek right now, so nothing was added.")
+                Text("Not all \(failure.songs) songs of “\(failure.album.title)” can be downloaded from Soulseek right now, so nothing was added.")
             }
         }
     }

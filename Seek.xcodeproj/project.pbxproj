@@ -32,6 +32,7 @@
 		3B11EEFFDC713698BB3C4930 /* BandcampLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F762D45BC9C6BE4947CB0E1 /* BandcampLoginView.swift */; };
 		3FB85E494D5344035B2B2F0D /* PaypalOnlyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 087FFD400AA97E45493959EE /* PaypalOnlyTests.swift */; };
 		420115F8CA1F04537744619D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D7415D95463F6BC217019DA7 /* Assets.xcassets */; };
+		438A77E1B6C50282E1183609 /* AddGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1086F5B093A28F9203769F1 /* AddGroupTests.swift */; };
 		44202CC1EE3CC2720F0EFFEB /* DiscoveryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A95BF5B3169F7A287A4B5F9 /* DiscoveryViews.swift */; };
 		447EE4A535836E633DB3099B /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = A386E31E425646123D2B8E03 /* Components.swift */; };
 		44D5680808DC341E54AFC0AF /* BandcampAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51769C4A62C28841B6D7E81A /* BandcampAPI.swift */; };
@@ -221,6 +222,7 @@
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		9EA4953C44E8DD74B463CA20 /* AlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumView.swift; sourceTree = "<group>"; };
 		9F5017006373FDFDF0E03624 /* LibraryMemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryMemo.swift; sourceTree = "<group>"; };
+		A1086F5B093A28F9203769F1 /* AddGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGroupTests.swift; sourceTree = "<group>"; };
 		A30FEB4461396E57E31B1B25 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A386E31E425646123D2B8E03 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A5FD190F215D9287B4545F5E /* PerfHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfHarness.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 		4E0E55E496B136F955892010 /* SeekTests */ = {
 			isa = PBXGroup;
 			children = (
+				A1086F5B093A28F9203769F1 /* AddGroupTests.swift */,
 				4D52EF5EB3B46628A165BDD6 /* AlbumIdentityTests.swift */,
 				43016CFBDD94A9A66A0651F8 /* AlbumReferenceTests.swift */,
 				7756E0651A70996486396F8B /* ArrivingTrackTests.swift */,
@@ -791,6 +794,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				438A77E1B6C50282E1183609 /* AddGroupTests.swift in Sources */,
 				353D6B3F963BB9B0699D1FBC /* AlbumIdentityTests.swift in Sources */,
 				D8EF7E30D9FE024C9001C810 /* AlbumReferenceTests.swift in Sources */,
 				CF3499F7AE5850F824BA970D /* ArrivingTrackTests.swift in Sources */,

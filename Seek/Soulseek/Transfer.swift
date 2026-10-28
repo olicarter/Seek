@@ -69,6 +69,9 @@ final class Transfer: Identifiable {
     /// one album can come from several copies whose tags spell it differently ("Copacetic" in
     /// a remaster's), so each is filed under this name instead.
     var album: AlbumKey?
+    /// The songs added together as one album (AlbumAdder): they all arrive, or none of them
+    /// stay (see SoulseekClient.checkAddGroups).
+    var addGroup: UUID?
     /// A library download that's also being played: it leaves a copy in the stream cache for the
     /// player before moving into the library.
     @ObservationIgnored var alsoStreaming = false
@@ -118,12 +121,16 @@ struct SavedTransfer: Codable {
     var plannedPath: String?
     var replacesExisting: Bool?
     var album: AlbumKey?
+    var addGroup: UUID?
+    var libraryPath: String?
 
     @MainActor
     init(_ transfer: Transfer) {
         id = transfer.id
         file = transfer.file
         album = transfer.album
+        addGroup = transfer.addGroup
+        libraryPath = transfer.libraryPath
         plannedPath = transfer.plannedPath
         replacesExisting = transfer.replacesExisting ? true : nil
         switch transfer.state {
@@ -138,6 +145,8 @@ struct SavedTransfer: Codable {
     func restore() -> Transfer {
         let transfer = Transfer(file: file, id: id)
         transfer.album = album
+        transfer.addGroup = addGroup
+        transfer.libraryPath = libraryPath
         transfer.plannedPath = plannedPath
         transfer.replacesExisting = replacesExisting ?? false
         switch outcome {

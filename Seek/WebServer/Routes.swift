@@ -72,7 +72,7 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
         let failure = await MainActor.run { () -> String? in
             defer { core.adder.failure = nil }
             return core.adder.failure.map {
-                "Not all \($0.songs) songs of “\($0.album.title)” are on Soulseek right now, so nothing was added."
+                "Not all \($0.songs) songs of “\($0.album.title)” can be downloaded from Soulseek right now, so nothing was added."
             }
         }
         return try json(["message": failure])
