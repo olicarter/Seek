@@ -65,6 +65,7 @@ struct RequireKey<Context: RequestContext>: RouterMiddleware {
         let path = request.uri.path
         let guarded = path.hasPrefix("/api/") || path.hasPrefix("/files/")
         let open = path == "/api/auth" || path.hasPrefix("/api/auth/signin/")
+            || path == "/api/auth/device/begin" || path == "/api/auth/device/poll"
         if guarded, !open, !(await Access.isTrusted(request)) {
             throw HTTPError(.unauthorized, message: "Sign in with a passkey.")
         }

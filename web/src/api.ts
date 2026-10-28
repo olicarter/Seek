@@ -189,6 +189,7 @@ export const api = {
   passkeys: () => get<Passkey[]>("/api/auth/passkeys"),
   removePasskey: (id: string) => post<{ ok: boolean }>("/api/auth/passkeys/remove", { id }),
   signOut: () => post<{ ok: boolean }>("/api/auth/signout"),
+  approveDevice: (code: string) => post<{ name: string }>("/api/auth/device/approve", { code }),
   signOutEverywhere: () => post<{ ok: boolean }>("/api/auth/signout-everywhere"),
   beginSignIn: () => post<{ challenge: string; site: string }>("/api/auth/signin/begin"),
   finishSignIn: (answer: object) => post<{ session: string }>("/api/auth/signin/finish", answer),

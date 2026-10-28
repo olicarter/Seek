@@ -28,6 +28,8 @@ targets:
       # Seek on the web, served by the Mac app (see WebServer.swift): the Mac only.
       - path: Seek/WebServer
         destinationFilters: [macCatalyst]
+      - path: Shared
+        destinationFilters: [macCatalyst]
     dependencies:
       - package: ZIPFoundation
       - target: SeekShare
@@ -108,6 +110,28 @@ targets:
             NSExtensionActivationRule:
               NSExtensionActivationSupportsWebURLWithMaxCount: 1
               NSExtensionActivationSupportsText: true
+  # Seek on the Apple TV: a client of Seek on the Mac, like the site (see SeekTV/Connection.swift).
+  SeekTV:
+    type: application
+    platform: tvOS
+    deploymentTarget: "26.0"
+    sources: [SeekTV, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tv
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # The Mac's address (its Tailscale Funnel one), given when building for the TV: it isn't
+        # kept in this public repo.
+        SEEK_SERVER: ""
+    info:
+      path: SeekTV/Info.plist
+      properties:
+        CFBundleDisplayName: Seek
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        UILaunchScreen: {}
+        SeekServer: $(SEEK_SERVER)
+        ITSAppUsesNonExemptEncryption: false
   SeekTests:
     type: bundle.unit-test
     platform: iOS
@@ -119,6 +143,10 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tests
 schemes:
+  SeekTV:
+    build:
+      targets:
+        SeekTV: all
   Seek:
     build:
       targets:

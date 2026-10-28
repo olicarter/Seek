@@ -7,6 +7,7 @@ import { Album } from "./pages/Album";
 import { Artist } from "./pages/Artist";
 import { Downloads } from "./pages/Downloads";
 import { Settings } from "./pages/Settings";
+import { TV } from "./pages/TV";
 import "./styles.css";
 
 render(
@@ -18,6 +19,7 @@ render(
       <Route path="/artist" component={Artist} />
       <Route path="/downloads" component={Downloads} />
       <Route path="/settings" component={Settings} />
+      <Route path="/tv" component={TV} />
     </Router>
   ),
   document.getElementById("root")!,

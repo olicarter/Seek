@@ -19,6 +19,9 @@ private struct RegisterAnswer: Decodable {
     var id: String; var clientData: String; var authenticatorData: String; var publicKey: String; var algorithm: Int; var name: String
 }
 private struct PasskeyRef: Decodable { var id: String }
+private struct DeviceName: Decodable { var name: String }
+private struct DevicePoll: Decodable { var secret: String }
+private struct DeviceCode: Decodable { var code: String }
 private struct PasskeyRow: Encodable { var id: String; var name: String; var created: Date; var lastUsed: Date? }
 
 /// Everything the site asks the server for.
@@ -157,6 +160,31 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
         let passkey = try await request.decode(as: PasskeyRef.self, context: context)
         await Passkeys.shared.remove(passkey: passkey.id)
         return try json(["ok": true])
+    }
+
+    /// A TV asks for a code to show; a signed-in browser approves it at 4n.studio/seek/web/tv.
+    router.post("/api/auth/device/begin") { request, context in
+        let device = try await request.decode(as: DeviceName.self, context: context)
+        let (code, secret) = await Passkeys.shared.beginDevice(name: device.name)
+        return try json(["code": code, "secret": secret, "approveAt": "\(PairingPage.site)tv?code=\(code)"])
+    }
+
+    router.post("/api/auth/device/poll") { request, context in
+        let poll = try await request.decode(as: DevicePoll.self, context: context)
+        switch await Passkeys.shared.pollDevice(secret: poll.secret) {
+        case .pending: return try json(["state": "pending"])
+        case .approved(let session): return try json(["state": "approved", "session": session])
+        case .expired: return try json(["state": "expired"])
+        }
+    }
+
+    router.post("/api/auth/device/approve") { request, context in
+        let code = try await request.decode(as: DeviceCode.self, context: context)
+        do {
+            return try json(["name": try await Passkeys.shared.approveDevice(code: code.code)])
+        } catch let failure as Passkeys.Failure {
+            throw HTTPError(.badRequest, message: failure.description)
+        }
     }
 
     router.post("/api/auth/signout") { request, _ in

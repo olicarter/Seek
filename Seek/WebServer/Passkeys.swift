@@ -46,6 +46,16 @@ actor Passkeys {
     private var saved: Saved
     private var challenges: [Data: (purpose: Purpose, expires: Date)] = [:]
 
+    /// A device that can't use a passkey (the Apple TV) waiting for a signed-in browser to approve
+    /// its code. It polls with the secret, which only it knows; the code alone gets nothing.
+    private struct Device {
+        var secret: String
+        var name: String
+        var expires: Date
+        var session: String?
+    }
+    private var devices: [String: Device] = [:]
+
     private static var file: URL { Core.storeFolder.appending(path: "passkeys.json") }
 
     init() {
@@ -119,6 +129,55 @@ actor Passkeys {
         saved.passkeys[index].signCount = count
         saved.passkeys[index].lastUsed = .now
         return newSession()
+    }
+
+    // MARK: - Devices
+
+    enum DeviceState: Sendable { case pending, approved(String), expired }
+
+    /// A code to show on the device, and the secret it polls with. Good for ten minutes.
+    func beginDevice(name: String) -> (code: String, secret: String) {
+        let now = Date.now
+        devices = devices.filter { $0.value.expires > now }
+        if devices.count > 10, let oldest = devices.min(by: { $0.value.expires < $1.value.expires }) { devices[oldest.key] = nil }
+        // No 0/O or 1/I/L: read off a TV across the room.
+        let letters = Array("ABCDEFGHJKMNPQRSTUVWXYZ23456789")
+        var code = ""
+        repeat {
+            code = String(Self.random(8).map { letters[Int($0) % letters.count] })
+        } while devices[code] != nil
+        let secret = Self.base64url(Self.random(32))
+        devices[code] = Device(secret: secret, name: String(name.prefix(60)), expires: now.addingTimeInterval(600))
+        return (Self.display(code), secret)
+    }
+
+    /// From a signed-in browser (the route checks that). Returns the device's name.
+    func approveDevice(code: String) throws -> String {
+        let key = code.uppercased().filter { $0.isLetter || $0.isNumber }
+        guard var device = devices[key], device.expires > .now, device.session == nil else {
+            throw Failure.invalid("That code isn't one the TV is showing now")
+        }
+        device.session = newSession()
+        devices[key] = device
+        return device.name
+    }
+
+    func pollDevice(secret: String) -> DeviceState {
+        guard let (code, device) = devices.first(where: { $0.value.secret == secret }) else { return .expired }
+        if let session = device.session {
+            devices[code] = nil
+            return .approved(session)
+        }
+        if device.expires < .now {
+            devices[code] = nil
+            return .expired
+        }
+        return .pending
+    }
+
+    /// "ABCD2345" → "ABCD-2345".
+    static func display(_ code: String) -> String {
+        "\(code.prefix(4))-\(code.suffix(code.count - 4))"
     }
 
     // MARK: - Sessions
