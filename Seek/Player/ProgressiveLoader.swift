@@ -77,21 +77,30 @@ final class ProgressiveLoader: NSObject, AVAssetResourceLoaderDelegate, @uncheck
             : min(totalSize, dataRequest.requestedOffset + Int64(dataRequest.requestedLength))
         let id = ObjectIdentifier(request)
         while offset < end {
-            let (url, failed, isCancelled) = lock.withLock { (fileURL, self.failed, cancelled.contains(id)) }
-            if isCancelled { return }
-            if failed {
-                request.finishLoading(with: URLError(.networkConnectionLost))
+            guard let chunk = await chunk(at: offset, upTo: end, isCancelled: { self.lock.withLock { self.cancelled.contains(id) } }) else {
+                if !lock.withLock({ cancelled.contains(id) }) { request.finishLoading(with: URLError(.networkConnectionLost)) }
                 return
             }
-            if let chunk = Self.read(url, from: offset, upTo: min(end, offset + 256 * 1024)), !chunk.isEmpty {
-                dataRequest.respond(with: chunk)
-                offset += Int64(chunk.count)
-            } else {
-                // Not here yet; the download is still on its way.
-                try? await Task.sleep(for: .milliseconds(100))
-            }
+            dataRequest.respond(with: chunk)
+            offset += Int64(chunk.count)
         }
         request.finishLoading()
+    }
+
+    /// The file's size once it's all here.
+    var size: Int64 { totalSize }
+
+    /// The next bytes from `offset` (up to `end`, at most 256 KB), waiting for them to arrive:
+    /// for the player here, and for the server sending the song to a browser. Nil once the
+    /// download gives up for good, or the reader no longer wants them.
+    func chunk(at offset: Int64, upTo end: Int64, isCancelled: @Sendable () -> Bool = { false }) async -> Data? {
+        while true {
+            let (url, failed) = lock.withLock { (fileURL, self.failed) }
+            if failed || isCancelled() { return nil }
+            if let chunk = Self.read(url, from: offset, upTo: min(end, offset + 256 * 1024)), !chunk.isEmpty { return chunk }
+            // Not here yet; the download is still on its way.
+            try? await Task.sleep(for: .milliseconds(100))
+        }
     }
 
     /// Bytes from `offset` up to `end` that have arrived so far.

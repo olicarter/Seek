@@ -15,6 +15,8 @@ final class Core {
     let resolver = FolderResolver()
     let adder = AlbumAdder()
     let search = SearchModel()
+    let streamer: StreamService
+    private(set) lazy var bandcampLogin = BandcampLogin(bandcamp: bandcamp)
     let quality = QualityPreference.cd
     /// Bumped whenever anything a page shows may have changed; pages refetch when it does.
     private(set) var version = 0
@@ -45,6 +47,7 @@ final class Core {
             fatalError("Couldn't open the library index: \(error)")
         }
         library = LibraryStore(container: container)
+        streamer = StreamService(client: client)
     }
 
     func start() async {
@@ -59,7 +62,17 @@ final class Core {
         client.libraryHasSong = { [library] name, path in library.hasSong(named: name, besides: path) }
         client.releaseReserved = { [library] path, abandoned in library.releaseReserved(path, abandoned: abandoned) }
         library.onAlbumsDeleted = { [client] folders in client.cancelDownloads(into: folders) }
+        client.cacheStream = { [streamer] transfer, url in try streamer.store(transfer, from: url) }
+        client.cachedFile = { [streamer] file in streamer.cachedURL(for: file) }
+        bandcamp.importFile = { [library] url, folders, name in
+            try await library.importFile(at: url, folders: folders, name: name)
+        }
+        bandcamp.replaceFiles = { [library] item, paths in
+            library.replace(paths, withPurchaseFrom: item.itemURL)
+        }
         client.restoreDownloads()
+        bandcamp.restoreDownloads()
+        Task { await bandcamp.refreshIfStale() }
         // Signed in for as long as the server runs: there's no app going into the background.
         client.searchViewAppeared()
         Task { await watch() }
@@ -90,6 +103,25 @@ final class Core {
                        storeVerifier: storeVerifier, quality: quality)
     }
 
+    // MARK: - Bandcamp
+
+    private var watchingPurchase: Task<Void, Never>?
+
+    /// Bought on Bandcamp's own page, in another tab: the collection is read again every half
+    /// minute for a quarter of an hour, so the purchase turns up here once it's done.
+    func watchForPurchase() {
+        watchingPurchase?.cancel()
+        let before = bandcamp.items.count
+        watchingPurchase = Task {
+            for _ in 0..<30 {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                await bandcamp.refresh()
+                if bandcamp.items.count > before { return }
+            }
+        }
+    }
+
     // MARK: - Watching
 
     /// What the search groups from: when any of it changes, it's grouped again (as SearchView's
@@ -111,6 +143,9 @@ final class Core {
             "\(search.results.result.releases.reduce(0) { $0 + $1.folders.count })",
             "\(library.allTracks.count)", adder.checking.sorted().joined(separator: ","), adder.failure.map { "\($0.album)" } ?? "",
             "\(references.references.count)", "\(AppleCovers.shared.version)",
+            bandcamp.username ?? "", "\(bandcamp.items.count)", "\(bandcamp.prices.count)",
+            bandcamp.downloads.map { "\($0.state)\(Int(($0.ringProgress ?? 0) * 50))" }.joined(separator: ","),
+            "\(streamer.progress.count)", "\(bandcampLogin.isOpen)",
         ]
     }
 

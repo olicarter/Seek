@@ -8,6 +8,8 @@ export type Status = {
   signedIn: boolean;
   downloading: number;
   failure?: string;
+  bandcamp?: string;
+  bandcampSigningIn: boolean;
 };
 
 export type Release = {
@@ -52,6 +54,13 @@ export type AlbumPage = {
   adding: boolean;
   lookingForCopies: boolean;
   copies: number;
+  bandcamp?: { owned: boolean; page?: string; price?: string; downloading?: number };
+};
+
+export type ArtistPage = {
+  name: string;
+  albums: LibraryAlbum[];
+  sections: { title: string; releases: { title: string; year: number; artwork?: string }[] }[];
 };
 
 export type LibraryAlbum = { artist: string; title: string; year?: number; artwork: string; songs: number };
@@ -103,10 +112,18 @@ export const api = {
   library: () => get<LibraryAlbum[]>("/api/library"),
   downloads: () => get<Download[]>("/api/downloads"),
   takeFailure: () => post<{ message?: string }>("/api/failure/take"),
+  artist: (name: string) => get<ArtistPage>(`/api/artist?name=${encodeURIComponent(name)}`),
+  bandcampSignIn: () => post<Status>("/api/bandcamp/signin"),
+  bandcampSignOut: () => post<Status>("/api/bandcamp/signout"),
+  buying: () => post<{ ok: boolean }>("/api/bandcamp/buying"),
 };
 
 export function albumHref(ref: AlbumRef): string {
   return `/album?${albumQuery(ref)}`;
+}
+
+export function artistHref(name: string): string {
+  return `/artist?name=${encodeURIComponent(name)}`;
 }
 
 /**

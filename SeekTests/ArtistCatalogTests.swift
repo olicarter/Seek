@@ -256,7 +256,7 @@ struct ArtistPageCatalogTests {
             release("Infinity On High", year: 2007),
         ]
         let owned = [Album(key: AlbumKey(artist: "Fall Out Boy", title: "From Under the Cork Tree"), tracks: [])]
-        let titles = ArtistDetailView.missing(from: catalog, owned: owned).map(\.title)
+        let titles = ArtistPage.missing(from: catalog, owned: owned).map(\.title)
         #expect(titles == [
             "From Under The Cork Tree (20th Anniversary Deluxe)",
             "Infinity On High",

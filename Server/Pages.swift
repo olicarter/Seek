@@ -9,6 +9,8 @@ enum Pages {
         var signedIn: Bool
         var downloading: Int
         var failure: String?
+        var bandcamp: String?
+        var bandcampSigningIn: Bool
     }
 
     struct Release: Encodable {
@@ -39,7 +41,8 @@ enum Pages {
         var title: String
         var artist: String?
         var duration: Double?
-        /// The file to play, for songs in the library.
+        /// What to play: the library's file, or for a song that isn't here, the server's stream of
+        /// it from Soulseek (or Bandcamp's player).
         var file: String?
         /// For missing songs: some copy has it.
         var available: Bool
@@ -62,6 +65,33 @@ enum Pages {
         var adding: Bool
         var lookingForCopies: Bool
         var copies: Int
+        var bandcamp: Bandcamp?
+    }
+
+    struct Bandcamp: Encodable {
+        /// In the collection: adding takes the purchase's own files.
+        var owned: Bool
+        /// The album's page, to buy it there.
+        var page: String?
+        var price: String?
+        var downloading: Double?
+    }
+
+    struct CatalogEntry: Encodable {
+        var title: String
+        var year: Int
+        var artwork: String?
+    }
+
+    struct ArtistSection: Encodable {
+        var title: String
+        var releases: [CatalogEntry]
+    }
+
+    struct Artist: Encodable {
+        var name: String
+        var albums: [LibraryAlbum]
+        var sections: [ArtistSection]
     }
 
     struct LibraryAlbum: Encodable {
@@ -91,7 +121,8 @@ extension Core {
         return Pages.Status(
             soulseek: "\(client.status)".components(separatedBy: "(").first ?? "",
             username: client.savedUsername, signedIn: client.savedUsername != nil,
-            downloading: client.activeTransferCount, failure: failure
+            downloading: client.activeTransferCount + bandcamp.activeDownloadCount, failure: failure,
+            bandcamp: bandcamp.username, bandcampSigningIn: bandcampLogin.isOpen
         )
     }
 
@@ -127,6 +158,11 @@ extension Core {
         let folders = copies(of: key, release: found, expectedTracks: reference?.tracks.count, missing: !missing.isEmpty || album.tracks.isEmpty)
         let downloads = AlbumRows.downloads(for: album, client: client)
         let files = folders.map(client.complete).flatMap(\.files)
+        let owned = bandcamp.ownedRelease(artist: key.artist, title: key.title) ?? found?.owned
+        let store = found?.store
+        if let store, owned == nil, bandcamp.prices[store.id] == nil { Task { await bandcamp.loadPrice(for: store) } }
+        let streams = streamQueue(key, album: album, missing: missing, folders: folders,
+                                  bandcampPage: store?.url ?? owned?.itemURL ?? page, artwork: found?.artworkURL ?? reference?.artworkURL)
         let songs = AlbumRows.rows(album, missing: missing, arriving: AlbumRows.arriving(album, missing: missing, client: client)).map { row in
             switch row {
             case .have(_, let track):
@@ -137,8 +173,10 @@ extension Core {
                                   available: true, progress: nil, lossless: AudioQuality(track).isLossless)
             case .missing(let track):
                 let download = MissingTracks.download(for: track, in: downloads)
+                let streamable = streams.contains { $0.reference == track }
                 return Pages.Song(kind: "missing", number: track.number > 0 ? track.number : nil, disc: track.disc, title: track.title,
-                                  artist: nil, duration: track.duration, file: nil,
+                                  artist: nil, duration: track.duration,
+                                  file: streamable ? Self.streamPath(key, release: id, track: track) : nil,
                                   available: download != nil || MissingTracks.file(for: track, in: files) != nil,
                                   progress: download.flatMap { $0.state.isActive ? $0.ringProgress : nil }, lossless: nil)
             case .arriving(let transfer):
@@ -155,15 +193,21 @@ extension Core {
             ? (found?.artworkURL ?? reference?.artworkURL).map { BandcampAPI.largeArtwork($0).absoluteString }
             : Self.coverPath(key)
         let adding = adder.isChecking(key) || AlbumRows.isBeingAdded(album, client: client)
+            || owned.flatMap { bandcamp.download(for: $0) }?.state.isActive == true
         return Pages.Album(
             artist: key.artist, title: key.title,
             year: album.year > 0 ? album.year : (found?.year ?? reference?.year),
             artwork: artwork, songs: songs, footer: footer,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
-            canAdd: !folders.isEmpty && (album.tracks.isEmpty || !missing.isEmpty) && !adding,
+            canAdd: (!folders.isEmpty || owned?.redownloadURL != nil) && (album.tracks.isEmpty || !missing.isEmpty) && !adding,
             adding: adding,
             lookingForCopies: found == nil && copyFinder.copies(of: key)?.status == .searching,
-            copies: folders.count
+            copies: folders.count,
+            bandcamp: owned != nil || store != nil
+                ? Pages.Bandcamp(owned: owned != nil, page: (owned?.itemURL ?? store?.url)?.absoluteString,
+                                 price: store.flatMap { bandcamp.prices[$0.id] }.map(\.formatted),
+                                 downloading: owned.flatMap { bandcamp.download(for: $0) }.flatMap { $0.state.isActive ? $0.ringProgress ?? 0 : nil })
+                : nil
         )
     }
 
@@ -180,8 +224,74 @@ extension Core {
         let found = id.flatMap(search.results.release)
         let key = AlbumKey(artist: found?.artist ?? artist, title: found?.title ?? title)
         let reference = await references.reference(for: key)
+        // Bought: the purchase's own files, at no cost, beat any Soulseek copy (as in the app).
+        if let item = bandcamp.ownedRelease(artist: key.artist, title: key.title) ?? found?.owned, item.redownloadURL != nil {
+            if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }
+            return
+        }
         let folders = copies(of: key, release: found, expectedTracks: reference?.tracks.count, missing: true)
         adder.add(key, from: folders, client: client, references: references)
+    }
+
+    /// The album's songs that aren't in the library, each with where to play it from, as the
+    /// app's album page builds them.
+    func streamQueue(_ key: AlbumKey, album: Album, missing: [ReferenceTrack], folders: [RemoteFolder],
+                     bandcampPage: URL?, artwork: URL?) -> StreamService.Queue {
+        guard !missing.isEmpty else { return [] }
+        return streamer.queue(
+            reference: AlbumReference(source: .itunes, artist: key.artist, title: key.title, tracks: missing),
+            artist: key.artist, album: key.title, folders: folders.map(client.complete),
+            bandcampPage: bandcampPage, artworkURL: artwork.map(BandcampAPI.largeArtwork), artwork: album.artwork
+        )
+    }
+
+    /// Something to play for a song that isn't in the library, as the app's player gets it.
+    func stream(artist: String, title: String, release id: String?, disc: Int, number: Int, song: String) async -> StreamService.Playable? {
+        let found = id.flatMap(search.results.release)
+        var key = AlbumKey(artist: artist, title: title)
+        if let owned = found?.inLibrary ?? library.index.album(artist: artist, title: title, named: true) { key = owned }
+        let album = library.albumsByKey[key] ?? Album(key: key, tracks: [])
+        guard let reference = await references.reference(for: key) else { return nil }
+        let missing = MissingTracks.missing(from: reference, have: album.tracks)
+        let folders = copies(of: key, release: found, expectedTracks: reference.tracks.count, missing: true)
+        let owned = bandcamp.ownedRelease(artist: key.artist, title: key.title) ?? found?.owned
+        let queue = streamQueue(key, album: album, missing: missing, folders: folders,
+                                bandcampPage: found?.store?.url ?? owned?.itemURL, artwork: found?.artworkURL ?? reference.artworkURL)
+        guard let entry = queue.first(where: { $0.reference.disc == disc && $0.reference.number == number && $0.reference.title == song })
+                ?? queue.first(where: { $0.reference.title == song }) else { return nil }
+        return await streamer.fetch(entry.track)
+    }
+
+    static func streamPath(_ key: AlbumKey, release: String?, track: ReferenceTrack) -> String {
+        var components = URLComponents()
+        components.path = "/api/stream"
+        components.queryItems = [
+            URLQueryItem(name: "artist", value: key.artist), URLQueryItem(name: "title", value: key.title),
+            URLQueryItem(name: "disc", value: "\(track.disc)"), URLQueryItem(name: "number", value: "\(track.number)"),
+            URLQueryItem(name: "song", value: track.title),
+        ] + (release.map { [URLQueryItem(name: "release", value: $0)] } ?? [])
+        return components.string ?? "/api/stream"
+    }
+
+    /// The artist's albums in the library, then what else they've released (Apple's catalogue),
+    /// under the app's headings.
+    func artistPage(_ name: String) async -> Pages.Artist {
+        let tracks = ArtistPage.tracks(of: name, in: library.allTracks)
+        let albums = LibraryGrouping.albums(tracks).sorted { $0.year > $1.year }
+        let catalog = await ArtistCatalog.releases(for: name)
+        let missing = ArtistPage.missing(from: catalog, owned: albums)
+        return Pages.Artist(
+            name: albums.first?.artist ?? catalog.first?.artist ?? name,
+            albums: albums.map { Pages.LibraryAlbum(artist: $0.artist, title: $0.title, year: $0.year > 0 ? $0.year : nil,
+                                                    artwork: Self.coverPath($0.key), songs: $0.tracks.count) },
+            sections: ArtistPage.Section.allCases.compactMap { section in
+                let releases = missing.filter { section.kinds.contains($0.kind) }
+                return releases.isEmpty ? nil : Pages.ArtistSection(
+                    title: section.rawValue,
+                    releases: releases.map { Pages.CatalogEntry(title: $0.title, year: $0.year, artwork: $0.artworkURL?.absoluteString) }
+                )
+            }
+        )
     }
 
     var libraryPage: [Pages.LibraryAlbum] {
@@ -193,7 +303,12 @@ extension Core {
     }
 
     var downloadsPage: [Pages.Download] {
-        client.transfers.filter { !$0.forStreaming }.map { transfer in
+        // Bandcamp purchases first, then Soulseek songs.
+        bandcamp.downloads.map { download in
+            Pages.Download(id: "bc-\(download.id)", name: download.item.title, album: download.item.artist, user: "Bandcamp",
+                           state: download.state.label, active: download.state.isActive,
+                           progress: download.ringProgress ?? 0, speed: 0)
+        } + client.transfers.filter { !$0.forStreaming }.map { transfer in
             Pages.Download(
                 id: transfer.id.uuidString, name: ReleaseText.songTitle(transfer.file.name),
                 album: transfer.album?.title ?? (transfer.file.folder as NSString).lastPathComponent,

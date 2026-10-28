@@ -474,4 +474,12 @@ extension BandcampAPI {
         URL(string: url.absoluteString.replacingOccurrences(of: "_2.jpg", with: "_16.jpg")) ?? url
     }
 
+    /// The `identity` cookie Bandcamp sets once signed in, from its login page's cookies, once it
+    /// has moved on from /login (it sets one for logged-out visitors too).
+    static func identity(after url: URL?, in cookies: [HTTPCookie]) -> String? {
+        guard url?.path.hasPrefix("/login") == false,
+              let identity = cookies.first(where: { $0.name == "identity" && $0.domain.hasSuffix("bandcamp.com") }),
+              !identity.value.isEmpty else { return nil }
+        return identity.value
+    }
 }

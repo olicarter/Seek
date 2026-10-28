@@ -148,7 +148,7 @@ struct ArtistsView: View {
     @State private var deleting: PendingDelete?
 
     private func askToDelete(_ name: String) {
-        deleting = PendingDelete(name: name, tracks: ArtistDetailView.tracks(of: name, in: tracks))
+        deleting = PendingDelete(name: name, tracks: ArtistPage.tracks(of: name, in: tracks))
     }
 
     var body: some View {
@@ -742,20 +742,15 @@ struct ArtistDetailView: View {
     /// Everything they've released, from Apple Music, to show what the library doesn't have.
     @State private var catalog: [CatalogRelease] = []
 
-    /// Their albums, and their songs on other people's (e.g. compilations), but not the rest of those.
-    static func tracks(of name: String, in tracks: [Track]) -> [Track] {
-        tracks.filter { $0.albumKey.artist == name || $0.artist == name }
-    }
-
     var body: some View {
-        let artistTracks = Self.tracks(of: name, in: tracks)
+        let artistTracks = ArtistPage.tracks(of: name, in: tracks)
         let albums = LibraryGrouping.albums(artistTracks).sorted { $0.year > $1.year }
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 PlayShuffleButtons(tracks: albums.flatMap(\.tracks))
                 AlbumGrid(albums: albums)
-                let missing = Self.missing(from: catalog, owned: albums)
-                ForEach(CatalogSection.allCases, id: \.self) { section in
+                let missing = ArtistPage.missing(from: catalog, owned: albums)
+                ForEach(ArtistPage.Section.allCases, id: \.self) { section in
                     let releases = missing.filter { section.kinds.contains($0.kind) }
                     if !releases.isEmpty {
                         Text(section.rawValue).font(.title3.bold())
@@ -786,36 +781,6 @@ struct ArtistDetailView: View {
     }
 }
 
-extension ArtistDetailView {
-    /// The headings the rest of an artist's catalogue goes under, as in Apple Music.
-    enum CatalogSection: String, CaseIterable {
-        case albums = "Albums"
-        case singles = "Singles & EPs"
-        case other = "Remixes & Mixes"
-
-        var kinds: [CatalogRelease.Kind] {
-            switch self {
-            case .albums: [.album]
-            case .singles: [.ep, .single]
-            case .other: [.other]
-            }
-        }
-    }
-
-    /// Releases the library doesn't have, newest first, each once (Apple lists clean and explicit
-    /// versions separately). Only the very release in the library is left out: its deluxe
-    /// edition, or an EP sharing its name, is a release of its own and is listed.
-    static func missing(from catalog: [CatalogRelease], owned: [Album]) -> [CatalogRelease] {
-        let have = Set(owned.map { AlbumIdentity.title($0.title).releaseKey })
-        var seen = Set<String>()
-        return catalog
-            .sorted { $0.released > $1.released }
-            .filter { release in
-                let name = AlbumIdentity.title(release.title).releaseKey
-                return !have.contains(name) && seen.insert(name).inserted
-            }
-    }
-}
 
 /// Releases that aren't in the library, opening their album page to listen or add them.
 private struct CatalogGrid: View {

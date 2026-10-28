@@ -65,13 +65,9 @@ private struct LoginWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // After a successful login Bandcamp navigates away from /login.
-            guard webView.url?.path.hasPrefix("/login") == false else { return }
+            let url = webView.url
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [onIdentity] cookies in
-                if let identity = cookies.first(where: { $0.name == "identity" && $0.domain.hasSuffix("bandcamp.com") }),
-                   !identity.value.isEmpty {
-                    onIdentity(identity.value)
-                }
+                if let identity = BandcampAPI.identity(after: url, in: cookies) { onIdentity(identity) }
             }
         }
     }

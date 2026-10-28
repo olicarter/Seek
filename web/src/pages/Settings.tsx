@@ -1,8 +1,9 @@
-import { createResource, createSignal, Show } from "solid-js";
-import { api } from "../api";
+import { createSignal, Show } from "solid-js";
+import { api, changes } from "../api";
+import { live } from "../live";
 
 export function Settings() {
-  const [status, { mutate }] = createResource(api.status);
+  const [status, { mutate }] = live(changes, api.status);
   const [username, setUsername] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [busy, setBusy] = createSignal(false);
@@ -36,6 +37,25 @@ export function Settings() {
       >
         <p>Signed in as <strong>{status()?.username}</strong> ({status()?.soulseek}).</p>
         <button onClick={async () => mutate(await api.logout())}>Sign Out</button>
+      </Show>
+
+      <h2>Bandcamp</h2>
+      <Show
+        when={status()?.bandcamp}
+        fallback={
+          <>
+            <button disabled={status()?.bandcampSigningIn} onClick={async () => mutate(await api.bandcampSignIn())}>
+              {status()?.bandcampSigningIn ? "Waiting for Sign-In…" : "Sign In"}
+            </button>
+            <p class="empty">
+              Bandcamp's sign-in page opens in a window on the Mac running the server. Seek keeps Bandcamp's session there,
+              never your password, so your purchases show up in Search and add from Bandcamp.
+            </p>
+          </>
+        }
+      >
+        <p>Signed in as <strong>{status()?.bandcamp}</strong>.</p>
+        <button onClick={async () => mutate(await api.bandcampSignOut())}>Sign Out</button>
       </Show>
     </section>
   );

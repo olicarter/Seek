@@ -1,7 +1,7 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
 import { For, Show } from "solid-js";
-import { api, changes, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { api, artistHref, changes, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { current, play, type QueueItem } from "../player";
 
@@ -42,7 +42,7 @@ export function Album() {
               <img class="album-art" src={album().artwork} alt="" />
             </Show>
             <h1 class="album-title">{album().title}</h1>
-            <A class="album-artist" href={`/search?q=${encodeURIComponent(album().artist)}`}>{album().artist}</A>
+            <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
             <Show when={album().year}><div class="album-year">{album().year}</div></Show>
             <div class="album-actions">
               <button class="round" aria-label="Shuffle" disabled={!queue(album()).length} onClick={() => shuffle(album())}>⤮</button>
@@ -59,7 +59,19 @@ export function Album() {
                 <span class="round spinner" aria-label="Adding" />
               </Show>
             </div>
-            <Show when={!album().inLibrary && album().listed && !album().copies}>
+            <Show when={album().bandcamp}>
+              {(bandcamp) => (
+                <Show
+                  when={!bandcamp().owned}
+                  fallback={<p class="album-note">In your Bandcamp collection{bandcamp().downloading !== undefined ? " · adding…" : ""}</p>}
+                >
+                  <a class="buy" href={bandcamp().page} target="_blank" rel="noopener" onClick={() => void api.buying()}>
+                    Buy on Bandcamp{bandcamp().price ? ` · ${bandcamp().price}` : ""}
+                  </a>
+                </Show>
+              )}
+            </Show>
+            <Show when={!album().inLibrary && album().listed && !album().copies && !album().bandcamp?.owned}>
               <p class="album-note">{album().lookingForCopies ? "Looking on Soulseek…" : "No copies on Soulseek right now."}</p>
             </Show>
           </header>
@@ -69,6 +81,7 @@ export function Album() {
               {(song) => (
                 <li
                   classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: !!song.file && current()?.file === song.file }}
+                  title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
                   onClick={() => song.file && playFrom(album(), song)}
                 >
                   <span class="song-number">{song.number ?? ""}</span>

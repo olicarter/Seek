@@ -119,3 +119,8 @@ h2 { font-size: 20px; margin: 24px 0 8px; }
 }
 .toast p { margin: 0 0 12px; }
 .toast button { border: none; background: none; color: var(--accent); font-weight: 600; font-size: 17px; }
+
+.buy { display: inline-block; margin: 6px 0; padding: 8px 16px; border-radius: 999px; background: rgba(29, 160, 195, 0.18);
+  color: var(--bandcamp); font-weight: 600; font-size: 15px; }
+.song.missing.playable:hover { color: var(--text); }
+section > h2 + button { margin-bottom: 8px; }
