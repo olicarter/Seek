@@ -15,6 +15,7 @@ struct SeekApp: App {
     @State private var folderResolver = FolderResolver()
     @State private var albumReferences = AlbumReferences()
     @State private var copyFinder = CopyFinder()
+    @State private var albumAdder = AlbumAdder()
     @State private var storeVerifier = StoreVerifier()
     @State private var streamer: StreamService
     @State private var sharing: SharingService
@@ -103,6 +104,7 @@ struct SeekApp: App {
         .environment(storeVerifier)
         .environment(streamer)
         .environment(sharing)
+        .environment(albumAdder)
         .commands {
             PlaybackCommands(player: player, router: router)
         }

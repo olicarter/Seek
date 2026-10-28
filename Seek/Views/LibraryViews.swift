@@ -414,7 +414,7 @@ struct AlbumDetailView: View {
             NavigationStack {
                 List {
                     if let copies = copyFinder.copies(of: key), copies.status != .unavailable {
-                        OtherCopiesSection(copies: copies)
+                        OtherCopiesSection(copies: copies, album: key)
                     } else {
                         Text("Soulseek isn't available right now.").foregroundStyle(.secondary)
                     }
@@ -425,6 +425,7 @@ struct AlbumDetailView: View {
                     Button("Done", systemImage: "xmark") { showingCopies = false }
                 }
                 .libraryDestinations()
+                .albumAddFailureAlert()
             }
         }
         .toolbar {
@@ -1215,6 +1216,7 @@ struct UpgradeBanner: View {
 /// Soulseek copies found for a library album: preferred ones first, the rest behind "Show All".
 struct OtherCopiesSection: View {
     let copies: CopyFinder.Copies
+    var album: AlbumKey? = nil
 
     var body: some View {
         if copies.status == .searching || copies.folders.isEmpty {
@@ -1229,7 +1231,7 @@ struct OtherCopiesSection: View {
                 Text("Other Copies")
             }
         } else {
-            SoulseekCopiesSection(folders: copies.folders, title: "Other Copies")
+            SoulseekCopiesSection(folders: copies.folders, title: "Other Copies", album: album)
         }
     }
 }

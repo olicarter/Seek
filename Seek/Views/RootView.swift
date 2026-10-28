@@ -71,6 +71,7 @@ struct RootView: View {
         }
         .newPlaylistPrompt()
         .appUpdatePrompt()
+        .albumAddFailureAlert()
         // Full screen everywhere, as in Apple Music; Now Playing handles the swipe down itself.
         .fullScreenCover(isPresented: $showingNowPlaying) { NowPlayingView() }
         .onChange(of: scenePhase) { _, phase in

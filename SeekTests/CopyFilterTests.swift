@@ -44,3 +44,37 @@ struct OneSongFolderTests {
         #expect(result.songs.map(\.username) == ["u2"])
     }
 }
+
+/// Adding an album takes one copy with every song on its tracklist, and only those songs.
+struct FullCopyTests {
+    private let reference = AlbumReference(source: .itunes, artist: "Cryogeyser", title: "Glitch", tracks: [
+        ReferenceTrack(number: 1, disc: 1, title: "Glitch"),
+        ReferenceTrack(number: 2, disc: 1, title: "Halftones"),
+        ReferenceTrack(number: 3, disc: 1, title: "Love Is Land"),
+    ])
+
+    private func folder(_ user: String, files: [String]) -> RemoteFolder {
+        RemoteFolder(username: user, path: "music\\Cryogeyser - Glitch",
+                     files: files.map { RemoteFile(username: user, path: "music\\Cryogeyser - Glitch\\\($0)", size: 30_000_000) },
+                     hasFreeSlot: true, averageSpeed: 100, queueLength: 0)
+    }
+
+    @Test func aCopyMissingASongIsNotUsed() {
+        let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
+        #expect(AlbumAdder.songs(of: reference, in: partial) == nil)
+        #expect(AlbumAdder.fullCopy(of: reference, in: [partial]) == nil)
+    }
+
+    @Test func bonusTracksStayBehind() {
+        let withBonus = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac", "04 Glitch (Demo).flac"])
+        let songs = AlbumAdder.songs(of: reference, in: withBonus)
+        #expect(songs?.map(\.name) == ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac"])
+    }
+
+    @Test func theFirstFullCopyIsTaken() {
+        let partial = folder("u1", files: ["01 Glitch.flac", "02 Halftones.flac"])
+        let full = folder("u2", files: ["01 Glitch.flac", "02 Halftones.flac", "03 Love Is Land.flac"])
+        let other = folder("u3", files: ["1. Glitch.flac", "2. Halftones.flac", "3. Love Is Land.flac"])
+        #expect(AlbumAdder.fullCopy(of: reference, in: [partial, full, other])?.0.username == "u2")
+    }
+}
