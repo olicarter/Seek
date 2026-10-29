@@ -124,7 +124,8 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
     router.post("/api/app/download") { request, context in
         let body = try await request.decode(as: MacLinkWire.Download.self, context: context)
         await client.connectIfNeeded()
-        await client.download(body.files, in: body.folder, album: body.album, others: body.others, group: body.group)
+        await client.download(body.files, in: body.folder, album: body.album, others: body.others, group: body.group,
+                              replacingExisting: body.replacingExisting ?? false)
         return try json(["ok": true])
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// One row of an album page: a song in the library, one on the tracklist that isn't, or one
 /// downloading that has no row of its own.
@@ -43,10 +44,30 @@ enum AlbumRows {
     static func arriving(_ album: Album, missing: [ReferenceTrack], client: SoulseekClient) -> [Transfer] {
         let downloads = downloads(for: album, client: client)
         let claimed = Set(missing.compactMap { MissingTracks.download(for: $0, in: downloads)?.id })
+            .union(replacing(album, client: client).values.map(\.id))
         let paths = Set(album.tracks.map(\.path))
         return downloads.filter {
             client.isOnItsWay($0) && !claimed.contains($0.id) && !($0.plannedPath.map(paths.contains) ?? false)
         }
+    }
+
+    /// Downloads on their way to replace songs already here (a better copy, see CopyFinder.upgrade),
+    /// by the song each replaces: they show on its row, not as songs of their own named after
+    /// their files.
+    static func replacing(_ album: Album, client: SoulseekClient) -> [PersistentIdentifier: Transfer] {
+        let paths = Set(album.tracks.map(\.path))
+        var going = downloads(for: album, client: client).filter {
+            client.isOnItsWay($0) && !($0.plannedPath.map(paths.contains) ?? false)
+        }
+        var result: [PersistentIdentifier: Transfer] = [:]
+        for track in album.tracks where !going.isEmpty {
+            let song = ReferenceTrack(number: track.trackNumber, disc: max(track.discNumber, 1), title: track.title,
+                                      duration: track.duration > 0 ? track.duration : nil)
+            guard let download = MissingTracks.download(for: song, in: going) else { continue }
+            result[track.persistentModelID] = download
+            going.removeAll { $0.id == download.id }
+        }
+        return result
     }
 
     /// This album's Soulseek downloads, from whichever copies, going or done or failed.

@@ -112,9 +112,11 @@ final class MacLink {
         try await post("/api/app/contents", ["folder": folder])
     }
 
-    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey?, others: [RemoteFolder], group: UUID?) async {
+    func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey?, others: [RemoteFolder], group: UUID?,
+                  replacingExisting: Bool = false) async {
         let _: [String: Bool]? = try? await post("/api/app/download",
-                                                 MacLinkWire.Download(files: files, folder: folder, album: album, others: others, group: group))
+                                                 MacLinkWire.Download(files: files, folder: folder, album: album, others: others, group: group,
+                                                                      replacingExisting: replacingExisting ? true : nil))
         startMirroring()
     }
 

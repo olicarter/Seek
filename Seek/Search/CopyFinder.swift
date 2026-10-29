@@ -135,14 +135,21 @@ final class CopyFinder {
 
     /// Downloads a better copy and, once every file is in, swaps the album's tracks for it by
     /// title, keeping anything without a match.
-    func upgrade(_ album: AlbumKey, replacing oldPaths: [String], with folder: RemoteFolder,
+    func upgrade(_ album: AlbumKey, replacing oldPaths: [String], with folder: RemoteFolder, reference: AlbumReference? = nil,
                  client: SoulseekClient, library: LibraryStore) {
         let key = AlbumReferences.key(album)
         guard upgrading.insert(key).inserted else { return }
         Task {
             defer { upgrading.remove(key) }
-            let files = (try? await client.contents(of: folder)) ?? folder.files
-            for file in files { client.download(file, replacingExisting: true) }
+            let all = (try? await client.contents(of: folder)) ?? folder.files
+            // The tracklist's songs when it's known (named from it as they come in, so each finds
+            // the song it replaces), otherwise the copy's audio.
+            let audio = all.filter { AudioFormats.playable.contains($0.fileExtension) }
+            let songs = reference?.tracks.compactMap { MissingTracks.file(for: $0, in: audio) } ?? []
+            let files = songs.isEmpty ? audio : songs
+            var chosen = folder
+            chosen.files = all
+            client.download(files, in: chosen, album: album, replacingExisting: true)
             let ids = Set(files.map(\.id))
             while true {
                 try? await Task.sleep(for: .seconds(3))

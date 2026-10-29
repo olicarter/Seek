@@ -49,6 +49,8 @@ enum MacLinkWire {
         var album: AlbumKey?
         var others: [RemoteFolder]
         var group: UUID?
+        /// A better copy of songs already in the library (see CopyFinder.upgrade).
+        var replacingExisting: Bool? = nil
     }
 
     /// A transfer's state as words, and back.

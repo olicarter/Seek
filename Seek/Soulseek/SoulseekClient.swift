@@ -551,8 +551,10 @@ final class SoulseekClient {
     /// Downloads just these songs from a folder: an album's listed tracks, not its extras.
     /// `others`: the album's other copies, where helpers with the same rip may be.
     /// `group`: songs added as one album, which all arrive or none stay (see checkAddGroups).
+    /// `replacingExisting`: a better copy of songs already in the library, added beside them
+    /// (never dropped as songs the library has) until CopyFinder.upgrade swaps them in.
     func download(_ files: [RemoteFile], in folder: RemoteFolder, album: AlbumKey? = nil, others: [RemoteFolder] = [],
-                  group: UUID? = nil) {
+                  group: UUID? = nil, replacingExisting: Bool = false) {
         if let mac {
             // Shown here straight away; the Mac's own state follows (see mirror).
             for file in files where !transfers.contains(where: { $0.file.id == file.id && !$0.forStreaming && $0.state.isActive }) {
@@ -560,11 +562,11 @@ final class SoulseekClient {
                 transfer.album = album
                 transfer.addGroup = group
             }
-            Task { await mac.download(files, in: folder, album: album, others: others, group: group) }
+            Task { await mac.download(files, in: folder, album: album, others: others, group: group, replacingExisting: replacingExisting) }
             return
         }
         for file in files {
-            guard let transfer = download(file), transfer.state != .completed else { continue }
+            guard let transfer = download(file, replacingExisting: replacingExisting), transfer.state != .completed else { continue }
             if let album { transfer.album = album }
             if let group { transfer.addGroup = group }
         }

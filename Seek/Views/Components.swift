@@ -194,6 +194,8 @@ struct TrackRow: View {
     let track: Track
     var showArtwork = true
     var showNumber = false
+    /// A better copy of the song on its way, replacing it when it's in.
+    var replacement: Transfer? = nil
     @Environment(Player.self) private var player
     @Environment(LibraryStore.self) private var library
     @AppStorage(MusicalKey.Notation.defaultsKey) private var notation = MusicalKey.Notation.camelot
@@ -238,25 +240,33 @@ struct TrackRow: View {
                     .lineLimit(1)
                     .accessibilityLabel(tempoAndKey.replacingOccurrences(of: " · ", with: " BPM, key "))
             }
-            switch library.availability(of: track) {
-            case .cloudOnly:
-                EmptyView()
-            // Centred in the same column as the rings of songs still downloading into the album.
-            case .downloading(let progress):
-                ProgressRing(progress: progress, size: 14, lineWidth: 2)
-                    .frame(width: 28)
-            case .onDevice:
-                // Like Apple Music: only songs kept for offline listening are marked.
-                if library.usesICloud, track.keepOffline {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 28)
-                        .accessibilityLabel("Downloaded")
-                }
+            if let replacement {
+                ProgressRing(progress: replacement.ringProgress)
+            } else {
+                availability
             }
         }
         .contentShape(.rect)
+    }
+
+    @ViewBuilder private var availability: some View {
+        switch library.availability(of: track) {
+        case .cloudOnly:
+            EmptyView()
+        // Centred in the same column as the rings of songs still downloading into the album.
+        case .downloading(let progress):
+            ProgressRing(progress: progress, size: 14, lineWidth: 2)
+                .frame(width: 28)
+        case .onDevice:
+            // Like Apple Music: only songs kept for offline listening are marked.
+            if library.usesICloud, track.keepOffline {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28)
+                    .accessibilityLabel("Downloaded")
+            }
+        }
     }
 }
 

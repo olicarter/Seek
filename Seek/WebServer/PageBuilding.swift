@@ -49,6 +49,7 @@ extension Core {
         if let store, owned == nil, bandcamp.prices[store.id] == nil { Task { await bandcamp.loadPrice(for: store) } }
         let streams = streamQueue(key, album: album, missing: missing, folders: folders,
                                   bandcampPage: store?.url ?? owned?.itemURL ?? page, artwork: found?.artworkURL ?? reference?.artworkURL)
+        let replacing = AlbumRows.replacing(album, client: client)
         let songs = AlbumRows.rows(album, missing: missing, arriving: AlbumRows.arriving(album, missing: missing, client: client)).map { row in
             switch row {
             case .have(_, let track):
@@ -56,7 +57,8 @@ extension Core {
                                   title: track.title.isEmpty ? (track.path as NSString).lastPathComponent : track.title,
                                   artist: track.artist == album.artist ? nil : track.artist, duration: track.duration,
                                   file: "/files/" + track.path.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/"),
-                                  available: true, progress: nil, lossless: AudioQuality(track).isLossless,
+                                  available: true, progress: replacing[track.persistentModelID]?.ringProgress,
+                                  lossless: AudioQuality(track).isLossless,
                                   quality: AudioQuality(track).soundQuality, tempoAndKey: track.tempoAndKey(.camelot))
             case .missing(let track):
                 let download = MissingTracks.download(for: track, in: downloads)

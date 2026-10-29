@@ -389,10 +389,11 @@ struct AlbumDetailView: View {
                 .listRowSeparator(.hidden)
             }
 
+            let replacing = AlbumRows.replacing(album, client: client)
             ForEach(rows) { row in
                 switch row {
                 case .have(_, let track):
-                    TrackRow(track: track, showNumber: true)
+                    TrackRow(track: track, showNumber: true, replacement: replacing[track.persistentModelID])
                         .onTapGesture { player.play(queue, startingAt: queue.firstIndex { $0 === track } ?? 0) }
                         .contextMenu { TrackMenu(track: track) }
                 case .arriving(let transfer):
@@ -482,7 +483,8 @@ struct AlbumDetailView: View {
         .confirmationDialog("Upgrade to the lossless copy?", isPresented: $confirmingUpgrade, titleVisibility: .visible) {
             if let folder = upgradeCopy(album, copies: copyFinder.copies(of: key)) {
                 Button("Add and Replace") {
-                    copyFinder.upgrade(key, replacing: album.tracks.map(\.path), with: folder, client: client, library: library)
+                    copyFinder.upgrade(key, replacing: album.tracks.map(\.path), with: folder, reference: references.cached(key),
+                                       client: client, library: library)
                 }
             }
         } message: {
