@@ -26,6 +26,7 @@ struct SeekApp: App {
     #endif
 
     init() {
+        SyncReport.start()
         let container = LibraryStore.makeContainer()
         let library = LibraryStore(container: container)
         self.container = container
