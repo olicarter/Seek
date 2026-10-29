@@ -58,6 +58,7 @@
 		690AAD66C439162C45E27140 /* RealSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BB5A35F73D4A3ADDF23CA97 /* RealSearchTests.swift */; };
 		694FE84FCA17403049D1EA7C /* Pages.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6610840563298DA26EACED1B /* Pages.swift */; };
 		6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20CC9811E43E6250AF81358F /* DiscoveryTests.swift */; };
+		6BCC6C171C25953C0945336E /* LooseSingleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A14E0838000537490B2FF2 /* LooseSingleTests.swift */; };
 		6CB13B09DD1F738F7295FD61 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0B53D59997A13ECE24DCF6 /* SignInView.swift */; };
 		6EF8E40FE2D96DE76D674F51 /* SearchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2484EE2114073E282CE92C2F /* SearchSession.swift */; };
 		7028C881A89E3DC45295CBFD /* MacLink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5AB91809E5AAC23CA985A2FC /* MacLink.swift */; };
@@ -238,6 +239,7 @@
 		86654379C73349786A952AD6 /* BackgroundWork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWork.swift; sourceTree = "<group>"; };
 		86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
 		875588F0BCE7DE68B3F929D2 /* AppAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAPI.swift; sourceTree = "<group>"; };
+		87A14E0838000537490B2FF2 /* LooseSingleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LooseSingleTests.swift; sourceTree = "<group>"; };
 		8DC462038046EC3F2D2BCB33 /* AlbumAddFailureAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumAddFailureAlert.swift; sourceTree = "<group>"; };
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
 		9EA4953C44E8DD74B463CA20 /* AlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumView.swift; sourceTree = "<group>"; };
@@ -367,6 +369,7 @@
 				95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */,
 				CBE6CAC6EB42D335728E3606 /* CopyFilterTests.swift */,
 				20CC9811E43E6250AF81358F /* DiscoveryTests.swift */,
+				87A14E0838000537490B2FF2 /* LooseSingleTests.swift */,
 				087FFD400AA97E45493959EE /* PaypalOnlyTests.swift */,
 				37FF443C36D614DD2D2D7E10 /* ProgressiveLoaderTests.swift */,
 				7CD2A2D1464C8BA2F4367671 /* ProtocolTests.swift */,
@@ -846,6 +849,7 @@
 				1CE12F46D5A2B81B5BFC0297 /* BandcampTests.swift in Sources */,
 				11FBBF9EF51ED5BCD2A950DF /* CopyFilterTests.swift in Sources */,
 				6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */,
+				6BCC6C171C25953C0945336E /* LooseSingleTests.swift in Sources */,
 				3FB85E494D5344035B2B2F0D /* PaypalOnlyTests.swift in Sources */,
 				DB701B4AD5FECB34269E9E2F /* ProgressiveLoaderTests.swift in Sources */,
 				C2B23499A3C981D22C38AA93 /* ProtocolTests.swift in Sources */,

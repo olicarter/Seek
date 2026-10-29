@@ -51,8 +51,11 @@ final class CopyFinder {
             }
             var folders = await Self.matching(album, query: query, in: found, expectedTracks: expectedTracks, quality: quality)
             copies[key] = Copies(status: .found, folders: folders)
-            // A search only lists matching files; fetch the rest for the best few copies.
-            for folder in folders.prefix(3) { _ = try? await client.contents(of: folder) }
+            // A search only lists matching files; fetch the rest for the best few copies (not
+            // for a single's song in a folder of other music, where the rest isn't the release).
+            for folder in folders.prefix(3) where AlbumIdentity.folder(folder.path, holds: album.title) {
+                _ = try? await client.contents(of: folder)
+            }
             folders = folders.map(client.complete).sorted { ReleaseGrouper.better($0, $1, quality: quality) }
             copies[key] = Copies(status: .found, folders: folders)
         }
@@ -87,7 +90,47 @@ final class CopyFinder {
             }
             .flatMap(\.folders)
             .filter { CopyFilter.isCopy($0, expectedTracks: expectedTracks) }
+            .appendingLooseSingles(expectedTracks == 1 ? looseSingles(album, in: folders) : [])
             .sorted { ReleaseGrouper.better($0, $1, quality: quality) }
+    }
+
+    /// Words naming another version of a song; "Original Mix" is the song itself.
+    private nonisolated static let versionWords: Set<String> = [
+        "remix", "mix", "edit", "dub", "vip", "instrumental", "acapella", "live", "rework", "bootleg", "flip",
+        "refix", "extended", "radio", "remaster", "remastered", "version", "cover",
+    ]
+
+    /// A single found as a song on its own: in a folder named for something else (the artist's
+    /// songs, a mix of tracks), the file named for the artist and the title and nothing else
+    /// ("114 - jayc, lemtom - starlight.flac"). The copy is that song alone, lossless first.
+    nonisolated static func looseSingles(_ album: AlbumKey, in folders: [RemoteFolder]) -> [RemoteFolder] {
+        let title = ReleaseText.fold(ReleaseText.cleanTitle(album.title))
+        guard !title.isEmpty else { return [] }
+        let artists = ReleaseText.creditNames(album.artist).union([ReleaseText.fold(album.artist)]).filter { !$0.isEmpty }
+        let titleWords = Set(title.split(separator: " ").map(String.init))
+        let joiners: Set<String> = ["feat", "ft", "and", "x", "vs", "with"]
+        return folders.compactMap { folder in
+            let songs = folder.files.filter { file in
+                var name = " " + ReleaseText.fold((file.name as NSString).deletingPathExtension) + " "
+                name = name.replacingOccurrences(of: " original mix ", with: " ")
+                // The artists named in the file or its folders.
+                let path = " " + ReleaseText.fold(file.path) + " "
+                guard artists.contains(where: { path.contains(" \($0) ") }) else { return false }
+                // What's left of the name, once the artists and numbers are taken out, is the title.
+                for artist in artists.sorted(by: { $0.count > $1.count }) {
+                    name = name.replacingOccurrences(of: " \(artist) ", with: " ")
+                }
+                let rest = name.split(separator: " ").map(String.init)
+                    .filter { !$0.allSatisfy(\.isNumber) && !joiners.contains($0) }
+                guard rest.joined(separator: " ") == title else { return false }
+                return !rest.contains { versionWords.contains($0) && !titleWords.contains($0) }
+            }
+            // A handful at most (the song in two formats); more is a folder of something else.
+            guard !songs.isEmpty, songs.count <= 3 else { return nil }
+            return RemoteFolder(username: folder.username, path: folder.path,
+                                files: songs.sorted { $0.isLossless && !$1.isLossless },
+                                hasFreeSlot: folder.hasFreeSlot, averageSpeed: folder.averageSpeed, queueLength: folder.queueLength)
+        }
     }
 
     /// Downloads a better copy and, once every file is in, swaps the album's tracks for it by
@@ -111,5 +154,13 @@ final class CopyFinder {
                 }
             }
         }
+    }
+}
+
+private extension Array where Element == RemoteFolder {
+    /// Loose songs found for a single, besides the folders already found as it.
+    func appendingLooseSingles(_ loose: [RemoteFolder]) -> [RemoteFolder] {
+        let ids = Set(map(\.id))
+        return self + loose.filter { !ids.contains($0.id) }
     }
 }

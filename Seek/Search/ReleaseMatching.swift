@@ -170,7 +170,7 @@ enum ReleaseText {
 
     /// Each name in a credit ("A & B feat. C"), split before folding, which would drop the
     /// commas and ampersands.
-    private static func creditNames(_ text: String) -> Set<String> {
+    static func creditNames(_ text: String) -> Set<String> {
         if let cached = creditCache.object(forKey: text as NSString) as? Set<String> { return cached }
         let separators = /(?i)\s*(,|&|\+|\s(and|x|feat\.?|ft\.?|vs\.?|with)\s)\s*/
         let value = Set(text.split(separator: separators).map { fold(String($0)) }.filter { $0.count >= 3 })
