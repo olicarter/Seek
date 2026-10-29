@@ -30,8 +30,11 @@ extension FLACTags {
     /// the artwork and the audio untouched, and optionally replaces the front cover. The file is
     /// rewritten and swapped in atomically.
     static func update(_ url: URL, setting values: [String: String], frontCover: Picture? = nil) throws {
-        let data = try Data(contentsOf: url, options: .mappedIfSafe)
-        guard data.count > 4, data.prefix(4) == Data("fLaC".utf8) else { throw WriteError.notFLAC }
+        let whole = try Data(contentsOf: url, options: .mappedIfSafe)
+        // An ID3 tag in front (non-standard, see FLACTags.streamStart) is left out of the new file.
+        guard let start = FLACTags.streamStart(whole.prefix(10)), whole.count > start + 4 else { throw WriteError.notFLAC }
+        let data = whole.subdata(in: start..<whole.count)
+        guard data.prefix(4) == Data("fLaC".utf8) else { throw WriteError.notFLAC }
 
         // Read every metadata block; the audio frames follow the last one.
         var blocks: [(type: UInt8, body: Data)] = []

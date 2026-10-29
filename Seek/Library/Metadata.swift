@@ -121,7 +121,8 @@ enum MetadataReader {
             metadata.duration = duration.seconds
         }
         await readFormat(of: asset, url: url, into: &metadata)
-        if url.pathExtension.lowercased() == "flac" {
+        // By what the file holds: some MP3s are named .flac.
+        if AudioTags.format(of: url) == .flac {
             if let flac = try? FLACTags.read(url) {
                 metadata.title = flac.title
                 metadata.artist = flac.artist
@@ -222,9 +223,22 @@ enum FLACTags {
         var key: MusicalKey?
     }
 
+    /// Where the FLAC stream starts: at once, or after an ID3 tag some rippers put in front
+    /// (non-standard, and its tags are often junk: "m" as the artist, a link as the album artist).
+    static func streamStart(_ head: Data) -> Int? {
+        if head.prefix(4) == Data("fLaC".utf8) { return 0 }
+        guard head.count >= 10, head.prefix(3) == Data("ID3".utf8) else { return nil }
+        let bytes = Array(head.prefix(10))
+        // A "syncsafe" size: seven bits a byte. Plus the footer, when the flags say there is one.
+        let size = Int(bytes[6]) << 21 | Int(bytes[7]) << 14 | Int(bytes[8]) << 7 | Int(bytes[9])
+        return 10 + size + (bytes[5] & 0x10 != 0 ? 10 : 0)
+    }
+
     static func read(_ url: URL) throws -> Tags {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
+        guard let head = try handle.read(upToCount: 10), let start = streamStart(head) else { return Tags() }
+        try handle.seek(toOffset: UInt64(start))
         guard try handle.read(upToCount: 4) == Data("fLaC".utf8) else { return Tags() }
         var tags = Tags()
         var isLast = false

@@ -9,6 +9,8 @@ struct ReferenceTrack: Codable, Hashable, Sendable {
     var duration: Double?
     /// Bandcamp's own stream of the track, when the artist allows it. Short-lived; fetched fresh to play.
     var streamURL: URL?
+    /// The song's own artist (Apple's), e.g. with a featured artist.
+    var artist: String? = nil
 
     var matchTitle: String { ReferenceTitles.match(title) }
 
@@ -226,7 +228,8 @@ final class AlbumReferences {
                 number: item["trackNumber"] as? Int ?? 0,
                 disc: item["discNumber"] as? Int ?? 1,
                 title: title,
-                duration: (item["trackTimeMillis"] as? Double).map { $0 / 1000 }
+                duration: (item["trackTimeMillis"] as? Double).map { $0 / 1000 },
+                artist: item["artistName"] as? String
             )
         }
         .sorted { ($0.disc, $0.number) < ($1.disc, $1.number) }
@@ -295,6 +298,13 @@ enum MissingTracks {
         return files.first { file in
             leadingNumber(file.name) == track.number && file.duration.map { abs(Double($0) - duration) <= 4 } == true
         }
+    }
+
+    /// The song on a tracklist a downloaded file holds: the one song whose file it would be
+    /// picked as (two songs matching it, e.g. by number alone, is none).
+    static func song(for file: RemoteFile, in reference: AlbumReference) -> ReferenceTrack? {
+        let songs = reference.tracks.filter { self.file(for: $0, in: [file]) != nil }
+        return songs.count == 1 ? songs[0] : songs.first { matchName(of: file) == ReferenceTitles.match($0.title) }
     }
 
     /// The download of a song among an album's downloads, wherever each came from: one going

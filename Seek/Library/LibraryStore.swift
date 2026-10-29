@@ -533,10 +533,11 @@ final class LibraryStore {
     /// Moves a finished Soulseek download into Music/<Artist>/<Album>/ and indexes it.
     /// Returns the file's path in the library.
     @discardableResult
-    func importDownload(at source: URL, remotePath: String, plannedPath: String? = nil, album: AlbumKey? = nil) async throws -> String {
+    func importDownload(at source: URL, remotePath: String, plannedPath: String? = nil, album: AlbumKey? = nil,
+                        song: ReferenceTrack? = nil) async throws -> String {
         let components = remotePath.split(separator: "\\").map(String.init)
         return try await importFile(at: source, folders: Array(components.dropLast().suffix(2)), name: components.last,
-                                    plannedPath: plannedPath, album: album)
+                                    plannedPath: plannedPath, album: album, song: song)
     }
 
     // MARK: - Reserved paths
@@ -627,10 +628,22 @@ final class LibraryStore {
     @discardableResult
     /// `album`: the album the song was added as part of, which it's filed under whatever its
     /// tags say (written into FLAC files, so other devices read the same).
-    func importFile(at source: URL, folders: [String], name: String? = nil, plannedPath: String? = nil, album: AlbumKey? = nil) async throws -> String {
+    /// `song`: where it is on the album's tracklist (Apple's or Bandcamp's), when it's added as
+    /// part of one: its title, artist and numbers are taken from there, written into the file,
+    /// rather than whatever the uploader's tags say.
+    func importFile(at source: URL, folders: [String], name: String? = nil, plannedPath: String? = nil, album: AlbumKey? = nil,
+                    song: ReferenceTrack? = nil) async throws -> String {
         guard let root else { throw CocoaError(.fileNoSuchFile) }
         let sanitizedFolders = folders.map(Self.sanitize)
-        let fileName = Self.sanitize(name ?? source.lastPathComponent)
+        var fileName = Self.sanitize(name ?? source.lastPathComponent)
+        let reserved = plannedPath
+        var plannedPath = plannedPath
+        // An MP3 named .flac (it happens on Soulseek) is kept as what it is.
+        let format = AudioTags.format(of: source)
+        if format == .mp3, (fileName as NSString).pathExtension.lowercased() == "flac" {
+            fileName = (fileName as NSString).deletingPathExtension + ".mp3"
+            plannedPath = plannedPath.map { ($0 as NSString).deletingPathExtension + ".mp3" }
+        }
         let path: String
         if let plannedPath, !FileManager.default.fileExists(atPath: root.appending(path: plannedPath).path) {
             path = plannedPath
@@ -643,13 +656,28 @@ final class LibraryStore {
         // Tags are read before the file moves in, so the song appears complete: added bare, it
         // showed for a moment as its file name at the bottom of the album.
         var metadata = await Task.detached { await MetadataReader.read(source) }.value
-        if let album, metadata.album != album.title || metadata.albumArtist != album.artist {
+        if let album {
+            var values = ["ALBUM": album.title, "ALBUMARTIST": album.artist]
             metadata.album = album.title
             metadata.albumArtist = album.artist
-            if source.pathExtension.lowercased() == "flac" {
-                try? await Task.detached {
-                    try FLACTags.update(source, setting: ["ALBUM": album.title, "ALBUMARTIST": album.artist])
-                }.value
+            if let song {
+                let artist = song.artist ?? album.artist
+                metadata.title = song.title
+                metadata.artist = artist
+                values["TITLE"] = song.title
+                values["ARTIST"] = artist
+                if song.number > 0 {
+                    metadata.trackNumber = song.number
+                    values["TRACKNUMBER"] = "\(song.number)"
+                }
+                if song.disc > 0 {
+                    metadata.discNumber = song.disc
+                    values["DISCNUMBER"] = "\(song.disc)"
+                }
+            }
+            if format != nil {
+                let setting = values
+                try? await Task.detached { try AudioTags.update(source, setting: setting) }.value
             }
         }
         // The iCloud index may see the file before this finishes; it leaves it to the import.
@@ -665,9 +693,9 @@ final class LibraryStore {
             }
         }.value
 
-        if let plannedPath {
-            reservedPaths.remove(plannedPath)
-            if plannedPath != path { movePending(from: plannedPath, to: path) }
+        if let reserved {
+            reservedPaths.remove(reserved)
+            if reserved != path { movePending(from: reserved, to: path) }
         }
         let track = existingTrack(path) ?? insertTrack(path)
         track.apply(metadata)
@@ -722,12 +750,12 @@ final class LibraryStore {
             if edit.year != track.year { changes["DATE"] = edit.year > 0 ? String(edit.year) : "" }
             guard !changes.isEmpty || frontCover != nil else { continue }
 
-            if track.fileExtension == "flac", let url = url(for: track), await ensureLocal(url) {
+            if let url = url(for: track), await ensureLocal(url), AudioTags.canWrite(url) {
                 try await Task.detached {
                     var coordinationError: NSError?
                     var writeError: Error?
                     NSFileCoordinator().coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { url in
-                        do { try FLACTags.update(url, setting: changes, frontCover: frontCover) } catch { writeError = error }
+                        do { try AudioTags.update(url, setting: changes, frontCover: frontCover) } catch { writeError = error }
                     }
                     if let error = coordinationError ?? writeError { throw error }
                 }.value

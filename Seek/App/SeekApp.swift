@@ -77,9 +77,12 @@ struct SeekApp: App {
                     #else
                     analysis.load()
                     #endif
-                    client.importDownload = { [library] transfer, url in
-                        try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
-                                                         album: transfer.album)
+                    client.importDownload = { [library, albumReferences] transfer, url in
+                        // Added as part of an album with a known tracklist: named from it.
+                        let song = transfer.album.flatMap { albumReferences.cached($0) }
+                            .flatMap { MissingTracks.song(for: transfer.file, in: $0) }
+                        return try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
+                                                                album: transfer.album, song: song)
                     }
                     client.reservePath = { [library] transfer in library.reservePath(forRemotePath: transfer.path) }
                     client.keepReserved = { [library] path in library.keepReserved(path) }
