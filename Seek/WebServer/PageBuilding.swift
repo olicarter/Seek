@@ -79,6 +79,8 @@ extension Core {
         let artwork: String? = album.tracks.isEmpty
             ? (found?.artworkURL ?? reference?.artworkURL).map { BandcampAPI.largeArtwork($0).absoluteString }
             : coverPath(key)
+        let remoteArtwork = album.tracks.isEmpty ? (found?.artworkURL ?? reference?.artworkURL).map(BandcampAPI.largeArtwork) : nil
+        let tint = await Self.tint(artwork: album.tracks.isEmpty ? nil : album.artwork, url: remoteArtwork)
         let adding = adder.isChecking(key) || AlbumRows.isBeingAdded(album, client: client)
             || owned.flatMap { bandcamp.download(for: $0) }?.state.isActive == true
         return Pages.Album(
@@ -87,6 +89,7 @@ extension Core {
             artwork: artwork, preview: album.tracks.isEmpty ? nil : coverPreview(key), songs: songs, footer: footer,
             released: (reference?.released).map { $0.ISO8601Format(.iso8601.year().month().day().dateSeparator(.dash)) },
             copyright: reference?.copyright,
+            tint: tint,
             quality: album.tracks.isEmpty ? folders.first?.soundQuality : AudioQuality.summary(of: album.tracks)?.quality,
             qualityDetail: album.tracks.isEmpty ? folders.first?.qualityDetail : AudioQuality.summary(of: album.tracks)?.detail,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
@@ -225,5 +228,19 @@ extension Core {
 
     func coverPreview(_ key: AlbumKey) -> String? {
         cover(artist: key.artist, title: key.title).flatMap { Covers.preview($0, key: "\(key.artist)|\(key.title)") }
+    }
+
+    /// Covers' page colours by link, so a cover is fetched for its colour once.
+    private static var tints: [URL: String] = [:]
+
+    /// The page's colour from its cover (ArtworkColor), as "#1e3f6e".
+    static func tint(artwork: Data?, url: URL?) async -> String? {
+        if let artwork { return await Task.detached { ArtworkColor.color(of: artwork)?.hex }.value }
+        guard let url else { return nil }
+        if let known = tints[url] { return known }
+        guard let (data, _) = try? await URLSession.shared.data(from: url),
+              let hex = await Task.detached(operation: { ArtworkColor.color(of: data)?.hex }).value else { return nil }
+        tints[url] = hex
+        return hex
     }
 }

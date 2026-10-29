@@ -58,6 +58,8 @@ export type AlbumPage = {
   /** "2026-07-31" and the ℗ line, when Apple or Bandcamp give them. */
   released?: string;
   copyright?: string;
+  /** The page's colour from the cover, "#1e3f6e". */
+  tint?: string;
   quality?: SoundQuality;
   /** "24-bit, 96 kHz". */
   qualityDetail?: string;

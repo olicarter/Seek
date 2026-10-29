@@ -221,28 +221,70 @@ struct AlbumPage<Header: View, Songs: View>: View {
     let title: String
     let footer: AlbumFooter
     let versions: [CatalogRelease]
+    /// The cover, as data (the library's) or a link (search results'): the page takes its colour.
+    var artwork: Data? = nil
+    var artworkURL: URL? = nil
     @ViewBuilder let header: () -> Header
     @ViewBuilder let songs: () -> Songs
+    @State private var color: ArtworkColor.RGB?
 
     var body: some View {
         List {
-            header()
-                .listRowSeparator(.hidden)
-                .listRowBackground(Color.clear)
-                .padding(.bottom, 8)
-            songs()
-            footer
-                .listRowSeparator(.hidden)
-            OtherVersionsRow(versions: versions)
-                .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
-                .listRowSeparator(.hidden)
-            if !artist.isEmpty, artist != "Unknown Artist" {
-                DiscoveryRow(subject: .album(artist: artist, title: title))
-                    .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 20, trailing: 0))
+            Group {
+                header()
                     .listRowSeparator(.hidden)
+                    .padding(.bottom, 8)
+                songs()
+                footer
+                    .listRowSeparator(.hidden)
+                OtherVersionsRow(versions: versions)
+                    .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
+                    .listRowSeparator(.hidden)
+                if !artist.isEmpty, artist != "Unknown Artist" {
+                    DiscoveryRow(subject: .album(artist: artist, title: title))
+                        .listRowInsets(EdgeInsets(top: 20, leading: 0, bottom: 20, trailing: 0))
+                        .listRowSeparator(.hidden)
+                }
             }
+            .listRowBackground(Color.clear)
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background { ArtworkBackground(color: color) }
+        // The colour is dark, as Apple Music's pages are: light text on it in either mode.
+        .environment(\.colorScheme, color == nil ? colorScheme : .dark)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: artwork) {
+            guard let artwork else { return }
+            let found = await Task.detached { ArtworkColor.color(of: artwork) }.value
+            withAnimation(.easeInOut(duration: 0.4)) { color = found }
+        }
+        .task(id: artworkURL) {
+            guard artwork == nil, let artworkURL,
+                  let (data, _) = try? await URLSession.shared.data(from: artworkURL) else { return }
+            let found = await Task.detached { ArtworkColor.color(of: data) }.value
+            withAnimation(.easeInOut(duration: 0.4)) { color = found }
+        }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+}
+
+/// A page's colour from its artwork (ArtworkColor), a little darker towards the bottom, as Apple
+/// Music's album pages and Now Playing are. The system background until the colour is known.
+struct ArtworkBackground: View {
+    let color: ArtworkColor.RGB?
+
+    var body: some View {
+        ZStack {
+            if let color {
+                let base = Color(red: color.red, green: color.green, blue: color.blue)
+                base
+                LinearGradient(colors: [.white.opacity(0.06), .black.opacity(0.28)], startPoint: .top, endPoint: .bottom)
+            } else {
+                Color(.systemBackground)
+            }
+        }
+        .ignoresSafeArea()
     }
 }

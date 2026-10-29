@@ -428,26 +428,21 @@ struct NowPlayingView: View {
 }
 
 /// The current artwork, blurred and darkened, behind the whole player.
+/// Now Playing's colour, from the artwork as Apple Music's is (see ArtworkColor).
 private struct NowPlayingBackground: View {
     let artwork: Data?
-    @State private var image: UIImage?
+    @State private var color: ArtworkColor.RGB?
 
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(white: 0.28), Color(white: 0.1)], startPoint: .top, endPoint: .bottom)
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .blur(radius: 70, opaque: true)
-                    .scaleEffect(1.4)
-                    .transition(.opacity)
-            }
-            LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.45)], startPoint: .top, endPoint: .bottom)
+            if color != nil { ArtworkBackground(color: color).transition(.opacity) }
         }
         .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.6), value: image)
-        .task(id: artwork) { image = await ThumbnailCache.shared.image(for: artwork) }
+        .task(id: artwork) {
+            let found = await Task.detached { [artwork] in artwork.flatMap(ArtworkColor.color(of:)) }.value
+            withAnimation(.easeInOut(duration: 0.6)) { color = found }
+        }
     }
 }
 

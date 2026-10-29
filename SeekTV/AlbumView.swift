@@ -17,6 +17,16 @@ struct AlbumView: View {
                 }
                 .padding(80)
             }
+            // The cover's colour, as on the album page in the app.
+            .background {
+                if let tint = album.tint.flatMap(ArtworkColor.RGB.init(hex:)) {
+                    ZStack {
+                        Color(red: tint.red, green: tint.green, blue: tint.blue)
+                        LinearGradient(colors: [.white.opacity(0.06), .black.opacity(0.28)], startPoint: .top, endPoint: .bottom)
+                    }
+                    .ignoresSafeArea()
+                }
+            }
             #if DEBUG
             // -SeekTVPlay YES: plays it as soon as it's open, for checking in the simulator.
             .task {
@@ -135,6 +145,8 @@ struct AlbumView: View {
 
 struct NowPlayingView: View {
     @Environment(TVPlayer.self) private var player
+    /// The cover's colour, as Now Playing in the app (see ArtworkColor).
+    @State private var tint: ArtworkColor.RGB?
 
     var body: some View {
         if let song = player.current {
@@ -163,6 +175,22 @@ struct NowPlayingView: View {
                 .frame(maxWidth: 900)
             }
             .padding(80)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background {
+                if let tint {
+                    ZStack {
+                        Color(red: tint.red, green: tint.green, blue: tint.blue)
+                        LinearGradient(colors: [.white.opacity(0.06), .black.opacity(0.28)], startPoint: .top, endPoint: .bottom)
+                    }
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                }
+            }
+            .task(id: song.artwork) {
+                guard let url = song.artwork, let (data, _) = try? await URLSession.shared.data(from: url) else { return }
+                let found = await Task.detached { ArtworkColor.color(of: data) }.value
+                withAnimation(.easeInOut(duration: 0.6)) { tint = found }
+            }
         } else {
             ContentUnavailableView("Nothing playing", systemImage: "play.circle",
                                    description: Text("Play an album from your library or search."))

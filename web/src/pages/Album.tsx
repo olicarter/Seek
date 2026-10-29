@@ -1,6 +1,6 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
-import { For, Show } from "solid-js";
+import { createEffect, For, onCleanup, Show } from "solid-js";
 import { api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { Cover } from "../Cover";
@@ -34,6 +34,15 @@ export function Album() {
   };
 
   const add = async () => mutate(await api.add(ref()));
+
+  // The page takes the cover's colour, as in the app (and Apple Music).
+  createEffect(() => {
+    const tint = page()?.tint;
+    document.body.style.background = tint
+      ? `linear-gradient(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.28)) fixed, ${tint}`
+      : "";
+  });
+  onCleanup(() => (document.body.style.background = ""));
 
   return (
     <Show when={page()} fallback={<p class="empty">Loading…</p>}>

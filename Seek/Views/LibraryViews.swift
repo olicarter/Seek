@@ -355,7 +355,8 @@ struct AlbumDetailView: View {
             footer: AlbumFooter(released: listed?.released ?? references.cached(key)?.released, year: album.year, songs: rows.count,
                                 duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
                                 copyright: listed?.copyright ?? references.cached(key)?.copyright, label: album.label),
-            versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? []
+            versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? [],
+            artwork: album.artwork
         ) {
             AlbumHeader(
                 title: album.title, artist: album.artist, onArtist: { openArtistPage() }, year: album.year,

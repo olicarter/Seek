@@ -567,7 +567,8 @@ struct ReleaseDetailView: View {
                                     duration: reference.map { $0.tracks.reduce(0) { $0 + ($1.duration ?? 0) } }
                                         ?? Double(release.bestFolder?.files.reduce(0) { $0 + ($1.duration ?? 0) } ?? 0),
                                     copyright: listed?.copyright ?? reference?.copyright),
-                versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? []
+                versions: catalog.map { CatalogRelease.otherVersions(of: release.title, in: $0) } ?? [],
+                artworkURL: release.artworkURL.map(BandcampAPI.largeArtwork)
             ) {
                 AlbumHeader(
                     title: release.title, artist: release.artist,

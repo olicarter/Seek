@@ -67,6 +67,8 @@ enum Pages {
         /// "2026-07-31", the release day (UTC, as Apple dates them), and the ℗ line.
         var released: String?
         var copyright: String?
+        /// The page's colour from the cover, "#1e3f6e" (see ArtworkColor).
+        var tint: String? = nil
         /// The album's tier (its lowest song's, or its best copy's) and "24-bit, 96 kHz".
         var quality: SoundQuality? = nil
         var qualityDetail: String? = nil
