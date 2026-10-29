@@ -89,6 +89,7 @@ export function Album() {
                     {song.title}
                     <Show when={song.artist}><span class="song-artist">{song.artist}</span></Show>
                   </span>
+                  <Show when={song.tempoAndKey}><span class="song-tempo">{song.tempoAndKey}</span></Show>
                   <Show when={song.progress !== undefined} fallback={<span class="song-duration">{duration(song.duration)}</span>}>
                     <progress value={song.progress} max="1" />
                   </Show>

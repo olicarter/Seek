@@ -21,6 +21,8 @@ struct TrackMetadata: Sendable, Equatable {
     var bitDepth: Int?
     /// Kilobits per second.
     var bitrate: Int?
+    var bpm: Double?
+    var key: MusicalKey?
 }
 
 /// Best-effort metadata from a path like "Artist/Album (2001)/01 - Title.flac",
@@ -134,6 +136,8 @@ enum MetadataReader {
                 metadata.codec = "FLAC"
                 metadata.sampleRate = flac.sampleRate
                 metadata.bitDepth = flac.bitDepth
+                metadata.bpm = flac.bpm
+                metadata.key = flac.key
                 if let duration = metadata.duration, duration > 0,
                    let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize {
                     metadata.bitrate = Int(Double(size) * 8 / duration / 1000)
@@ -182,6 +186,13 @@ enum MetadataReader {
         ]) {
             metadata.year = leadingNumber(value)
         }
+        if let value = await string([.id3MetadataBeatsPerMinute]), let bpm = Double(value), bpm > 0 {
+            metadata.bpm = bpm
+        } else if let raw = await data([.iTunesMetadataBeatsPerMin]), raw.count >= 2 {
+            let bpm = Double(Int(raw[raw.count - 2]) << 8 | Int(raw[raw.count - 1]))
+            if bpm > 0 { metadata.bpm = bpm }
+        }
+        if let value = await string([.id3MetadataInitialKey]) { metadata.key = MusicalKey(value) }
         return metadata
     }
 
@@ -207,6 +218,8 @@ enum FLACTags {
         var comment: String?
         var sampleRate: Int?
         var bitDepth: Int?
+        var bpm: Double?
+        var key: MusicalKey?
     }
 
     static func read(_ url: URL) throws -> Tags {
@@ -252,6 +265,9 @@ enum FLACTags {
             case "DATE", "YEAR": tags.year = tags.year ?? MetadataReader.leadingNumber(value)
             case "URL", "WEBSITE": tags.url = tags.url ?? value
             case "COMMENT", "DESCRIPTION": tags.comment = tags.comment ?? value
+            // "0" means the tagger didn't know.
+            case "BPM", "TEMPO": if let bpm = Double(value.replacingOccurrences(of: ",", with: ".")), bpm > 0 { tags.bpm = bpm }
+            case "INITIALKEY", "KEY", "INITIAL KEY": tags.key = tags.key ?? MusicalKey(value)
             default: break
             }
         }

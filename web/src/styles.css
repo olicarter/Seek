@@ -134,3 +134,4 @@ section > h2 + button { margin-bottom: 8px; }
 .signin button, section button.link { border: none; background: none; color: var(--accent); font-weight: 600; padding: 0; }
 .signin button { padding: 8px 14px; border-radius: 10px; background: var(--accent); color: #fff; }
 section button.link { margin-right: 16px; margin-top: 8px; }
+.song-tempo { color: var(--tertiary); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }

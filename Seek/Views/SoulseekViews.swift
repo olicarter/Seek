@@ -283,6 +283,8 @@ struct SettingsView: View {
     @AppStorage(LibraryStore.automaticDownloadsKey) private var automaticDownloads = LibraryStore.defaultAutomaticDownloads
     @State private var username = ""
     @State private var password = ""
+    @AppStorage(MusicalKey.Notation.defaultsKey) private var notation = MusicalKey.Notation.camelot
+    @Environment(SongAnalysisStore.self) private var analysis
     #if targetEnvironment(macCatalyst)
     @Environment(WebServer.self) private var web: WebServer?
     #endif
@@ -392,6 +394,19 @@ struct SettingsView: View {
                     Text("Claude")
                 } footer: {
                     Text("Used by Fix with Claude in an album's Edit Info. Create a key at platform.claude.com. It's kept in iCloud Keychain; album details are sent to Anthropic only when you use the button.")
+                }
+
+                Section {
+                    Picker("Keys", selection: $notation) {
+                        ForEach(MusicalKey.Notation.allCases) { Text($0.name).tag($0) }
+                    }
+                    #if targetEnvironment(macCatalyst)
+                    if analysis.analysed > 0 { LabeledContent("Worked Out", value: "\(analysis.analysed) songs") }
+                    #endif
+                } header: {
+                    Text("Tempo and Key")
+                } footer: {
+                    Text("From each song's tags where they say, otherwise worked out from the music by Seek on your Mac and shared with your other devices. Camelot codes show which keys mix: one number either way, or A to B at the same number.")
                 }
 
                 Section {

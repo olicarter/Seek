@@ -88,6 +88,9 @@ struct AlbumView: View {
                             if let artist = song.artist { Text(artist).font(.caption).foregroundStyle(.secondary) }
                         }
                         Spacer()
+                        if let tempoAndKey = song.tempoAndKey {
+                            Text(tempoAndKey).font(.caption).monospacedDigit().foregroundStyle(.secondary)
+                        }
                         if let progress = song.progress {
                             ProgressView(value: progress).frame(width: 120)
                         } else {

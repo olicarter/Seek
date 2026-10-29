@@ -33,7 +33,12 @@ final class Track {
     @Transient var stream: StreamSource? = nil
     /// Which version of tag reading filled this in; older reads are redone when the file is here.
     var tagsVersion: Int = 0
-    static let currentTagsVersion = 3
+    /// 4: tempo and key. 5: tempo and key again, from the tags alone (clearing first results).
+    static let currentTagsVersion = 5
+    /// Beats a minute (0: not known), from the tags or worked out on the Mac (SongAnalysisStore).
+    var bpm: Double = 0
+    /// Its Camelot code ("8A"; empty: not known), from the tags or worked out on the Mac.
+    var musicalKey: String = ""
     /// Chosen to stay on this device for offline listening; downloaded again if the system removes it.
     var keepOffline: Bool = false
     /// The `TrackInfo.changedAt` last applied, for tracks whose file this device hasn't read.
@@ -66,6 +71,14 @@ final class Track {
         if let value = metadata.sampleRate { sampleRate = value }
         if let value = metadata.bitDepth { bitDepth = value }
         if let value = metadata.bitrate { bitrate = value }
+        if let value = metadata.bpm, value > 0 { bpm = value }
+        if let value = metadata.key { musicalKey = value.camelot }
+    }
+
+    /// "128 · 8A", as song rows show it (nothing when neither is known).
+    func tempoAndKey(_ notation: MusicalKey.Notation) -> String? {
+        let parts = [bpm > 0 ? "\(Int(bpm.rounded()))" : nil, MusicalKey(musicalKey)?.shown(as: notation)].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 

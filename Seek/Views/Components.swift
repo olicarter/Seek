@@ -196,6 +196,7 @@ struct TrackRow: View {
     var showNumber = false
     @Environment(Player.self) private var player
     @Environment(LibraryStore.self) private var library
+    @AppStorage(MusicalKey.Notation.defaultsKey) private var notation = MusicalKey.Notation.camelot
 
     var body: some View {
         HStack(spacing: 12) {
@@ -230,6 +231,13 @@ struct TrackRow: View {
                 }
             }
             Spacer()
+            if let tempoAndKey = track.tempoAndKey(notation) {
+                Text(tempoAndKey)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .accessibilityLabel(tempoAndKey.replacingOccurrences(of: " · ", with: " BPM, key "))
+            }
             switch library.availability(of: track) {
             case .cloudOnly:
                 EmptyView()

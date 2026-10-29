@@ -118,6 +118,7 @@ struct MiniPlayer: View {
 /// Full-screen player in the style of Apple Music: artwork-tinted background, large artwork
 /// that shrinks into the header when the queue is shown, and system volume and AirPlay.
 struct NowPlayingView: View {
+    @AppStorage(MusicalKey.Notation.defaultsKey) private var notation = MusicalKey.Notation.camelot
     @Environment(Player.self) private var player
     @Environment(Router.self) private var router
     @Environment(LibraryStore.self) private var library
@@ -328,6 +329,11 @@ struct NowPlayingView: View {
                 .font(size == .headline ? .subheadline : .title3)
                 .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
+            if let tempoAndKey = player.current?.tempoAndKey(notation) {
+                Text(tempoAndKey)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.45))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)

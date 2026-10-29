@@ -49,6 +49,8 @@ enum Pages {
         /// 0–1 while downloading.
         var progress: Double?
         var lossless: Bool?
+        /// "128 · 8A", for songs in the library (Camelot codes).
+        var tempoAndKey: String? = nil
     }
 
     struct Album: Codable, Sendable {

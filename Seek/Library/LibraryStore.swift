@@ -757,6 +757,27 @@ final class LibraryStore {
         return (tags.url, tags.comment)
     }
 
+    /// Tempo and key from the shared analysis (SongAnalysisStore). Its entries are the songs'
+    /// tags where they have them (the Mac puts those first), so they're taken as they are: a
+    /// correction there reaches every device.
+    func applyTempoAndKey(_ entries: [String: SongAnalysisStore.Entry]) {
+        var changed = false
+        for track in allTracks where !track.isDeleted && track.modelContext != nil {
+            guard let entry = entries[track.path] else { continue }
+            if let bpm = entry.bpm, bpm > 0, track.bpm != bpm {
+                track.bpm = bpm
+                changed = true
+            }
+            if let key = entry.key, !key.isEmpty, track.musicalKey != key {
+                track.musicalKey = key
+                changed = true
+            }
+        }
+        guard changed else { return }
+        try? context.save()
+        contentChanged()
+    }
+
     func delete(_ track: Track) {
         delete([track])
     }
@@ -1238,6 +1259,9 @@ final class LibraryStore {
         defer { reading.remove(track.path) }
         let metadata = await Task.detached { await MetadataReader.read(url) }.value
         guard !track.isDeleted else { return }
+        // Tempo and key from the tags alone here; the shared analysis fills in the rest.
+        track.bpm = 0
+        track.musicalKey = ""
         track.apply(metadata)
         track.hasTags = true
         track.tagsVersion = Track.currentTagsVersion

@@ -56,7 +56,8 @@ extension Core {
                                   title: track.title.isEmpty ? (track.path as NSString).lastPathComponent : track.title,
                                   artist: track.artist == album.artist ? nil : track.artist, duration: track.duration,
                                   file: "/files/" + track.path.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/"),
-                                  available: true, progress: nil, lossless: AudioQuality(track).isLossless)
+                                  available: true, progress: nil, lossless: AudioQuality(track).isLossless,
+                                  tempoAndKey: track.tempoAndKey(.camelot))
             case .missing(let track):
                 let download = MissingTracks.download(for: track, in: downloads)
                 let streamable = streams.contains { $0.reference == track }

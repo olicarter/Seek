@@ -38,6 +38,8 @@ export type Song = {
   available: boolean;
   progress?: number;
   lossless?: boolean;
+  /** "128 · 8A". */
+  tempoAndKey?: string;
 };
 
 export type AlbumPage = {

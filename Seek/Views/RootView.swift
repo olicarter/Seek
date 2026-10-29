@@ -12,6 +12,7 @@ struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(\.scenePhase) private var scenePhase
     @Environment(DiscoveryService.self) private var discovery
+    @Environment(SongAnalysisStore.self) private var analysis
     @State private var showingNowPlaying = false
 
     var body: some View {
@@ -82,6 +83,8 @@ struct RootView: View {
             case .active:
                 client.appDidBecomeActive()
                 discovery.resumePending()
+                // The Mac's latest tempo and key results.
+                analysis.load()
             default: break
             }
         }

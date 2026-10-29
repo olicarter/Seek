@@ -19,6 +19,7 @@ struct SeekApp: App {
     @State private var storeVerifier = StoreVerifier()
     @State private var streamer: StreamService
     @State private var sharing: SharingService
+    @State private var analysis: SongAnalysisStore
     #if targetEnvironment(macCatalyst)
     /// Seek on the web, served from this Mac (see WebServer).
     @State private var web: WebServer?
@@ -40,6 +41,7 @@ struct SeekApp: App {
         sharing.onChange = { [weak client] in client?.shareCountsChanged() }
         library.onLibraryChanged = { [weak sharing] in sharing?.libraryChanged() }
         _sharing = State(initialValue: sharing)
+        _analysis = State(initialValue: SongAnalysisStore(library: library))
         #if !targetEnvironment(macCatalyst)
         // The person's Mac, when it's reachable, does the Soulseek work (see MacLink).
         client.macLink = MacLink(client: client)
@@ -69,6 +71,12 @@ struct SeekApp: App {
                     }
                     await library.start()
                     await client.macLink?.check(force: true)
+                    #if targetEnvironment(macCatalyst)
+                    // The Mac works out tempo and key for the library; the others read its results.
+                    analysis.run()
+                    #else
+                    analysis.load()
+                    #endif
                     client.importDownload = { [library] transfer, url in
                         try await library.importDownload(at: url, remotePath: transfer.path, plannedPath: transfer.plannedPath,
                                                          album: transfer.album)
@@ -133,6 +141,7 @@ struct SeekApp: App {
         .environment(storeVerifier)
         .environment(streamer)
         .environment(sharing)
+        .environment(analysis)
         .environment(albumAdder)
         #if targetEnvironment(macCatalyst)
         .environment(web)
