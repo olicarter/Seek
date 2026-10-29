@@ -34,8 +34,8 @@ final class Track {
     /// Which version of tag reading filled this in; older reads are redone when the file is here.
     var tagsVersion: Int = 0
     /// 4: tempo and key. 5: tempo and key again, from the tags alone (clearing first results).
-    /// 6: MP3s named .flac read as MP3s (they read as untagged FLACs).
-    static let currentTagsVersion = 6
+    /// 6: MP3s named .flac read as MP3s (they read as untagged FLACs). 7: and renamed (on the Mac).
+    static let currentTagsVersion = 7
     /// Beats a minute (0: not known), from the tags or worked out on the Mac (SongAnalysisStore).
     var bpm: Double = 0
     /// Its Camelot code ("8A"; empty: not known), from the tags or worked out on the Mac.
@@ -293,26 +293,23 @@ struct AudioQuality: Hashable {
     }
 
     var isLossless: Bool { Self.losslessCodecs.contains(codec) }
-    var isHiRes: Bool { isLossless && (bitDepth > 16 || sampleRate > 48000) }
-
-    var label: String {
-        if isLossless {
-            guard bitDepth > 0, sampleRate > 0 else { return codec }
-            return "\(codec) \(bitDepth)-bit/\(String(format: "%g", Double(sampleRate) / 1000)) kHz"
-        }
-        // Bitrates read from files wobble (319, 321); round to the usual steps.
-        let steps = [96, 128, 160, 192, 224, 256, 320]
-        let rounded = steps.min { abs($0 - bitrate) < abs($1 - bitrate) } ?? bitrate
-        return bitrate > 0 ? "\(codec) \(rounded) kbps" : codec
+    var soundQuality: SoundQuality {
+        SoundQuality(lossless: isLossless, bitDepth: bitDepth > 0 ? bitDepth : nil, sampleRate: sampleRate > 0 ? sampleRate : nil)
+    }
+    var isHiRes: Bool { soundQuality == .max }
+    /// "24-bit, 96 kHz" or "320 kbps".
+    var detail: String? {
+        SoundQuality.detail(lossless: isLossless, bitDepth: bitDepth > 0 ? bitDepth : nil,
+                            sampleRate: sampleRate > 0 ? sampleRate : nil, bitrate: bitrate > 0 ? bitrate : nil)
     }
 
-    /// The album's quality: the most common one, or "Mixed" with each format.
-    static func summary(of tracks: [Track]) -> String? {
+    /// The album's quality: its lowest song's tier (an album is only Max if every song is), and
+    /// the most common detail within that tier.
+    static func summary(of tracks: [Track]) -> (quality: SoundQuality, detail: String?)? {
         let qualities = tracks.map(AudioQuality.init)
-        guard !qualities.isEmpty else { return nil }
-        let counts = Dictionary(grouping: qualities.map(\.label), by: { $0 }).mapValues(\.count)
-        if counts.count == 1 { return counts.keys.first }
-        let codecs = Set(qualities.map(\.codec)).sorted()
-        return codecs.count == 1 ? counts.max { $0.value < $1.value }?.key : "Mixed: " + codecs.joined(separator: ", ")
+        guard let lowest = qualities.map(\.soundQuality).min() else { return nil }
+        let details = qualities.filter { $0.soundQuality == lowest }.compactMap(\.detail)
+        let counts = Dictionary(grouping: details, by: { $0 }).mapValues(\.count)
+        return (lowest, counts.max { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }?.key)
     }
 }

@@ -35,7 +35,10 @@ struct AlbumView: View {
                     Text(album.artist).foregroundStyle(Color("AccentColor"))
                 }
                 .buttonStyle(.plain)
-                if let year = album.year { Text(String(year)).font(.callout).foregroundStyle(.secondary) }
+                HStack(spacing: 14) {
+                    if let year = album.year { Text(String(year)).font(.callout).foregroundStyle(.secondary) }
+                    if let quality = album.quality { SoundQualityBadge(quality: quality, detail: album.qualityDetail) }
+                }
             }
             HStack(spacing: 24) {
                 Button("Play", systemImage: "play.fill") { play(album) }

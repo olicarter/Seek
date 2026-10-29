@@ -4,6 +4,7 @@ import { For, Show } from "solid-js";
 import { api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { Cover } from "../Cover";
+import { Quality } from "../Quality";
 import { current, play, type QueueItem } from "../player";
 
 /** The album page, the same for albums in the library and ones that aren't (as in the app). */
@@ -42,7 +43,12 @@ export function Album() {
             <Cover class="album-art" src={album().artwork} preview={album().preview} />
             <h1 class="album-title">{album().title}</h1>
             <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
-            <Show when={album().year}><div class="album-year">{album().year}</div></Show>
+            <Show when={album().year || album().quality}>
+              <div class="album-year">
+                <Show when={album().year}><span>{album().year}</span></Show>
+                <Quality quality={album().quality} detail={album().qualityDetail} />
+              </div>
+            </Show>
             <div class="album-actions">
               <button class="round" aria-label="Shuffle" disabled={!queue(album()).length} onClick={() => shuffle(album())}>⤮</button>
               <button class="play" disabled={!queue(album()).length} onClick={() => playFrom(album())}>▶ Play</button>

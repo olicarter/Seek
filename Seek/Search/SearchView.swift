@@ -307,7 +307,7 @@ struct ReleaseArtwork: View {
     }
 }
 
-/// Where a release can come from: "Purchased" or "Bandcamp", "Soulseek ×14", "Lossless". Shortens
+/// Where a release can come from: "Purchased" or "Bandcamp", "Soulseek ×14", and its quality ("MAX"). Shortens
 /// to icons and counts when the row is narrow, and never makes the row wider.
 struct SourceBadges: View {
     let release: SearchRelease
@@ -322,6 +322,7 @@ struct SourceBadges: View {
                 ForEach(items, id: \.label) { item in
                     Image(systemName: item.icon ?? "waveform").font(.caption2).foregroundStyle(item.tint)
                 }
+                if let quality = release.soundQuality { SoundQualityBadge(quality: quality) }
             }
         }
         .lineLimit(1)
@@ -350,11 +351,6 @@ struct SourceBadges: View {
             items.append(Item(label: count == 1 ? "Soulseek" : "Soulseek ×\(count)", short: count == 1 ? "" : "\(count)",
                               icon: "arrow.down.circle", tint: .blue))
         }
-        if let best = release.bestFolder, best.isHiRes {
-            items.append(Item(label: "Hi-Res", short: "Hi-Res", icon: nil, tint: .purple))
-        } else if release.isLossless {
-            items.append(Item(label: "Lossless", short: "Lossless", icon: nil, tint: .green))
-        }
         return items
     }
 
@@ -363,6 +359,7 @@ struct SourceBadges: View {
             ForEach(items, id: \.label) { item in
                 badge(short ? item.short : item.label, systemImage: item.icon, tint: item.tint)
             }
+            if let quality = release.soundQuality { SoundQualityBadge(quality: quality) }
         }
     }
 
@@ -475,10 +472,13 @@ struct SongRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text((file.name as NSString).deletingPathExtension).lineLimit(2)
-                Text("\(file.quality) · \(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)) · \(file.username)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    SoundQualityBadge(quality: file.soundQuality)
+                    Text("\([file.fileExtension.uppercased(), file.qualityDetail].compactMap { $0 }.joined(separator: " · ")) · \(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)) · \(file.username)")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
             Spacer()
             if client.isDownloading(file) {
@@ -573,7 +573,8 @@ struct ReleaseDetailView: View {
                     title: release.title, artist: release.artist,
                     onArtist: release.artist == "Unknown Artist" ? nil : { openArtistPage(release.artist) },
                     year: release.year ?? reference?.year,
-                    isLossless: release.isLossless, description: about.text(for: key),
+                    quality: release.soundQuality,
+                    qualityDetail: release.bestFolder.map(\.qualityDetail), description: about.text(for: key),
                     isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
                     isPreparing: soulseekStatus == .searching || client.currentSearch != nil && release.folders.isEmpty,
                     // Played without adding to the library: songs are fetched as they come up.

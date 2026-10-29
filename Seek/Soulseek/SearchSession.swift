@@ -21,11 +21,15 @@ struct RemoteFolder: Identifiable, Hashable, Codable {
         return Double(files.filter(\.isLossless).count) >= Double(files.count) * 0.9
     }
     var isHiRes: Bool { isLossless && files.contains(where: \.isHiRes) }
-
-    var quality: String {
-        let counts = Dictionary(grouping: files, by: \.quality).mapValues(\.count)
-        return counts.max { $0.value < $1.value }?.key ?? ""
+    var soundQuality: SoundQuality { isHiRes ? .max : isLossless ? .high : .low }
+    /// The most common file's detail ("16-bit, 44.1 kHz"), with its format.
+    var qualityDetail: String {
+        let counts = Dictionary(grouping: files.filter { $0.isLossless == isLossless }) {
+            [$0.fileExtension.uppercased(), $0.qualityDetail].compactMap { $0 }.joined(separator: " · ")
+        }.mapValues(\.count)
+        return counts.max { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }?.key ?? ""
     }
+
 }
 
 @MainActor

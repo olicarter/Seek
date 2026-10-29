@@ -17,7 +17,7 @@ extension Core {
             Pages.Release(
                 id: release.id, artist: release.artist, title: release.title, year: release.year ?? release.catalog?.year,
                 kind: release.catalog?.kind.name, artwork: release.artworkURL.map { BandcampAPI.largeArtwork($0).absoluteString },
-                copies: release.folders.count, lossless: release.isLossless,
+                copies: release.folders.count, lossless: release.isLossless, quality: release.soundQuality,
                 bandcamp: release.store != nil || release.owned != nil, inLibrary: release.inLibrary != nil,
                 adding: adder.isChecking(AlbumKey(artist: release.artist, title: release.title))
                     || ReleaseAction.soulseekProgress(release, client: client) != nil
@@ -57,7 +57,7 @@ extension Core {
                                   artist: track.artist == album.artist ? nil : track.artist, duration: track.duration,
                                   file: "/files/" + track.path.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/"),
                                   available: true, progress: nil, lossless: AudioQuality(track).isLossless,
-                                  tempoAndKey: track.tempoAndKey(.camelot))
+                                  quality: AudioQuality(track).soundQuality, tempoAndKey: track.tempoAndKey(.camelot))
             case .missing(let track):
                 let download = MissingTracks.download(for: track, in: downloads)
                 let streamable = streams.contains { $0.reference == track }
@@ -87,6 +87,8 @@ extension Core {
             artwork: artwork, preview: album.tracks.isEmpty ? nil : coverPreview(key), songs: songs, footer: footer,
             released: (reference?.released).map { $0.ISO8601Format(.iso8601.year().month().day().dateSeparator(.dash)) },
             copyright: reference?.copyright,
+            quality: album.tracks.isEmpty ? folders.first?.soundQuality : AudioQuality.summary(of: album.tracks)?.quality,
+            qualityDetail: album.tracks.isEmpty ? folders.first?.qualityDetail : AudioQuality.summary(of: album.tracks)?.detail,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
             canAdd: (!folders.isEmpty || owned?.redownloadURL != nil) && (album.tracks.isEmpty || !missing.isEmpty) && !adding,
             adding: adding,

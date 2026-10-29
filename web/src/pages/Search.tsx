@@ -2,6 +2,7 @@ import { A, useNavigate, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
 import { createEffect, createSignal, For, on, onMount, Show } from "solid-js";
 import { albumHref, api, changes } from "../api";
+import { Quality } from "../Quality";
 
 export function Search() {
   const [params] = useSearchParams<{ q?: string }>();
@@ -62,9 +63,10 @@ export function Search() {
                         <Show when={release.adding}><span class="badge-pill">Adding…</span></Show>
                         <Show when={release.copies > 0}>
                           <span class="badge-pill quiet">
-                            {release.copies} {release.copies === 1 ? "copy" : "copies"}{release.lossless ? " · lossless" : ""}
+                            {release.copies} {release.copies === 1 ? "copy" : "copies"}
                           </span>
                         </Show>
+                        <Quality quality={release.quality} />
                         <Show when={release.bandcamp}><span class="badge-pill bandcamp">Bandcamp</span></Show>
                       </div>
                     </div>

@@ -22,6 +22,8 @@ enum Pages {
         var artwork: String?
         var copies: Int
         var lossless: Bool
+        /// TIDAL's tier of the copy Seek would pick (SoundQuality).
+        var quality: SoundQuality? = nil
         var bandcamp: Bool
         var inLibrary: Bool
         var adding: Bool
@@ -49,6 +51,7 @@ enum Pages {
         /// 0–1 while downloading.
         var progress: Double?
         var lossless: Bool?
+        var quality: SoundQuality? = nil
         /// "128 · 8A", for songs in the library (Camelot codes).
         var tempoAndKey: String? = nil
     }
@@ -64,6 +67,9 @@ enum Pages {
         /// "2026-07-31", the release day (UTC, as Apple dates them), and the ℗ line.
         var released: String?
         var copyright: String?
+        /// The album's tier (its lowest song's, or its best copy's) and "24-bit, 96 kHz".
+        var quality: SoundQuality? = nil
+        var qualityDetail: String? = nil
         /// Has a tracklist (Apple's or Bandcamp's): adding adds exactly it.
         var listed: Bool
         var inLibrary: Bool

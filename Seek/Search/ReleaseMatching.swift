@@ -340,6 +340,11 @@ struct SearchRelease: Identifiable, Equatable, Codable {
     var isTrack: Bool { owned?.isTrack ?? store?.isTrack ?? false }
     var trackCount: Int? { bestFolder?.files.count }
     var isLossless: Bool { folders.contains(where: \.isLossless) }
+    /// The tier of the copy Seek would pick, or of a lossless one when there is one.
+    var soundQuality: SoundQuality? {
+        guard let bestFolder else { return nil }
+        return bestFolder.isHiRes ? .max : isLossless ? .high : .low
+    }
 }
 
 /// Merges Bandcamp purchases, Bandcamp store results and Soulseek folders into one list of releases.

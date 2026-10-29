@@ -70,7 +70,8 @@ struct WireTests {
         #expect(response.files[0].name == "01 - Song.flac")
         #expect(response.files[0].folder == "@@abc\\Music\\Artist\\Album")
         #expect(response.files[0].duration == 245)
-        #expect(response.files[1].quality == "MP3 320")
+        #expect(response.files[1].qualityDetail == "320 kbps")
+        #expect(response.files[1].soundQuality == .low)
     }
 }
 

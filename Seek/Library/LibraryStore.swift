@@ -638,11 +638,15 @@ final class LibraryStore {
         var fileName = Self.sanitize(name ?? source.lastPathComponent)
         let reserved = plannedPath
         var plannedPath = plannedPath
-        // An MP3 named .flac (it happens on Soulseek) is kept as what it is.
-        let format = AudioTags.format(of: source)
-        if format == .mp3, (fileName as NSString).pathExtension.lowercased() == "flac" {
-            fileName = (fileName as NSString).deletingPathExtension + ".mp3"
-            plannedPath = plannedPath.map { ($0 as NSString).deletingPathExtension + ".mp3" }
+        // A file named for another format (an MP3 named .flac happens on Soulseek) is kept as
+        // what it is. The download's own name is what's checked: the source is a temporary file.
+        let canWrite = AudioTags.canWrite(source)
+        let named = (fileName as NSString).pathExtension.lowercased()
+        if let container = AudioTags.container(of: source), AudioTags.audioExtensions.contains(named),
+           !container.extensions.contains(named) {
+            let fixed = container.extensions[0]
+            fileName = (fileName as NSString).deletingPathExtension + "." + fixed
+            plannedPath = plannedPath.map { ($0 as NSString).deletingPathExtension + "." + fixed }
         }
         let path: String
         if let plannedPath, !FileManager.default.fileExists(atPath: root.appending(path: plannedPath).path) {
@@ -675,7 +679,7 @@ final class LibraryStore {
                     values["DISCNUMBER"] = "\(song.disc)"
                 }
             }
-            if format != nil {
+            if canWrite {
                 let setting = values
                 try? await Task.detached { try AudioTags.update(source, setting: setting) }.value
             }
@@ -1284,7 +1288,13 @@ final class LibraryStore {
     private func readTags(for track: Track, at url: URL) async {
         guard !reading.contains(track.path) else { return }
         reading.insert(track.path)
-        defer { reading.remove(track.path) }
+        let readPath = track.path
+        defer { reading.remove(readPath) }
+        var url = url
+        #if targetEnvironment(macCatalyst)
+        // One device renames files named for another format; the others see them move.
+        if let renamed = await fixExtension(of: track, at: url) { url = renamed }
+        #endif
         let metadata = await Task.detached { await MetadataReader.read(url) }.value
         guard !track.isDeleted else { return }
         // Tempo and key from the tags alone here; the shared analysis fills in the rest.
@@ -1297,6 +1307,39 @@ final class LibraryStore {
         try? context.save()
         contentChanged(artwork: true)
         scheduleInfoSync()
+    }
+
+    /// Renames a song's file whose extension is another format's (an MP3 named .flac, as some
+    /// uploads are), keeping favourites, playlists and its details with it. Returns where it went.
+    private func fixExtension(of track: Track, at url: URL) async -> URL? {
+        guard let fixed = await Task.detached(operation: { AudioTags.correctedExtension(for: url) }).value else { return nil }
+        let folder = (track.path as NSString).deletingLastPathComponent
+        let name = ((track.path as NSString).lastPathComponent as NSString).deletingPathExtension + "." + fixed
+        let newPath = freePath(folders: folder.isEmpty ? [] : [folder], fileName: name, allowing: nil)
+        guard let root else { return nil }
+        let destination = root.appending(path: newPath)
+        let oldPath = track.path
+        let moved = await Task.detached { () -> Bool in
+            var coordinationError: NSError?
+            var moved = false
+            // The coordinator doing the move is the one that announces it.
+            let coordinator = NSFileCoordinator()
+            coordinator.coordinate(writingItemAt: url, options: .forMoving, writingItemAt: destination,
+                                   options: .forReplacing, error: &coordinationError) { from, to in
+                coordinator.item(at: from, willMoveTo: to)
+                moved = (try? FileManager.default.moveItem(at: from, to: to)) != nil
+                if moved { coordinator.item(at: from, didMoveTo: to) }
+            }
+            return moved && coordinationError == nil
+        }.value
+        guard moved, !track.isDeleted else { return nil }
+        Log.debug("library: renamed \(oldPath) to \(newPath), whose contents are \(fixed)")
+        track.path = newPath
+        var descriptor = FetchDescriptor<TrackInfo>(predicate: #Predicate { $0.path == oldPath })
+        descriptor.fetchLimit = 1
+        if let info = try? context.fetch(descriptor).first { info.path = newPath }
+        movePending(from: oldPath, to: newPath)
+        return destination
     }
 
     func relativePath(of url: URL) -> String {

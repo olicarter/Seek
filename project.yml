@@ -115,7 +115,7 @@ targets:
     type: application
     platform: tvOS
     deploymentTarget: "26.0"
-    sources: [SeekTV, Shared]
+    sources: [SeekTV, Shared, Seek/Library/SoundQuality.swift]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.olicarter.seek.tv

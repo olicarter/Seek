@@ -28,7 +28,7 @@ struct TagWritingTests {
 
     @Test func mp3NamedFLACIsSeenAsMP3() throws {
         let url = try temporary(mp3(title: "ukg Lemtom - Volitant"), ext: "flac")
-        #expect(AudioTags.format(of: url) == .mp3)
+        #expect(AudioTags.container(of: url) == .mp3)
         #expect(FLACTags.streamStart(try Data(contentsOf: url).prefix(10)) == tag(title: "ukg Lemtom - Volitant").count)
     }
 
@@ -50,7 +50,7 @@ struct TagWritingTests {
         var flac = Data("fLaC".utf8) + Data([0x80, 0, 0, 34]) + Data(count: 34)
         flac.append(contentsOf: [0xFF, 0xF8, 9, 9])
         let url = try temporary(tag(title: "junk") + flac, ext: "flac")
-        #expect(AudioTags.format(of: url) == .flac)
+        #expect(AudioTags.container(of: url) == .flac)
         try AudioTags.update(url, setting: ["TITLE": "Volitant"])
         let data = try Data(contentsOf: url)
         #expect(data.prefix(4) == Data("fLaC".utf8))
@@ -70,5 +70,34 @@ struct TagWritingTests {
         #expect(song("01 - Volitant.flac") == "Volitant")
         #expect(song("Lemtom - Fair Dinkum - 04 - Volitant (2 Step mix).flac") == "Volitant (2 Step Mix)")
         #expect(song("03 F303L.mp3") == "F303L")
+    }
+
+    @Test func extensionsFollowContents() throws {
+        #expect(AudioTags.correctedExtension(for: try temporary(mp3(title: "x"), ext: "flac")) == "mp3")
+        #expect(AudioTags.correctedExtension(for: try temporary(mp3(title: "x"), ext: "mp3")) == nil)
+        let m4a = Data([0, 0, 0, 0x20]) + Data("ftypM4A ".utf8) + Data(count: 20)
+        #expect(AudioTags.correctedExtension(for: try temporary(m4a, ext: "mp3")) == "m4a")
+        #expect(AudioTags.correctedExtension(for: try temporary(m4a, ext: "alac")) == nil)
+        let flac = Data("fLaC".utf8) + Data(count: 40)
+        #expect(AudioTags.correctedExtension(for: try temporary(flac, ext: "m4a")) == "flac")
+        let wav = Data("RIFF".utf8) + Data(count: 4) + Data("WAVE".utf8) + Data(count: 20)
+        #expect(AudioTags.correctedExtension(for: try temporary(wav, ext: "flac")) == "wav")
+        // ADTS AAC isn't mistaken for MP3.
+        #expect(AudioTags.correctedExtension(for: try temporary(Data([0xFF, 0xF1, 0x50, 0x80]) + Data(count: 20), ext: "mp3")) == "aac")
+        // Not audio, or not recognised: left alone.
+        #expect(AudioTags.correctedExtension(for: try temporary(Data("hello there".utf8), ext: "flac")) == nil)
+        #expect(AudioTags.correctedExtension(for: try temporary(mp3(title: "x"), ext: "txt")) == nil)
+    }
+
+    @Test func tidalTiers() {
+        #expect(SoundQuality(lossless: true, bitDepth: 16, sampleRate: 44_100) == .high)
+        #expect(SoundQuality(lossless: true, bitDepth: 16, sampleRate: 48_000) == .max)
+        #expect(SoundQuality(lossless: true, bitDepth: 24, sampleRate: 44_100) == .max)
+        #expect(SoundQuality(lossless: true, bitDepth: nil, sampleRate: nil) == .high)
+        #expect(SoundQuality(lossless: false, bitDepth: nil, sampleRate: 96_000) == .low)
+        #expect(SoundQuality.detail(lossless: true, bitDepth: 24, sampleRate: 96_000, bitrate: nil) == "24-bit, 96 kHz")
+        #expect(SoundQuality.detail(lossless: true, bitDepth: 16, sampleRate: 44_100, bitrate: nil) == "16-bit, 44.1 kHz")
+        #expect(SoundQuality.detail(lossless: false, bitDepth: nil, sampleRate: nil, bitrate: 319) == "320 kbps")
+        #expect(SoundQuality.low < .high && .high < .max)
     }
 }

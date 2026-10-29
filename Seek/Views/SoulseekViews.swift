@@ -29,12 +29,7 @@ struct RemoteFolderRow: View {
     }
 
     @ViewBuilder private var details: some View {
-        Text(folder.quality)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(folder.isLossless ? Color.green.opacity(0.2) : Color.secondary.opacity(0.15), in: .capsule)
-            .fixedSize()
+        SoundQualityBadge(quality: folder.soundQuality, detail: folder.qualityDetail)
         Text("\(folder.files.count) files").fixedSize()
         Text(ByteCountFormatter.string(fromByteCount: Int64(folder.totalSize), countStyle: .file)).fixedSize()
     }
@@ -76,7 +71,8 @@ struct RemoteFolderView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(file.name).lineLimit(2)
                             HStack {
-                                Text(file.quality)
+                                SoundQualityBadge(quality: file.soundQuality,
+                                                  detail: [file.fileExtension.uppercased(), file.qualityDetail].compactMap { $0 }.joined(separator: " · "))
                                 Text(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
                                 if let duration = file.duration {
                                     Text(Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))
@@ -438,8 +434,8 @@ struct SettingsView: View {
                     Text("Downloads")
                 } footer: {
                     Text(quality == .cd
-                        ? "When a release is on Soulseek in several qualities, Seek picks a 16-bit lossless copy over hi-res (24-bit or above 48 kHz), which can be several times bigger. Hi-res is still used when it's the only lossless copy. Bandcamp FLAC downloads come at whatever quality the artist uploaded."
-                        : "Seek picks the best-sounding copy, including 24-bit and high sample rates.")
+                        ? "Quality follows TIDAL's tiers: Max is lossless above CD quality (more than 16-bit or above 44.1 kHz), High is lossless up to 16-bit, 44.1 kHz, Low is MP3 or AAC. When a release is on Soulseek in several qualities, Seek picks High over Max, which can be several times bigger. Max is still used when it's the only lossless copy. Bandcamp FLAC downloads come at whatever quality the artist uploaded."
+                        : "Quality follows TIDAL's tiers: Max is lossless above CD quality (more than 16-bit or above 44.1 kHz), High is lossless up to 16-bit, 44.1 kHz, Low is MP3 or AAC. Seek picks the best-sounding copy, Max first.")
                     + Text("\n\nSongs played from album pages without adding them are kept in a cache of up to 2 GB, oldest dropped first. Adding one to your library later reuses the cached copy. MP3 for Faster Start streams MP3s where a copy has them.")
                 }
 

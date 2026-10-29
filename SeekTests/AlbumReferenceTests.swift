@@ -100,12 +100,15 @@ struct AlbumReferenceTests {
     @Test func describesQuality() {
         let flac = track("Marie", number: 1)
         flac.codec = "FLAC"; flac.bitDepth = 24; flac.sampleRate = 96000
-        #expect(AudioQuality(flac).label == "FLAC 24-bit/96 kHz")
-        #expect(AudioQuality(flac).isHiRes)
+        #expect(AudioQuality(flac).soundQuality == .max)
+        #expect(AudioQuality(flac).detail == "24-bit, 96 kHz")
         let mp3 = track("Focus", number: 2)
         mp3.codec = "MP3"; mp3.bitrate = 319
-        #expect(AudioQuality(mp3).label == "MP3 320 kbps")
-        #expect(AudioQuality.summary(of: [flac, mp3]) == "Mixed: FLAC, MP3")
+        #expect(AudioQuality(mp3).soundQuality == .low)
+        #expect(AudioQuality(mp3).detail == "320 kbps")
+        // An album is only as good as its lowest song.
+        #expect(AudioQuality.summary(of: [flac, mp3])?.quality == .low)
+        #expect(AudioQuality.summary(of: [flac])?.detail == "24-bit, 96 kHz")
         #expect(!AlbumDetailView.isLossless([flac, mp3]))
         #expect(AlbumDetailView.isLossless([flac]))
     }

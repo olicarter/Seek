@@ -122,7 +122,7 @@ enum MetadataReader {
         }
         await readFormat(of: asset, url: url, into: &metadata)
         // By what the file holds: some MP3s are named .flac.
-        if AudioTags.format(of: url) == .flac {
+        if AudioTags.container(of: url) == .flac {
             if let flac = try? FLACTags.read(url) {
                 metadata.title = flac.title
                 metadata.artist = flac.artist

@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The top of an album page, laid out like Apple Music's: artwork, title, artist, a details
-/// line ("1980 · Lossless"), round shuffle and download buttons around a wide Play, then a
+/// line ("1980 · MAX 24-bit, 96 kHz"), round shuffle and download buttons around a wide Play, then a
 /// short description that expands with MORE.
 struct AlbumHeader<Artwork: View, Accessory: View>: View {
     let title: String
@@ -10,7 +10,9 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
     /// gets a chevron and stretches to the row's edge.
     var onArtist: (() -> Void)?
     var year: Int?
-    var isLossless = false
+    /// TIDAL's tier (SoundQuality) and its detail, "24-bit, 96 kHz".
+    var quality: SoundQuality?
+    var qualityDetail: String?
     var description: String?
     var isDescribing = false
     var canPlay = true
@@ -44,11 +46,15 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
                 .font(.title3)
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
-                if let details {
-                    details
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 2)
+                if year ?? 0 > 0 || quality != nil {
+                    HStack(spacing: 6) {
+                        if let year, year > 0 { Text(String(year)) }
+                        if year ?? 0 > 0, quality != nil { Text("·") }
+                        if let quality { SoundQualityBadge(quality: quality, detail: qualityDetail) }
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
                 }
             }
             .padding(.horizontal)
@@ -90,14 +96,6 @@ struct AlbumHeader<Artwork: View, Accessory: View>: View {
         }
         .frame(maxWidth: .infinity)
         .animation(.easeOut, value: description)
-    }
-
-    private var details: Text? {
-        var parts: [Text] = []
-        if let year, year > 0 { parts.append(Text(String(year))) }
-        if isLossless { parts.append(Text("\(Image(systemName: "waveform")) Lossless")) }
-        guard !parts.isEmpty else { return nil }
-        return parts.dropFirst().reduce(parts[0]) { $0 + Text(" · ") + $1 }
     }
 }
 

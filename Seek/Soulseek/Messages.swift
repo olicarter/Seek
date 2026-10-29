@@ -97,27 +97,23 @@ struct RemoteFile: Identifiable, Hashable, Sendable, Codable {
     }
     var isLossless: Bool { ["flac", "wav", "aiff", "aif", "alac"].contains(fileExtension) }
 
-    /// "FLAC 16/44.1" or "MP3 320".
-    var quality: String {
-        var parts = [fileExtension.uppercased()]
-        if let bitDepth, let sampleRate {
-            parts.append("\(bitDepth)/\(String(format: "%g", Double(sampleRate) / 1000))")
-        } else if let bitrate, !isLossless {
-            parts.append(isVBR ? "V\(bitrate)" : "\(bitrate)")
-        }
-        return parts.joined(separator: " ")
-    }
 
-    /// Lossless above CD quality: more than 16-bit or above 48 kHz. Many clients don't report
-    /// either, so then it's judged by size: CD-quality audio is at most about 1.4 Mbit/s.
-    var isHiRes: Bool {
-        guard isLossless else { return false }
-        if let bitDepth, bitDepth > 16 { return true }
-        if let sampleRate, sampleRate > 48000 { return true }
+    /// TIDAL's tier (SoundQuality): Max is lossless above CD quality, more than 16-bit or above
+    /// 44.1 kHz. Many clients don't report either, so then it's judged by size: CD-quality audio
+    /// is at most about 1.4 Mbit/s.
+    var soundQuality: SoundQuality {
+        guard isLossless else { return .low }
         if bitDepth == nil, sampleRate == nil, let duration, duration > 0 {
-            return Double(size) * 8 / Double(duration) > 1_600_000
+            return Double(size) * 8 / Double(duration) > 1_600_000 ? .max : .high
         }
-        return false
+        return SoundQuality(lossless: true, bitDepth: bitDepth, sampleRate: sampleRate)
+    }
+    var isHiRes: Bool { soundQuality == .max }
+
+    /// "24-bit, 96 kHz", "320 kbps", "VBR 245 kbps".
+    var qualityDetail: String? {
+        if !isLossless, isVBR, let bitrate { return "VBR \(bitrate) kbps" }
+        return SoundQuality.detail(lossless: isLossless, bitDepth: bitDepth, sampleRate: sampleRate, bitrate: bitrate)
     }
 }
 
@@ -132,8 +128,8 @@ enum QualityPreference: String, CaseIterable, Identifiable, Sendable {
 
     var name: String {
         switch self {
-        case .cd: "CD Quality (16-bit)"
-        case .highest: "Highest Available"
+        case .cd: "High (up to 16-bit, 44.1 kHz)"
+        case .highest: "Max (up to 24-bit, 192 kHz)"
         }
     }
 }

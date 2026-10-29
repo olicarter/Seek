@@ -20,7 +20,8 @@ enum ID3Tags {
     static func isMP3(_ head: Data) -> Bool {
         let bytes = Array(head.prefix(3))
         if bytes.count == 3, bytes == Array("ID3".utf8) { return true }
-        return bytes.count >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0
+        // An MPEG frame's sync, with a layer set (AAC's ADTS frames have none).
+        return bytes.count >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0 && bytes[1] & 0x06 != 0
     }
 
     /// Sets the fields given, keeping the tag's other frames (artwork among them, unless a new
@@ -133,32 +134,81 @@ enum ID3Tags {
     }
 }
 
-/// Tags written into a song's file, FLAC or MP3, decided by what the file holds rather than its
-/// name: some uploads are MP3s named .flac.
+/// What a song's file holds, decided by its contents rather than its name: some uploads are
+/// MP3s named .flac. Tags are written by it, and a file named for something else is renamed.
 enum AudioTags {
-    enum Format { case flac, mp3 }
+    enum Container: String {
+        case flac, mp3, mp4, wav, aiff, ogg, aac
 
-    static func format(of url: URL) -> Format? {
+        /// The extensions a file holding this may have; the first is the one to give it.
+        var extensions: [String] {
+            switch self {
+            case .flac: ["flac"]
+            case .mp3: ["mp3"]
+            case .mp4: ["m4a", "mp4", "alac", "m4b"]
+            case .wav: ["wav"]
+            case .aiff: ["aiff", "aif", "aifc"]
+            case .ogg: ["ogg", "oga", "opus"]
+            case .aac: ["aac"]
+            }
+        }
+    }
+
+    static let audioExtensions = Set([Container.flac, .mp3, .mp4, .wav, .aiff, .ogg, .aac].flatMap(\.extensions))
+
+    static func container(of url: URL) -> Container? {
         guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
         defer { try? handle.close() }
-        guard let head = try? handle.read(upToCount: 10) else { return nil }
-        if let start = FLACTags.streamStart(head) {
-            if start == 0 { return .flac }
-            // An ID3 tag in front: a FLAC stream after it, or MPEG audio.
-            try? handle.seek(toOffset: UInt64(start))
-            if (try? handle.read(upToCount: 4)) == Data("fLaC".utf8) { return .flac }
+        guard let head = try? handle.read(upToCount: 12) else { return nil }
+        if head.prefix(3) == Data("ID3".utf8) {
+            // An ID3 tag in front: what follows it says what this is.
+            guard let start = FLACTags.streamStart(head), (try? handle.seek(toOffset: UInt64(start))) != nil,
+                  let after = try? handle.read(upToCount: 12) else { return nil }
+            if after.prefix(4) == Data("fLaC".utf8) { return .flac }
+            if isADTS(after) { return .aac }
+            // MPEG audio, or padding before it.
+            return .mp3
         }
-        return ID3Tags.isMP3(head) ? .mp3 : nil
+        return container(head)
+    }
+
+    static func container(_ head: Data) -> Container? {
+        let bytes = [UInt8](head.prefix(12))
+        func text(_ range: Range<Int>) -> String? {
+            bytes.count >= range.upperBound ? String(decoding: bytes[range], as: UTF8.self) : nil
+        }
+        if text(0..<4) == "fLaC" { return .flac }
+        if text(4..<8) == "ftyp" { return .mp4 }
+        if text(0..<4) == "RIFF", text(8..<12) == "WAVE" { return .wav }
+        if text(0..<4) == "FORM", ["AIFF", "AIFC"].contains(text(8..<12) ?? "") { return .aiff }
+        if text(0..<4) == "OggS" { return .ogg }
+        if isADTS(head) { return .aac }
+        if ID3Tags.isMP3(head) { return .mp3 }
+        return nil
+    }
+
+    private static func isADTS(_ head: Data) -> Bool {
+        let bytes = [UInt8](head.prefix(2))
+        return bytes.count == 2 && bytes[0] == 0xFF && bytes[1] & 0xF6 == 0xF0
+    }
+
+    /// The extension the file should have, when its own is another audio format's: "mp3" for
+    /// an MP3 named .flac. Nil when it's right, or the contents aren't recognised.
+    static func correctedExtension(for url: URL) -> String? {
+        let current = url.pathExtension.lowercased()
+        guard audioExtensions.contains(current), let container = container(of: url),
+              !container.extensions.contains(current) else { return nil }
+        return container.extensions[0]
     }
 
     /// Whether tags can be written into this file.
-    static func canWrite(_ url: URL) -> Bool { format(of: url) != nil }
+    static func canWrite(_ url: URL) -> Bool { [.flac, .mp3].contains(container(of: url)) }
 
     static func update(_ url: URL, setting values: [String: String], frontCover: FLACTags.Picture? = nil) throws {
-        switch format(of: url) {
+        switch container(of: url) {
         case .flac: try FLACTags.update(url, setting: values, frontCover: frontCover)
         case .mp3: try ID3Tags.update(url, setting: values, frontCover: frontCover)
-        case nil: throw FLACTags.WriteError.notFLAC
+        default: throw FLACTags.WriteError.notFLAC
         }
     }
 }

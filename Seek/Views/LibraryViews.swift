@@ -359,7 +359,8 @@ struct AlbumDetailView: View {
         ) {
             AlbumHeader(
                 title: album.title, artist: album.artist, onArtist: { openArtistPage() }, year: album.year,
-                isLossless: Self.isLossless(album.tracks), description: about.text(for: key),
+                quality: AudioQuality.summary(of: album.tracks)?.quality,
+                qualityDetail: AudioQuality.summary(of: album.tracks)?.detail, description: about.text(for: key),
                 isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
                 isPreparing: copies?.status == .searching,
                 onPlay: { player.play(queue, startingAt: 0) },
@@ -1075,8 +1076,11 @@ struct UpgradeBanner: View {
             Image(systemName: "sparkles").foregroundStyle(.green)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Lossless copy available").font(.subheadline.weight(.semibold))
-                Text("\(folder.quality) · \(folder.files.count) files · \(folder.username)")
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 5) {
+                    SoundQualityBadge(quality: folder.soundQuality)
+                    Text("\(folder.qualityDetail) · \(folder.files.count) files · \(folder.username)")
+                }
+                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if isUpgrading {

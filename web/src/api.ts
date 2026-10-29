@@ -11,6 +11,9 @@ export type Status = {
   bandcamp?: string;
 };
 
+/** TIDAL's tiers (tidal.com/sound-quality): max is lossless above 16-bit, 44.1 kHz. */
+export type SoundQuality = "max" | "high" | "low";
+
 export type Release = {
   id: string;
   artist: string;
@@ -20,6 +23,7 @@ export type Release = {
   artwork?: string;
   copies: number;
   lossless: boolean;
+  quality?: SoundQuality;
   bandcamp: boolean;
   inLibrary: boolean;
   adding: boolean;
@@ -38,6 +42,7 @@ export type Song = {
   available: boolean;
   progress?: number;
   lossless?: boolean;
+  quality?: SoundQuality;
   /** "128 · 8A". */
   tempoAndKey?: string;
 };
@@ -53,6 +58,9 @@ export type AlbumPage = {
   /** "2026-07-31" and the ℗ line, when Apple or Bandcamp give them. */
   released?: string;
   copyright?: string;
+  quality?: SoundQuality;
+  /** "24-bit, 96 kHz". */
+  qualityDetail?: string;
   listed: boolean;
   inLibrary: boolean;
   canAdd: boolean;

@@ -329,10 +329,19 @@ struct NowPlayingView: View {
                 .font(size == .headline ? .subheadline : .title3)
                 .foregroundStyle(.white.opacity(0.6))
                 .lineLimit(1)
-            if let tempoAndKey = player.current?.tempoAndKey(notation) {
-                Text(tempoAndKey)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.45))
+            if let current = player.current {
+                HStack(spacing: 8) {
+                    // A song streamed from Soulseek isn't read until it's here: its tier is a guess.
+                    if current.stream == nil || !current.codec.isEmpty {
+                        let quality = AudioQuality(current)
+                        SoundQualityBadge(quality: quality.soundQuality, detail: quality.detail)
+                    }
+                    if let tempoAndKey = current.tempoAndKey(notation) {
+                        Text(tempoAndKey)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
