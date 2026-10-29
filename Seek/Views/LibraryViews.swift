@@ -1077,8 +1077,8 @@ struct UpgradeBanner: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Lossless copy available").font(.subheadline.weight(.semibold))
                 HStack(spacing: 5) {
-                    SoundQualityBadge(quality: folder.soundQuality)
-                    Text("\(folder.qualityDetail) · \(folder.files.count) files · \(folder.username)")
+                    SoundQualityBadge(quality: folder.soundQuality, detail: folder.qualityDetail)
+                    Text("\(folder.files.count) files · \(folder.username)")
                 }
                 .font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }

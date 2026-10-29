@@ -71,8 +71,7 @@ struct RemoteFolderView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(file.name).lineLimit(2)
                             HStack {
-                                SoundQualityBadge(quality: file.soundQuality,
-                                                  detail: [file.fileExtension.uppercased(), file.qualityDetail].compactMap { $0 }.joined(separator: " · "))
+                                SoundQualityBadge(quality: file.soundQuality, detail: file.qualityDetail)
                                 Text(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file))
                                 if let duration = file.duration {
                                     Text(Duration.seconds(duration).formatted(.time(pattern: .minuteSecond)))

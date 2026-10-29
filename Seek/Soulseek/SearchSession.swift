@@ -22,12 +22,11 @@ struct RemoteFolder: Identifiable, Hashable, Codable {
     }
     var isHiRes: Bool { isLossless && files.contains(where: \.isHiRes) }
     var soundQuality: SoundQuality { isHiRes ? .max : isLossless ? .high : .low }
-    /// The most common file's detail ("16-bit, 44.1 kHz"), with its format.
-    var qualityDetail: String {
-        let counts = Dictionary(grouping: files.filter { $0.isLossless == isLossless }) {
-            [$0.fileExtension.uppercased(), $0.qualityDetail].compactMap { $0 }.joined(separator: " · ")
-        }.mapValues(\.count)
-        return counts.max { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }?.key ?? ""
+    /// The most common file's detail: "16-bit, 44.1 kHz" or "320 kbps".
+    var qualityDetail: String? {
+        let counts = Dictionary(grouping: files.filter { $0.isLossless == isLossless }.compactMap(\.qualityDetail)) { $0 }
+            .mapValues(\.count)
+        return counts.max { $0.value < $1.value || ($0.value == $1.value && $0.key > $1.key) }?.key
     }
 
 }

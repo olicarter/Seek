@@ -192,7 +192,9 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 function albumQuery(ref: AlbumRef): string {
   const params = new URLSearchParams({ artist: ref.artist, title: ref.title });
   if (ref.release) params.set("release", ref.release);
-  return params.toString();
+  // Spaces as %20, not "+": the router reads links back without turning "+" into spaces (a
+  // real "+" is already %2B).
+  return params.toString().replaceAll("+", "%20");
 }
 
 export type AuthInfo = { passkeys: boolean; signedIn: boolean; local: boolean };

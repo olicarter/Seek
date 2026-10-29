@@ -473,8 +473,8 @@ struct SongRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text((file.name as NSString).deletingPathExtension).lineLimit(2)
                 HStack(spacing: 5) {
-                    SoundQualityBadge(quality: file.soundQuality)
-                    Text("\([file.fileExtension.uppercased(), file.qualityDetail].compactMap { $0 }.joined(separator: " · ")) · \(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)) · \(file.username)")
+                    SoundQualityBadge(quality: file.soundQuality, detail: file.qualityDetail)
+                    Text("\(ByteCountFormatter.string(fromByteCount: Int64(file.size), countStyle: .file)) · \(file.username)")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -574,7 +574,7 @@ struct ReleaseDetailView: View {
                     onArtist: release.artist == "Unknown Artist" ? nil : { openArtistPage(release.artist) },
                     year: release.year ?? reference?.year,
                     quality: release.soundQuality,
-                    qualityDetail: release.bestFolder.map(\.qualityDetail), description: about.text(for: key),
+                    qualityDetail: release.bestFolder?.qualityDetail, description: about.text(for: key),
                     isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
                     isPreparing: soulseekStatus == .searching || client.currentSearch != nil && release.folders.isEmpty,
                     // Played without adding to the library: songs are fetched as they come up.
