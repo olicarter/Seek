@@ -37,7 +37,7 @@ h2 { font-size: 20px; margin: 24px 0 8px; }
 .badge { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px 16px; }
-.tile img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--surface); }
+.tile .cover { border-radius: 8px; }
 .tile-title { margin-top: 6px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-sub { color: var(--secondary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -65,8 +65,7 @@ h2 { font-size: 20px; margin: 24px 0 8px; }
 .download progress { width: 100%; margin-top: 6px; }
 
 .album-header { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 24px; }
-.album-art { width: min(260px, 70vw); aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--surface);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6); }
+.album-art { width: min(260px, 70vw); border-radius: 10px; box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6); }
 .album-title { font-size: 22px; margin: 18px 0 2px; }
 .album-artist { font-size: 20px; color: var(--accent); }
 .album-year { color: var(--secondary); font-size: 14px; margin-top: 4px; }
@@ -135,3 +134,8 @@ section > h2 + button { margin-bottom: 8px; }
 .signin button { padding: 8px 14px; border-radius: 10px; background: var(--accent); color: #fff; }
 section button.link { margin-right: 16px; margin-top: 8px; }
 .song-tempo { color: var(--tertiary); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+
+/* The preview, pixelated, under the cover as it sharpens in. */
+.cover { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background-color: var(--surface);
+  background-size: cover; image-rendering: pixelated; }
+.cover img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: auto; }

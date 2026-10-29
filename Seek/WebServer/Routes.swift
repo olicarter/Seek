@@ -83,8 +83,11 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
     router.get("/api/cover") { request, _ in
         let params = request.uri.queryParameters
         guard let artist = params.get("artist"), let title = params.get("title"),
-              let data = await core.cover(artist: artist, title: title) else { throw HTTPError(.notFound) }
-        return Response(status: .ok, headers: [.contentType: "image/jpeg", .cacheControl: "max-age=300"],
+              let original = await core.cover(artist: artist, title: title) else { throw HTTPError(.notFound) }
+        let size = min(max(params.get("size").flatMap(Int.init) ?? Covers.page, 64), 1200)
+        let data = await Covers.resized(original, key: "\(artist)|\(title)", size: size) ?? original
+        // Its address names the cover's version (see Core.coverPath): it can be kept a long while.
+        return Response(status: .ok, headers: [.contentType: "image/jpeg", .cacheControl: "max-age=2592000, immutable"],
                         body: ResponseBody(byteBuffer: ByteBuffer(data: data)))
     }
 

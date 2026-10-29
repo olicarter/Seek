@@ -28,7 +28,7 @@ struct AlbumView: View {
 
     private func header(_ album: Pages.Album) -> some View {
         VStack(alignment: .leading, spacing: 24) {
-            Cover(url: connection.media(album.artwork))
+            Cover(url: connection.media(album.artwork), preview: album.preview)
             VStack(alignment: .leading, spacing: 6) {
                 Text(album.title).font(.title2.bold()).lineLimit(3)
                 NavigationLink(value: ArtistRef(name: album.artist)) {

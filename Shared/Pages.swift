@@ -58,6 +58,7 @@ enum Pages {
         var title: String
         var year: Int?
         var artwork: String?
+        var preview: String? = nil
         var songs: [Song]
         var footer: String
         /// "2026-07-31", the release day (UTC, as Apple dates them), and the ℗ line.
@@ -104,6 +105,8 @@ enum Pages {
         var title: String
         var year: Int?
         var artwork: String
+        /// A tiny copy of the cover (a data: URL), shown pixelated until it's in.
+        var preview: String? = nil
         var songs: Int
     }
 

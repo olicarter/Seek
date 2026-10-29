@@ -3,6 +3,7 @@ import { live } from "../live";
 import { For, Show } from "solid-js";
 import { api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
+import { Cover } from "../Cover";
 import { current, play, type QueueItem } from "../player";
 
 /** The album page, the same for albums in the library and ones that aren't (as in the app). */
@@ -38,9 +39,7 @@ export function Album() {
       {(album) => (
         <section class="album">
           <header class="album-header">
-            <Show when={album().artwork} fallback={<div class="album-art" />}>
-              <img class="album-art" src={media(album().artwork)} alt="" />
-            </Show>
+            <Cover class="album-art" src={album().artwork} preview={album().preview} />
             <h1 class="album-title">{album().title}</h1>
             <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
             <Show when={album().year}><div class="album-year">{album().year}</div></Show>

@@ -1,7 +1,8 @@
 import { A } from "@solidjs/router";
 import { live } from "../live";
 import { For, Show } from "solid-js";
-import { albumHref, api, changes, media } from "../api";
+import { albumHref, api, changes } from "../api";
+import { Cover } from "../Cover";
 
 export function Library() {
   const [albums] = live(changes, api.library);
@@ -15,7 +16,7 @@ export function Library() {
         <For each={albums()}>
           {(album) => (
             <A class="tile" href={albumHref(album)}>
-              <img src={media(album.artwork)} alt="" loading="lazy" onError={(e) => e.currentTarget.classList.add("missing")} />
+              <Cover src={album.artwork} preview={album.preview} lazy />
               <div class="tile-title">{album.title}</div>
               <div class="tile-sub">{album.artist}</div>
             </A>

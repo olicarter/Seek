@@ -78,13 +78,13 @@ extension Core {
         let footer = [count == 1 ? "1 song" : "\(count) songs", minutes > 0 ? "\(minutes) minutes" : nil].compactMap { $0 }.joined(separator: ", ")
         let artwork: String? = album.tracks.isEmpty
             ? (found?.artworkURL ?? reference?.artworkURL).map { BandcampAPI.largeArtwork($0).absoluteString }
-            : Self.coverPath(key)
+            : coverPath(key)
         let adding = adder.isChecking(key) || AlbumRows.isBeingAdded(album, client: client)
             || owned.flatMap { bandcamp.download(for: $0) }?.state.isActive == true
         return Pages.Album(
             artist: key.artist, title: key.title,
             year: album.year > 0 ? album.year : (found?.year ?? reference?.year),
-            artwork: artwork, songs: songs, footer: footer,
+            artwork: artwork, preview: album.tracks.isEmpty ? nil : coverPreview(key), songs: songs, footer: footer,
             released: (reference?.released).map { $0.ISO8601Format(.iso8601.year().month().day().dateSeparator(.dash)) },
             copyright: reference?.copyright,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
@@ -172,7 +172,7 @@ extension Core {
         return Pages.Artist(
             name: albums.first?.artist ?? catalog.first?.artist ?? name,
             albums: albums.map { Pages.LibraryAlbum(artist: $0.artist, title: $0.title, year: $0.year > 0 ? $0.year : nil,
-                                                    artwork: Self.coverPath($0.key), songs: $0.tracks.count) },
+                                                    artwork: coverPath($0.key, size: Covers.tile), preview: coverPreview($0.key), songs: $0.tracks.count) },
             sections: ArtistPage.Section.allCases.compactMap { section in
                 let releases = missing.filter { section.kinds.contains($0.kind) }
                 return releases.isEmpty ? nil : Pages.ArtistSection(
@@ -188,7 +188,7 @@ extension Core {
             .sorted { $0.artist.localizedStandardCompare($1.artist) == .orderedAscending
                 || $0.artist == $1.artist && $0.year < $1.year }
             .map { Pages.LibraryAlbum(artist: $0.artist, title: $0.title, year: $0.year > 0 ? $0.year : nil,
-                                      artwork: Self.coverPath($0.key), songs: $0.tracks.count) }
+                                      artwork: coverPath($0.key, size: Covers.tile), preview: coverPreview($0.key), songs: $0.tracks.count) }
     }
 
     var downloadsPage: [Pages.Download] {
@@ -211,10 +211,17 @@ extension Core {
         library.albumsByKey[AlbumKey(artist: artist, title: title)]?.artwork
     }
 
-    static func coverPath(_ key: AlbumKey) -> String {
+    /// A library album's cover at `size`, named by its version so browsers can keep it.
+    func coverPath(_ key: AlbumKey, size: Int = Covers.page) -> String {
         var components = URLComponents()
         components.path = "/api/cover"
-        components.queryItems = [URLQueryItem(name: "artist", value: key.artist), URLQueryItem(name: "title", value: key.title)]
+        components.queryItems = [URLQueryItem(name: "artist", value: key.artist), URLQueryItem(name: "title", value: key.title),
+                                 URLQueryItem(name: "size", value: "\(size)"),
+                                 URLQueryItem(name: "v", value: cover(artist: key.artist, title: key.title).map(Covers.version) ?? "0")]
         return components.string ?? "/api/cover"
+    }
+
+    func coverPreview(_ key: AlbumKey) -> String? {
+        cover(artist: key.artist, title: key.title).flatMap { Covers.preview($0, key: "\(key.artist)|\(key.title)") }
     }
 }

@@ -47,6 +47,7 @@ export type AlbumPage = {
   title: string;
   year?: number;
   artwork?: string;
+  preview?: string;
   songs: Song[];
   footer: string;
   /** "2026-07-31" and the ℗ line, when Apple or Bandcamp give them. */
@@ -67,7 +68,7 @@ export type ArtistPage = {
   sections: { title: string; releases: { title: string; year: number; artwork?: string }[] }[];
 };
 
-export type LibraryAlbum = { artist: string; title: string; year?: number; artwork: string; songs: number };
+export type LibraryAlbum = { artist: string; title: string; year?: number; artwork: string; preview?: string; songs: number };
 
 export type Download = {
   id: string;

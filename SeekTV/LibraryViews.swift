@@ -1,17 +1,30 @@
 import SwiftUI
 
-/// An album's cover, from the Mac or Apple's or Bandcamp's servers.
+/// An album's cover, from the Mac or Apple's or Bandcamp's servers. Until it's in, its tiny
+/// preview from the page, pixelated (the TV can't draw an image as it arrives).
 struct Cover: View {
     let url: URL?
+    var preview: String? = nil
 
     var body: some View {
         AsyncImage(url: url) { image in
             image.resizable().aspectRatio(1, contentMode: .fill)
         } placeholder: {
-            Rectangle().fill(.quaternary).overlay { Image(systemName: "music.note").font(.largeTitle).foregroundStyle(.secondary) }
+            if let preview = Self.image(preview) {
+                Image(uiImage: preview).resizable().interpolation(.none).aspectRatio(1, contentMode: .fill)
+            } else {
+                Rectangle().fill(.quaternary).overlay { Image(systemName: "music.note").font(.largeTitle).foregroundStyle(.secondary) }
+            }
         }
         .aspectRatio(1, contentMode: .fit)
         .clipShape(.rect(cornerRadius: 12))
+    }
+
+    /// "data:image/jpeg;base64,…" → the image.
+    static func image(_ dataURL: String?) -> UIImage? {
+        guard let dataURL, let comma = dataURL.firstIndex(of: ","),
+              let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])) else { return nil }
+        return UIImage(data: data)
     }
 }
 
@@ -20,10 +33,11 @@ struct AlbumTile: View {
     let title: String
     let subtitle: String
     let artwork: URL?
+    var preview: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Cover(url: artwork)
+            Cover(url: artwork, preview: preview)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.callout).lineLimit(1)
                 Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -47,7 +61,7 @@ struct LibraryView: View {
                 LazyVGrid(columns: gridColumns, spacing: 56) {
                     ForEach(albums, id: \.key) { album in
                         NavigationLink(value: AlbumRef(artist: album.artist, title: album.title)) {
-                            AlbumTile(title: album.title, subtitle: album.artist, artwork: connection.media(album.artwork))
+                            AlbumTile(title: album.title, subtitle: album.artist, artwork: connection.media(album.artwork), preview: album.preview)
                         }
                         .buttonStyle(.borderless)
                     }
