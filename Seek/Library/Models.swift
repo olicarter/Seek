@@ -35,7 +35,8 @@ final class Track {
     var tagsVersion: Int = 0
     /// 4: tempo and key. 5: tempo and key again, from the tags alone (clearing first results).
     /// 6: MP3s named .flac read as MP3s (they read as untagged FLACs). 7: and renamed (on the Mac).
-    static let currentTagsVersion = 7
+    /// 8: reads that found no tags give way to the details other devices shared.
+    static let currentTagsVersion = 8
     /// Beats a minute (0: not known), from the tags or worked out on the Mac (SongAnalysisStore).
     var bpm: Double = 0
     /// Its Camelot code ("8A"; empty: not known), from the tags or worked out on the Mac.

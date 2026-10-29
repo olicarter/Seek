@@ -1086,6 +1086,14 @@ final class LibraryStore {
         // Imported songs the index has now seen are on their own from here.
         for path in awaitingIndex.keys where files[path] != nil { awaitingIndex[path] = nil }
         let tracks = (try? context.fetch(FetchDescriptor<Track>())) ?? []
+        // New files named as a missing song's but for the extension: the same song, renamed for
+        // what it holds (an MP3 named .flac, see fixExtension). It keeps its details, rather than
+        // coming back as a new song named after its file until it's read.
+        let known = Set(tracks.map(\.path))
+        var renamed: [String: [String]] = [:]
+        for path in files.keys where !known.contains(path) {
+            renamed[(path as NSString).deletingPathExtension, default: []].append(path)
+        }
         var byPath: [String: Track] = [:]
         for track in tracks {
             // A song added after the files were read isn't missing, just not in this read yet.
@@ -1094,6 +1102,17 @@ final class LibraryStore {
             // over ten minutes to list a new file, so it waits however long that takes.
             let unseen = awaitingIndex[track.path] != nil
             let missing = files[track.path] == nil && track.dateAdded < gatheredAt && !unseen
+            let stem = (track.path as NSString).deletingPathExtension
+            if missing, let moved = renamed[stem], moved.count == 1, byPath[moved[0]] == nil {
+                let oldPath = track.path
+                track.path = moved[0]
+                // Read again once it's here: its tags may have been written with the rename.
+                track.fileModified = nil
+                renamed[stem] = nil
+                byPath[track.path] = track
+                movePending(from: oldPath, to: track.path)
+                continue
+            }
             if missing || byPath[track.path] != nil {
                 context.delete(track)
             } else {
@@ -1112,7 +1131,9 @@ final class LibraryStore {
                 track.fileModified.map { abs($0.timeIntervalSince(modified)) > 1 } ?? true
             } ?? false
             let outdated = track.tagsVersion < Track.currentTagsVersion
-            if file.isLocal, !track.hasTags || changed || outdated, let url = root?.appending(path: path) {
+            // Not read yet (an empty read counts as read: its details come from other devices).
+            let unread = !track.hasTags && track.tagsVersion == 0
+            if file.isLocal, unread || changed || outdated, let url = root?.appending(path: path) {
                 Task { await readTags(for: track, at: url) }
             }
             // Kept for offline but removed by the system to save space: fetch it again.
@@ -1301,7 +1322,10 @@ final class LibraryStore {
         track.bpm = 0
         track.musicalKey = ""
         track.apply(metadata)
-        track.hasTags = true
+        // A read that found no tags at all (a file still arriving, or one this device can't read)
+        // leaves the song to the details other devices shared, rather than its file name.
+        track.hasTags = metadata.title != nil || metadata.album != nil || metadata.artist != nil
+        if !track.hasTags { track.infoUpdated = nil }
         track.tagsVersion = Track.currentTagsVersion
         track.fileModified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
         try? context.save()
