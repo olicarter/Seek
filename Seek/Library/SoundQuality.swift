@@ -70,22 +70,20 @@ extension SoundQuality {
     }
 }
 
-/// The tier as a small badge ("MAX"), with the detail after it when given ("24-bit, 96 kHz").
+/// The tier as a capsule ("MAX"), holding the detail too when given ("MAX 24-bit, 96 kHz").
 struct SoundQualityBadge: View {
     let quality: SoundQuality
     var detail: String? = nil
 
     var body: some View {
-        HStack(spacing: 5) {
-            Text(quality.label)
-                .font(.caption2.weight(.heavy))
-                .tracking(0.6)
-                .foregroundStyle(quality.tint)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1.5)
-                .background(quality.tint.opacity(0.15), in: .rect(cornerRadius: 3))
-            if let detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
+        HStack(spacing: 4) {
+            Text(quality.label).font(.caption2.weight(.heavy)).tracking(0.6)
+            if let detail { Text(detail).font(.caption2.weight(.medium)) }
         }
+        .foregroundStyle(quality.tint)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(quality.tint.opacity(0.15), in: .capsule)
         .lineLimit(1)
         .fixedSize()
         .accessibilityElement(children: .combine)
