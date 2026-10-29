@@ -65,7 +65,8 @@ h2 { font-size: 20px; margin: 24px 0 8px; }
 .download progress { width: 100%; margin-top: 6px; }
 
 .album-header { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 24px; }
-.album-art { width: min(260px, 70vw); border-radius: 10px; box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6); }
+/* Both classes: the cover's own width (100%, further down) would win otherwise. */
+.cover.album-art { width: min(260px, 70vw); border-radius: 10px; box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6); }
 .album-title { font-size: 22px; margin: 18px 0 2px; }
 .album-artist { font-size: 20px; color: var(--accent); }
 .album-year { color: var(--secondary); font-size: 14px; margin-top: 4px; }
