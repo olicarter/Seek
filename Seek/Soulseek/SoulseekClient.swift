@@ -476,6 +476,8 @@ final class SoulseekClient {
         let transfer = Transfer(file: file)
         transfer.replacesExisting = replacingExisting
         transfer.plannedPath = reservePath?(transfer)
+        // A song added afresh: what an earlier try found doesn't carry over.
+        songSources[Self.songKey(transfer)] = nil
         transfers.insert(transfer, at: 0)
         // Being streamed right now: asking the same user for the same file again would leave
         // one request hanging. Follow the stream, then add its copy.
@@ -565,11 +567,14 @@ final class SoulseekClient {
             Task { await mac.download(files, in: folder, album: album, others: others, group: group, replacingExisting: replacingExisting) }
             return
         }
+        var added: [Transfer] = []
         for file in files {
             guard let transfer = download(file, replacingExisting: replacingExisting), transfer.state != .completed else { continue }
             if let album { transfer.album = album }
             if let group { transfer.addGroup = group }
+            added.append(transfer)
         }
+        noteCopies(of: added, in: [folder] + others)
         var chosen = folder
         chosen.files = files
         share(chosen, among: others)
@@ -816,6 +821,7 @@ final class SoulseekClient {
     /// a growing wait. A download cut off part way carries on from where it stopped. Songs being
     /// streamed aren't retried: the player moves on to another copy.
     private func fail(_ transfer: Transfer, _ reason: String) {
+        if !transfer.forStreaming { songSources[Self.songKey(transfer), default: SongSources()].failed[transfer.username] = reason }
         if takeBack(transfer, reason) { return }
         transfer.state = .failed(reason)
         if reason.lowercased().contains("banned") { BannedUsers.insert(transfer.username) }
@@ -905,6 +911,27 @@ final class SoulseekClient {
         transfer.state.isActive || transfer.retryAt != nil
             || rescuing.contains("\(transfer.username)\u{0}\(transfer.file.folder)") && transfer.state != .cancelled && transfer.state != .completed
     }
+    /// Where each song being downloaded could come from, and how each user went (see SongSources),
+    /// by `songKey`.
+    private(set) var songSources: [String: SongSources] = [:]
+
+    /// A download's sources: worked out here, or (for one the Mac does) as the Mac sent them.
+    func sources(of transfer: Transfer) -> SongSources? {
+        transfer.onMac ? transfer.macSources : songSources[Self.songKey(transfer)]
+    }
+
+    private func noteFound(_ user: String, for transfer: Transfer) {
+        songSources[Self.songKey(transfer), default: SongSources()].found.insert(user)
+    }
+
+    /// Users with copies of these songs among `folders` (counterparts by name, then number).
+    private func noteCopies(of songs: [Transfer], in folders: [RemoteFolder]) {
+        for folder in folders {
+            let matches = Self.counterparts(of: songs.map(\.file), in: complete(folder).files)
+            for song in songs where matches[song.file.id] != nil { noteFound(folder.username, for: song) }
+        }
+    }
+
     /// Users already tried and lost for each album, so a second rescue doesn't go back to them.
     @ObservationIgnored private var lostUsers: [String: Set<String>] = [:]
 
@@ -946,6 +973,7 @@ final class SoulseekClient {
                 }
                 .flatMap(\.folders)
                 .filter { !lost.contains($0.username) }
+            noteCopies(of: stalled, in: candidates)
             // The whole album, free to send now, best first.
             let ranked = ReleaseGrouper.sortedBest(candidates.filter(\.hasFreeSlot) + candidates.filter { !$0.hasFreeSlot },
                                                    expectedTracks: all.count)
@@ -980,6 +1008,12 @@ final class SoulseekClient {
     /// and playlist entries made meanwhile stay put.
     @discardableResult
     private func move(_ old: Transfer, to file: RemoteFile) -> Transfer {
+        let oldKey = Self.songKey(old)
+        var sources = songSources[oldKey] ?? SongSources()
+        if sources.failed[old.username] == nil, case .queued(let place) = old.state {
+            let waited = old.queuedSince.map { Int(Date.now.timeIntervalSince($0) / 60) } ?? 0
+            sources.failed[old.username] = place.map { "Left at place \($0) in the queue" } ?? "Left after \(waited) min in the queue"
+        }
         let replacement = Transfer(file: file)
         replacement.album = old.album
         replacement.addGroup = old.addGroup
@@ -992,6 +1026,10 @@ final class SoulseekClient {
         try? FileManager.default.removeItem(at: old.partialURL)
         transfers.removeAll { $0 === old }
         transfers.insert(replacement, at: 0)
+        // The song's sources follow it (its key changes when it has no reserved path).
+        sources.found.insert(file.username)
+        songSources[oldKey] = nil
+        songSources[Self.songKey(replacement)] = sources
         requestUpload(replacement)
         return replacement
     }
@@ -1061,6 +1099,7 @@ final class SoulseekClient {
             transfer.bytesPerSecond = item.bytesPerSecond
             transfer.album = item.album ?? transfer.album
             transfer.addGroup = item.addGroup ?? transfer.addGroup
+            if transfer.macSources != item.sources { transfer.macSources = item.sources }
             transfer.plannedPath = item.plannedPath
             transfer.libraryPath = item.libraryPath
             transfer.retryAt = item.retryAt
@@ -1215,6 +1254,10 @@ final class SoulseekClient {
                     files = all
                 }
                 guard let match = SameRip.match(songs, in: files) else { continue }
+                for transfer in transfers where !transfer.forStreaming && transfer.username == folder.username
+                    && transfer.file.folder == folder.path && match[transfer.file.id] != nil {
+                    noteFound(candidate.username, for: transfer)
+                }
                 if helpers.count < Self.maxHelpers {
                     helpers[candidate.username] = match
                 } else {
@@ -1364,6 +1407,11 @@ final class SoulseekClient {
             return
         }
         transfer.state = .connecting
+        if !transfer.forStreaming {
+            let key = Self.songKey(transfer)
+            songSources[key, default: SongSources()].found.insert(transfer.username)
+            songSources[key, default: SongSources()].asked.insert(transfer.username)
+        }
         transfer.task = Task {
             do {
                 await connectIfNeeded()

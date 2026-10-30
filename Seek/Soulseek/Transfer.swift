@@ -76,6 +76,8 @@ final class Transfer: Identifiable {
     @ObservationIgnored var onMac = false
     /// The Mac's own id for it, once it's been seen there.
     @ObservationIgnored var macID: UUID?
+    /// Where the Mac could get it from, and how each user went, as the Mac sent it.
+    var macSources: SongSources?
     @ObservationIgnored let createdAt = Date.now
     /// A library download that's also being played: it leaves a copy in the stream cache for the
     /// player before moving into the library.

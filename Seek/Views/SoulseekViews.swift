@@ -143,10 +143,13 @@ struct DownloadsView: View {
                         }
                     }
                 }
-                if !transfersShown.isEmpty {
-                    Section(client.usingMac ? "Soulseek · on your Mac" : "Soulseek") {
-                        ForEach(transfersShown) { transfer in
-                            TransferRow(transfer: transfer)
+                // One section per release, as an album page lists it, rather than every song in one list.
+                ForEach(ReleaseDownloads.group(transfersShown)) { release in
+                    Section {
+                        ForEach(release.transfers) { transfer in
+                            NavigationLink(value: TransferSourcesKey(id: transfer.id)) {
+                                TransferRow(transfer: transfer, numbered: true)
+                            }
                                 .swipeActions {
                                     if transfer.state.isActive {
                                         Button("Cancel", systemImage: "xmark", role: .destructive) { client.cancel(transfer) }
@@ -159,6 +162,8 @@ struct DownloadsView: View {
                                     }
                                 }
                         }
+                    } header: {
+                        ReleaseDownloadsHeader(release: release, onMac: client.usingMac)
                     }
                 }
                 if !uploadsShown.isEmpty {
@@ -179,7 +184,146 @@ struct DownloadsView: View {
                 }
             }
             .navigationTitle("Activity")
+            .navigationDestination(for: TransferSourcesKey.self) { key in
+                if let transfer = client.transfers.first(where: { $0.id == key.id }) {
+                    TransferSourcesView(transfer: transfer)
+                } else {
+                    ContentUnavailableView("Finished", systemImage: "checkmark.circle")
+                }
+            }
         }
+    }
+}
+
+struct TransferSourcesKey: Hashable { let id: UUID }
+
+/// Downloads of one release (the album they were added as, or the folder they came from).
+struct ReleaseDownloads: Identifiable {
+    let id: String
+    let title: String
+    let artist: String?
+    var transfers: [Transfer]
+
+    @MainActor
+    static func group(_ transfers: [Transfer]) -> [ReleaseDownloads] {
+        var groups: [String: ReleaseDownloads] = [:]
+        var order: [String] = []
+        for transfer in transfers {
+            let title: String, artist: String?
+            if let album = transfer.album {
+                (title, artist) = (album.title, album.artist)
+            } else {
+                let folder = RemoteFolder(username: transfer.username, path: transfer.file.folder, files: [transfer.file],
+                                          hasFreeSlot: true, averageSpeed: 0, queueLength: 0)
+                let parsed = FolderParser.parse(folder)
+                (title, artist) = (parsed.title, parsed.artist)
+            }
+            let key = "\(ReleaseText.fold(artist ?? ""))|\(ReleaseText.fold(ReleaseText.cleanTitle(title)))"
+            if groups[key] == nil {
+                groups[key] = ReleaseDownloads(id: key, title: title, artist: artist, transfers: [])
+                order.append(key)
+            }
+            groups[key]?.transfers.append(transfer)
+        }
+        return order.compactMap { key in
+            groups[key].map { group in
+                var sorted = group
+                sorted.transfers.sort {
+                    (ReleaseText.songNumber($0.file.name) ?? 999, $0.file.name) < (ReleaseText.songNumber($1.file.name) ?? 999, $1.file.name)
+                }
+                return sorted
+            }
+        }
+    }
+}
+
+/// A release's heading: its name, and where its songs stand ("14 songs · 2 downloading · 12
+/// queued with 1 user").
+struct ReleaseDownloadsHeader: View {
+    let release: ReleaseDownloads
+    let onMac: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(release.title).font(.headline).foregroundStyle(.primary).textCase(nil)
+            Text(summary).font(.caption).textCase(nil)
+        }
+    }
+
+    private var summary: String {
+        let songs = release.transfers
+        let downloading = songs.filter { $0.state == .downloading }.count
+        let queued = songs.filter { if case .queued = $0.state { true } else { false } }
+        let failed = songs.filter { if case .failed = $0.state { true } else { false } }.count
+        let users = Set(songs.map(\.username)).count
+        var parts = [release.artist, songs.count == 1 ? "1 song" : "\(songs.count) songs"].compactMap { $0 }
+        if downloading > 0 { parts.append("\(downloading) downloading") }
+        if !queued.isEmpty {
+            let queuedUsers = Set(queued.map(\.username)).count
+            parts.append("\(queued.count) queued with \(queuedUsers == 1 ? "1 user" : "\(queuedUsers) users")")
+        }
+        if failed > 0 { parts.append("\(failed) failed") }
+        if users > 1, queued.isEmpty { parts.append("from \(users) users") }
+        return parts.joined(separator: " · ") + (onMac ? " · on your Mac" : "")
+    }
+}
+
+/// Every user a song could come from, and how each went: the one it's coming from now, those
+/// that failed (and why), and copies not asked yet.
+struct TransferSourcesView: View {
+    let transfer: Transfer
+    @Environment(SoulseekClient.self) private var client
+
+    var body: some View {
+        let sources = client.sources(of: transfer) ?? SongSources(found: [transfer.username], asked: [transfer.username])
+        List {
+            Section {
+                TransferRow(transfer: transfer)
+            }
+            Section {
+                ForEach(sources.found.sorted { rank($0, sources) < rank($1, sources) }, id: \.self) { user in
+                    HStack {
+                        Text(user)
+                        Spacer()
+                        Text(outcome(user, sources)).foregroundStyle(color(user, sources)).multilineTextAlignment(.trailing)
+                    }
+                    .font(.subheadline)
+                }
+            } header: {
+                Text(SongSourcesSummary.text(sources))
+            } footer: {
+                Text("Users found with this song: the copy it was added from, the album's other copies, and any a search for another copy turned up. Seek moves a song to another copy when its user is offline, refuses, keeps failing or has kept it queued for a while.")
+            }
+        }
+        .navigationTitle(ReleaseText.songTitle(transfer.file.name))
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func rank(_ user: String, _ sources: SongSources) -> (Int, String) {
+        if user == transfer.username { return (0, user) }
+        if sources.failed[user] != nil { return (1, user) }
+        return (sources.asked.contains(user) ? 2 : 3, user)
+    }
+
+    private func outcome(_ user: String, _ sources: SongSources) -> String {
+        if user == transfer.username { return "Now: \(transfer.state.label)" }
+        if let reason = sources.failed[user] { return reason }
+        return sources.asked.contains(user) ? "Asked" : "Not asked yet"
+    }
+
+    private func color(_ user: String, _ sources: SongSources) -> Color {
+        if user == transfer.username { return .primary }
+        return sources.failed[user] != nil ? .red : .secondary
+    }
+}
+
+/// "4 copies · asked 2 · 1 failed".
+enum SongSourcesSummary {
+    static func text(_ sources: SongSources) -> String {
+        var parts = [sources.found.count == 1 ? "1 copy" : "\(sources.found.count) copies", "asked \(sources.asked.count)"]
+        if !sources.failed.isEmpty { parts.append("\(sources.failed.count) failed") }
+        if sources.untried > 0 { parts.append("\(sources.untried) not asked") }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -229,10 +373,22 @@ struct RetryingStatus: View {
 
 struct TransferRow: View {
     let transfer: Transfer
+    /// Within its release: the song's number and title rather than the file's whole name.
+    var numbered = false
+    @Environment(SoulseekClient.self) private var client
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(transfer.file.name).lineLimit(1)
+            if numbered {
+                HStack(spacing: 8) {
+                    if let number = ReleaseText.songNumber(transfer.file.name) {
+                        Text(verbatim: "\(number)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                    Text(ReleaseText.songTitle(transfer.file.name)).lineLimit(1)
+                }
+            } else {
+                Text(transfer.file.name).lineLimit(1)
+            }
             if transfer.state == .downloading {
                 ProgressView(value: transfer.progress)
             }
@@ -243,6 +399,9 @@ struct TransferRow: View {
             }
             .font(.caption)
             .foregroundStyle(isFailure ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            if let sources = client.sources(of: transfer) {
+                Text(SongSourcesSummary.text(sources)).font(.caption2).foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 2)
     }
