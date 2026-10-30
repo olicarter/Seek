@@ -34,10 +34,23 @@ struct AlbumTile: View {
     let subtitle: String
     let artwork: URL?
     var preview: String? = nil
+    /// Marked on the cover, as on artist pages.
+    var inLibrary = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Cover(url: artwork, preview: preview)
+                .overlay(alignment: .bottomTrailing) {
+                    if inLibrary {
+                        Image(systemName: "checkmark")
+                            .font(.callout.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 40, height: 40)
+                            .background(.black.opacity(0.55), in: .circle)
+                            .padding(12)
+                            .accessibilityLabel("In Library")
+                    }
+                }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.callout).lineLimit(1)
                 Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -123,10 +136,10 @@ struct ArtistView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     Text(artist.name).font(.largeTitle.bold())
-                    grid(artist.albums.map { ($0.title, $0.year.map(String.init) ?? "", connection.media($0.artwork)) })
+                    // Everything they've released, the library's albums among the rest, marked.
                     ForEach(artist.sections, id: \.title) { section in
                         Text(section.title).font(.title2.bold())
-                        grid(section.releases.map { ($0.title, String($0.year), connection.media($0.artwork)) })
+                        grid(section.releases)
                     }
                 }
                 .padding(.horizontal, 80)
@@ -134,11 +147,13 @@ struct ArtistView: View {
         }
     }
 
-    private func grid(_ albums: [(String, String, URL?)]) -> some View {
+    private func grid(_ releases: [Pages.CatalogEntry]) -> some View {
         LazyVGrid(columns: gridColumns, spacing: 56) {
-            ForEach(albums, id: \.0) { title, subtitle, artwork in
-                NavigationLink(value: AlbumRef(artist: name, title: title)) {
-                    AlbumTile(title: title, subtitle: subtitle, artwork: artwork)
+            ForEach(releases, id: \.title) { release in
+                NavigationLink(value: AlbumRef(artist: release.artist ?? name, title: release.title)) {
+                    AlbumTile(title: release.title, subtitle: release.year > 0 ? String(release.year) : "",
+                              artwork: connection.media(release.artwork), preview: release.preview,
+                              inLibrary: release.inLibrary == true)
                 }
                 .buttonStyle(.borderless)
             }

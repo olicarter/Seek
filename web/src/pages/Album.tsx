@@ -50,14 +50,12 @@ export function Album() {
     const album = ref();
     if (!page) return [];
     const same = (title: string) => title.toLowerCase() === album.title.toLowerCase();
-    const owned = page.albums.filter((a) => !same(a.title)).map((a) => ({
-      href: albumHref(a), title: a.title, subtitle: a.year ? String(a.year) : undefined, artwork: a.artwork, preview: a.preview,
-    }));
-    const seen = new Set(owned.map((o) => o.title.toLowerCase()));
-    const others = page.sections.flatMap((s) => s.releases)
-      .filter((r) => !same(r.title) && !seen.has(r.title.toLowerCase()))
-      .map((r) => ({ href: albumHref({ artist: page.name, title: r.title }), title: r.title, subtitle: String(r.year), artwork: r.artwork }));
-    return [...owned, ...others];
+    return page.sections.flatMap((s) => s.releases)
+      .filter((r) => !same(r.title))
+      .map((r) => ({
+        href: albumHref({ artist: r.artist ?? page.name, title: r.title }), title: r.title,
+        subtitle: r.year ? String(r.year) : undefined, artwork: r.artwork, preview: r.preview, inLibrary: r.inLibrary,
+      }));
   });
 
   const isCurrent = (song: Song) => !!song.file && current()?.file === media(song.file);

@@ -95,6 +95,10 @@ enum Pages {
         var title: String
         var year: Int
         var artwork: String?
+        /// In the library: its album page is the library's, under `artist` (its own album artist).
+        var inLibrary: Bool? = nil
+        var artist: String? = nil
+        var preview: String? = nil
     }
 
     struct ArtistSection: Codable, Sendable {

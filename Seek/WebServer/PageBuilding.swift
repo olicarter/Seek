@@ -175,17 +175,20 @@ extension Core {
         let tracks = ArtistPage.tracks(of: name, in: library.allTracks)
         let albums = LibraryGrouping.albums(tracks).sorted { $0.year > $1.year }
         let catalog = await ArtistCatalog.releases(for: name)
-        let missing = ArtistPage.missing(from: catalog, owned: albums)
         return Pages.Artist(
             name: albums.first?.artist ?? catalog.first?.artist ?? name,
             albums: albums.map { Pages.LibraryAlbum(artist: $0.artist, title: $0.title, year: $0.year > 0 ? $0.year : nil,
                                                     artwork: coverPath($0.key, size: Covers.tile), preview: coverPreview($0.key), songs: $0.tracks.count) },
-            sections: ArtistPage.Section.allCases.compactMap { section in
-                let releases = missing.filter { section.kinds.contains($0.kind) }
-                return releases.isEmpty ? nil : Pages.ArtistSection(
-                    title: section.rawValue,
-                    releases: releases.map { Pages.CatalogEntry(title: $0.title, year: $0.year, artwork: $0.artworkURL?.absoluteString) }
-                )
+            // Everything they've released, the library's albums among the rest (see ArtistPage.sections).
+            sections: ArtistPage.sections(catalog: catalog, owned: albums).map { section in
+                Pages.ArtistSection(title: section.section.rawValue, releases: section.entries.map { entry in
+                    if let album = entry.album {
+                        Pages.CatalogEntry(title: album.title, year: entry.year ?? 0, artwork: coverPath(album.key, size: Covers.tile),
+                                           inLibrary: true, artist: album.artist, preview: coverPreview(album.key))
+                    } else {
+                        Pages.CatalogEntry(title: entry.title, year: entry.year ?? 0, artwork: entry.release?.artworkURL?.absoluteString)
+                    }
+                })
             }
         )
     }

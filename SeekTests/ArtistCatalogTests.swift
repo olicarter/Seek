@@ -263,6 +263,26 @@ struct ArtistPageCatalogTests {
             "From Under the Cork Tree (Limited \"Black Clouds and Underdogs\" Edition)",
         ])
     }
+
+    /// The library's albums sit among the rest of the artist's releases, in date order, marked;
+    /// one Apple doesn't list goes under the heading its length suggests.
+    @Test func libraryAlbumsAreListedInPlace() {
+        let catalog = [
+            release("From Under the Cork Tree", year: 2005),
+            release("Infinity On High", year: 2007),
+            release("Folie à Deux", year: 2008),
+        ]
+        let owned = [
+            Album(key: AlbumKey(artist: "Fall Out Boy", title: "Infinity On High"), tracks: []),
+            Album(key: AlbumKey(artist: "Fall Out Boy", title: "A Bootleg Nobody Lists"), tracks: []),
+        ]
+        let sections = ArtistPage.sections(catalog: catalog, owned: owned)
+        let albums = sections.first { $0.section == .albums }?.entries ?? []
+        #expect(albums.map(\.title) == ["Folie à Deux", "Infinity On High", "From Under the Cork Tree"])
+        #expect(albums.map { $0.album != nil } == [false, true, false])
+        // No songs to count: not an album's length, so with the singles and EPs.
+        #expect(sections.first { $0.section == .singles }?.entries.map(\.title) == ["A Bootleg Nobody Lists"])
+    }
 }
 
 struct RemasterTests {

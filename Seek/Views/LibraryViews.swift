@@ -760,15 +760,11 @@ struct ArtistDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 PlayShuffleButtons(tracks: albums.flatMap(\.tracks))
-                AlbumGrid(albums: albums)
-                let missing = ArtistPage.missing(from: catalog, owned: albums)
-                ForEach(ArtistPage.Section.allCases, id: \.self) { section in
-                    let releases = missing.filter { section.kinds.contains($0.kind) }
-                    if !releases.isEmpty {
-                        Text(section.rawValue).font(.title3.bold())
-                            .padding(.top, 8)
-                        CatalogGrid(releases: releases)
-                    }
+                // Everything they've released, the library's albums among the rest, marked.
+                ForEach(ArtistPage.sections(catalog: catalog, owned: albums), id: \.section) { section in
+                    Text(section.section.rawValue).font(.title3.bold())
+                        .padding(.top, 8)
+                    ArtistReleaseGrid(entries: section.entries)
                 }
             }
             .padding()
@@ -794,33 +790,67 @@ struct ArtistDetailView: View {
 }
 
 
-/// Releases that aren't in the library, opening their album page to listen or add them.
-private struct CatalogGrid: View {
-    let releases: [CatalogRelease]
+/// An artist's releases: the library's open their own page (and are marked as in it), the
+/// rest the album page to listen or add them.
+private struct ArtistReleaseGrid: View {
+    let entries: [ArtistPage.Entry]
     @Environment(Router.self) private var router
+    @State private var deleting: PendingDelete?
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
-            ForEach(releases, id: \.title) { release in
-                NavigationLink(value: ExternalAlbum(artist: release.artist, title: release.title, artworkURL: release.artworkURL)) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Color.secondary.opacity(0.15)
-                            .aspectRatio(1, contentMode: .fit)
-                            .overlay { RemoteImage(url: release.artworkURL) { Color.clear } }
-                            .clipShape(.rect(cornerRadius: 8))
-                        Text(release.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                        Text(verbatim: "\(release.year)").font(.subheadline).foregroundStyle(.secondary)
+            ForEach(entries) { entry in
+                if let album = entry.album {
+                    NavigationLink(value: album.key) {
+                        tile(entry) {
+                            ArtworkView(key: "album|\(album.key.artist)|\(album.key.title)", cornerRadius: 8) { album.artwork }
+                        }
                     }
-                    .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button("Search Soulseek and Bandcamp", systemImage: "magnifyingglass") {
-                        router.search("\(release.artist) \(release.title)")
+                    .buttonStyle(.plain)
+                    .contextMenu { AlbumMenuItems(album: album, deleting: $deleting) }
+                } else if let release = entry.release {
+                    NavigationLink(value: ExternalAlbum(artist: release.artist, title: release.title, artworkURL: release.artworkURL)) {
+                        tile(entry) {
+                            Color.secondary.opacity(0.15)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay { RemoteImage(url: release.artworkURL) { Color.clear } }
+                                .clipShape(.rect(cornerRadius: 8))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button("Search Soulseek and Bandcamp", systemImage: "magnifyingglass") {
+                            router.search("\(release.artist) \(release.title)")
+                        }
                     }
                 }
             }
         }
+        .deleteConfirmation($deleting)
+    }
+
+    private func tile(_ entry: ArtistPage.Entry, @ViewBuilder cover: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            cover()
+                .overlay(alignment: .bottomTrailing) {
+                    if entry.album != nil { InLibraryMark().padding(6) }
+                }
+            Text(entry.title).font(.subheadline.weight(.medium)).lineLimit(1)
+            if let year = entry.year { Text(verbatim: "\(year)").font(.subheadline).foregroundStyle(.secondary) }
+        }
+        .contentShape(.rect)
+    }
+}
+
+/// On a cover: this album is in the library.
+struct InLibraryMark: View {
+    var body: some View {
+        Image(systemName: "checkmark")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .frame(width: 24, height: 24)
+            .background(.black.opacity(0.55), in: .circle)
+            .accessibilityLabel("In Library")
     }
 }
 

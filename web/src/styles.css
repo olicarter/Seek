@@ -66,6 +66,11 @@ main { max-width: 1480px; margin: 0 auto; padding: 32px var(--gutter) 140px; }
 .tile .cover { border-radius: 8px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05); transition: filter 0.15s; }
 .tile:hover .cover { filter: brightness(0.8); }
 .tile.round .cover { border-radius: 50%; }
+.tile-cover { position: relative; }
+.in-library {
+  position: absolute; right: 8px; bottom: 8px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; backdrop-filter: blur(8px);
+}
 .tile.round { text-align: center; }
 .tile-title { margin-top: 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile-sub { color: var(--secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

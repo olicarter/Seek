@@ -75,7 +75,11 @@ export type AlbumPage = {
 export type ArtistPage = {
   name: string;
   albums: LibraryAlbum[];
-  sections: { title: string; releases: { title: string; year: number; artwork?: string }[] }[];
+  sections: {
+    title: string;
+    /** `inLibrary`: the library's album, under `artist` (its own album artist). */
+    releases: { title: string; year: number; artwork?: string; inLibrary?: boolean; artist?: string; preview?: string }[];
+  }[];
 };
 
 export type LibraryAlbum = { artist: string; title: string; year?: number; artwork: string; preview?: string; songs: number };
