@@ -6,8 +6,8 @@ import { speed } from "../format";
 export function Downloads() {
   const [downloads] = live(changes, api.downloads);
   return (
-    <section>
-      <h1>Downloads</h1>
+    <section class="narrow">
+      <div class="page-head"><h1>Downloads</h1></div>
       <Show when={downloads()?.length === 0}>
         <p class="empty">Nothing downloading.</p>
       </Show>

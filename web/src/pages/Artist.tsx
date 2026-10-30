@@ -1,8 +1,8 @@
-import { A, useSearchParams } from "@solidjs/router";
+import { useSearchParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import { albumHref, api, changes } from "../api";
-import { Cover } from "../Cover";
 import { live } from "../live";
+import { Grid, Shelf } from "../Tiles";
 
 /** An artist's page, as in the app: their albums here, then what else they've released. */
 export function Artist() {
@@ -12,34 +12,18 @@ export function Artist() {
     <Show when={page()} fallback={<p class="empty">Loading…</p>}>
       {(artist) => (
         <section>
-          <h1>{artist().name}</h1>
-          <div class="grid">
-            <For each={artist().albums}>
-              {(album) => (
-                <A class="tile" href={albumHref(album)}>
-                  <Cover src={album.artwork} preview={album.preview} lazy />
-                  <div class="tile-title">{album.title}</div>
-                  <div class="tile-sub">{album.year ?? ""}</div>
-                </A>
-              )}
-            </For>
-          </div>
+          <div class="page-head"><h1 class="artist-name">{artist().name}</h1></div>
+          <Show when={artist().albums.length}>
+            <h2>In Your Library</h2>
+            <Grid items={artist().albums.map((a) => ({
+              href: albumHref(a), title: a.title, subtitle: a.year ? String(a.year) : undefined, artwork: a.artwork, preview: a.preview,
+            }))} />
+          </Show>
           <For each={artist().sections}>
             {(section) => (
-              <>
-                <h2>{section.title}</h2>
-                <div class="grid">
-                  <For each={section.releases}>
-                    {(release) => (
-                      <A class="tile" href={albumHref({ artist: artist().name, title: release.title })}>
-                        <Cover src={release.artwork} lazy />
-                        <div class="tile-title">{release.title}</div>
-                        <div class="tile-sub">{release.year}</div>
-                      </A>
-                    )}
-                  </For>
-                </div>
-              </>
+              <Shelf title={section.title} items={section.releases.map((r) => ({
+                href: albumHref({ artist: artist().name, title: r.title }), title: r.title, subtitle: String(r.year), artwork: r.artwork,
+              }))} />
             )}
           </For>
         </section>

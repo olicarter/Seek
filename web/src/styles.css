@@ -1,153 +1,265 @@
+/* Seek on the web, laid out as Apple Music's web player: a sidebar, the page, a floating player.
+   Dark only, as the app's own colours are. Below 760px the sidebar becomes a tab bar. */
 :root {
   color-scheme: dark;
-  --bg: #000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --text: #fff;
-  --secondary: rgba(235, 235, 245, 0.6);
-  --tertiary: rgba(235, 235, 245, 0.3);
-  --separator: rgba(84, 84, 88, 0.6);
-  --accent: #ff4d6d;
+  --bg: #1f1f1f;
+  --sidebar: #262626;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.12);
+  --text: rgba(255, 255, 255, 0.92);
+  --secondary: rgba(255, 255, 255, 0.55);
+  --tertiary: rgba(255, 255, 255, 0.32);
+  --separator: rgba(255, 255, 255, 0.08);
+  --accent: #fa586a;
   --bandcamp: #1da0c3;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --sidebar-width: 250px;
+  --gutter: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: default; opacity: 0.4; }
 img.missing { visibility: hidden; }
-
-.app { min-height: 100vh; padding-bottom: 96px; }
-main { max-width: 1100px; margin: 0 auto; padding: 0 16px 32px; }
-h1 { font-size: 34px; font-weight: 700; margin: 24px 0 16px; }
-h2 { font-size: 20px; margin: 24px 0 8px; }
+h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.01em; margin: 0; }
+h2 { font-size: 20px; font-weight: 700; margin: 36px 0 14px; }
 .empty { color: var(--secondary); }
 .error { color: var(--accent); }
 
-.tabs {
-  position: sticky; top: 0; z-index: 2; display: flex; gap: 4px; justify-content: center;
-  padding: 10px 16px; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(20px);
-  border-bottom: 0.5px solid var(--separator);
+/* Layout */
+.app { min-height: 100vh; }
+.sidebar {
+  position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); z-index: 3;
+  padding: 22px 14px; background: var(--sidebar); border-right: 1px solid rgba(0, 0, 0, 0.4); overflow-y: auto;
 }
-.tabs a { padding: 6px 14px; border-radius: 999px; color: var(--secondary); font-weight: 600; font-size: 15px; }
-.tabs a.active { color: var(--text); background: var(--surface-2); }
-.badge { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; }
+.content { margin-left: var(--sidebar-width); min-height: 100vh; }
+main { max-width: 1480px; margin: 0 auto; padding: 32px var(--gutter) 140px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.narrow { max-width: 720px; }
+.only-narrow { display: none !important; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px 16px; }
-.tile .cover { border-radius: 8px; }
-.tile-title { margin-top: 6px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tile-sub { color: var(--secondary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.search input, .login input {
-  width: 100%; padding: 10px 14px; border: none; border-radius: 10px; background: var(--surface);
-  color: var(--text); font: inherit; font-size: 17px;
+/* Sidebar */
+.wordmark { display: block; padding: 0 10px 18px; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+.sidebar-search {
+  display: flex; align-items: center; gap: 8px; margin: 0 4px 18px; padding: 0 10px; height: 32px;
+  border-radius: 8px; background: var(--surface-2); color: var(--secondary);
 }
-.login { display: grid; gap: 10px; max-width: 360px; }
-.login button, section > button {
-  padding: 10px 16px; border: none; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600;
+.sidebar-search input { flex: 1; min-width: 0; border: none; outline: none; background: none; color: var(--text); font: inherit; font-size: 14px; }
+.sidebar-search:focus-within { box-shadow: 0 0 0 2px var(--accent); }
+.sidebar nav { display: grid; gap: 2px; }
+.sidebar-heading { margin: 16px 10px 6px; color: var(--tertiary); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.sidebar nav a {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; color: var(--text); font-size: 14px;
 }
+.sidebar nav a svg { color: var(--accent); flex: none; }
+.sidebar nav a:hover { background: var(--surface); }
+.sidebar nav a.active { background: var(--surface-2); }
+.badge { margin-left: auto; padding: 0 7px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; }
 
-.rows { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 12px; overflow: hidden; }
-.row { display: flex; gap: 12px; align-items: center; padding: 10px 14px; }
-.rows li + li .row, .rows li.row + li.row { border-top: 0.5px solid var(--separator); }
-.row-art { width: 56px; height: 56px; flex: none; border-radius: 6px; object-fit: cover; background: var(--surface-2); }
-.row-text { flex: 1; min-width: 0; }
-.row-title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-sub { color: var(--secondary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-badges { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-.badge-pill { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: rgba(255, 77, 109, 0.18); color: var(--accent); }
+/* Grids and shelves */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 28px 22px; }
+.tile { display: block; min-width: 0; }
+.tile .cover { border-radius: 8px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05); transition: filter 0.15s; }
+.tile:hover .cover { filter: brightness(0.8); }
+.tile.round .cover { border-radius: 50%; }
+.tile.round { text-align: center; }
+.tile-title { margin-top: 8px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-sub { color: var(--secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile-badges { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+.shelf-row {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 190px; gap: 22px; overflow-x: auto; padding-bottom: 8px;
+  scroll-snap-type: x mandatory; scrollbar-width: thin;
+}
+.shelf-row .tile { scroll-snap-align: start; }
+
+.sort { display: flex; align-items: center; gap: 8px; color: var(--secondary); font-size: 13px; }
+.sort select { padding: 4px 8px; border: none; border-radius: 6px; background: var(--surface-2); color: var(--text); font: inherit; }
+
+/* Badges */
+.badge-pill { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: rgba(250, 88, 106, 0.18); color: var(--accent); line-height: 18px; }
 .badge-pill.quiet { background: var(--surface-2); color: var(--secondary); }
 .badge-pill.bandcamp { background: rgba(29, 160, 195, 0.18); color: var(--bandcamp); }
-.row-state { text-align: right; font-size: 14px; }
-.download progress { width: 100%; margin-top: 6px; }
-
-.album-header { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 24px; }
-/* Both classes: the cover's own width (100%, further down) would win otherwise. */
-.cover.album-art { width: min(260px, 70vw); border-radius: 10px; box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6); }
-.album-title { font-size: 22px; margin: 18px 0 2px; }
-.album-artist { font-size: 20px; color: var(--accent); }
-.album-year { color: var(--secondary); font-size: 14px; margin-top: 4px; }
-.album-note { color: var(--secondary); font-size: 14px; }
-.album-actions { display: flex; gap: 14px; align-items: center; margin: 18px 0 8px; }
-.album-actions .play {
-  width: 180px; height: 50px; border: none; border-radius: 999px; background: #fff; color: #000; font-weight: 600; font-size: 17px;
-}
-.round {
-  width: 50px; height: 50px; display: inline-flex; align-items: center; justify-content: center;
-  border: none; border-radius: 50%; background: var(--surface-2); font-size: 22px;
-}
-.spinner::after {
-  content: ""; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--tertiary);
-  border-top-color: var(--text); animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.songs { list-style: none; margin: 16px 0 0; padding: 0; }
-.song { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 0.5px solid var(--separator); }
-.song.playable { cursor: pointer; }
-.song.playable:hover { background: var(--surface); }
-.song.missing { color: var(--secondary); }
-.song.current .song-title { color: var(--accent); }
-.song-number { width: 26px; text-align: right; color: var(--secondary); font-variant-numeric: tabular-nums; font-size: 15px; }
-.song-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.song-artist { display: block; color: var(--secondary); font-size: 13px; }
-.song-duration { color: var(--secondary); font-variant-numeric: tabular-nums; font-size: 15px; }
-.song progress { width: 60px; }
-.album-footer { color: var(--secondary); font-size: 14px; }
-
-.player {
-  position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(820px, calc(100% - 24px));
-  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 4px 12px; align-items: center;
-  padding: 10px 14px; border-radius: 18px; background: rgba(44, 44, 46, 0.85); backdrop-filter: blur(24px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); z-index: 3;
-}
-.player-art { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; background: var(--surface-2); grid-row: span 2; }
-.player-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-artist { color: var(--secondary); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.player-controls { display: flex; gap: 6px; }
-.player-controls button { background: none; border: none; font-size: 20px; padding: 4px 8px; }
-.player-time { grid-column: 2 / 4; display: flex; gap: 8px; align-items: center; color: var(--secondary); font-size: 12px;
-  font-variant-numeric: tabular-nums; }
-.player-time input { flex: 1; accent-color: var(--text); }
-
-.toast {
-  position: fixed; left: 50%; top: 64px; transform: translateX(-50%); width: min(420px, calc(100% - 32px)); z-index: 4;
-  padding: 16px; border-radius: 14px; background: var(--surface-2); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); text-align: center;
-}
-.toast p { margin: 0 0 12px; }
-.toast button { border: none; background: none; color: var(--accent); font-weight: 600; font-size: 17px; }
-
-.buy { display: inline-block; margin: 6px 0; padding: 8px 16px; border-radius: 999px; background: rgba(29, 160, 195, 0.18);
-  color: var(--bandcamp); font-weight: 600; font-size: 15px; }
-.song.missing.playable:hover { color: var(--text); }
-section > h2 + button { margin-bottom: 8px; }
-
-.offline { max-width: 1100px; margin: 12px auto 0; padding: 10px 14px; border-radius: 10px; background: rgba(255, 77, 109, 0.15);
-  color: var(--text); font-size: 14px; }
-.offline a { color: var(--accent); }
-
-.signin { display: grid; gap: 10px; justify-items: start; }
-.signin p { margin: 0; }
-.signin button, section button.link { border: none; background: none; color: var(--accent); font-weight: 600; padding: 0; }
-.signin button { padding: 8px 14px; border-radius: 10px; background: var(--accent); color: #fff; }
-section button.link { margin-right: 16px; margin-top: 8px; }
-.song-tempo { color: var(--tertiary); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
-
-/* The preview, pixelated, under the cover as it sharpens in. */
-.cover { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background-color: var(--surface);
-  background-size: cover; image-rendering: pixelated; }
-.cover img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: auto; }
 
 /* TIDAL's sound quality tiers: gold Max, cyan High, grey Low. */
-.quality { display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 8px; border-radius: 999px; line-height: 16px; white-space: nowrap; }
+.quality { display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 8px; border-radius: 999px; line-height: 18px; white-space: nowrap; }
 .quality b { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; }
 .quality.max { color: #ffd432; background: rgba(255, 212, 50, 0.15); }
 .quality.high { color: #33ffee; background: rgba(51, 255, 238, 0.13); }
 .quality.low { color: var(--secondary); background: var(--surface-2); }
 .quality-detail { font-size: 11px; font-weight: 500; }
-.album-year { display: flex; gap: 8px; justify-content: center; align-items: center; }
 
+/* Album page: the cover's colour fading into the page behind the header. */
+.album { position: relative; isolation: isolate; }
+.album::before {
+  content: ""; position: absolute; z-index: -1; left: calc(-1 * var(--gutter)); right: calc(-1 * var(--gutter)); top: -32px; height: 560px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--tint, #1f1f1f) 85%, transparent), transparent);
+  pointer-events: none;
+}
+.album-header { display: flex; gap: 36px; align-items: flex-end; margin-bottom: 30px; }
+/* Both classes: the cover's own width (100%, further down) would win otherwise. */
+.cover.album-art { flex: none; width: clamp(200px, 22vw, 290px); border-radius: 10px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45); }
+.album-info { min-width: 0; padding-bottom: 4px; }
+.album-title { font-size: clamp(26px, 2.6vw, 36px); line-height: 1.15; }
+.album-artist { display: inline-block; margin-top: 4px; font-size: clamp(20px, 2vw, 26px); color: var(--accent); }
+.album-artist:hover { text-decoration: underline; }
+.album-meta { display: flex; gap: 10px; align-items: center; margin-top: 8px; color: var(--secondary); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.album-meta .quality { text-transform: none; }
+.album-note { color: var(--secondary); font-size: 14px; margin: 10px 0 0; }
+.album-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 20px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 20px; border: none; border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font-weight: 600; font-size: 14px;
+}
+.pill.primary { background: var(--accent); color: #fff; }
+.pill.bandcamp { background: rgba(29, 160, 195, 0.2); color: #5cc8e5; }
+.pill:not(:disabled):hover { filter: brightness(1.12); }
+.circle {
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
+  background: var(--surface-2); color: var(--accent);
+}
+.spinner::after {
+  content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--tertiary);
+  border-top-color: var(--text); animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.songs { list-style: none; margin: 0; padding: 0; }
+.song {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 70px; align-items: center; gap: 12px;
+  min-height: 46px; padding: 6px 12px; border-radius: 8px; font-size: 14px;
+}
+.song + .song { box-shadow: 0 -1px 0 var(--separator); }
+.song:nth-child(odd) { background: rgba(255, 255, 255, 0.025); }
+.song.playable { cursor: pointer; }
+.song.playable:hover { background: var(--surface-2); box-shadow: none; }
+.song.playable:hover + .song { box-shadow: none; }
+.song.missing { color: var(--secondary); }
+.song.current .song-title { color: var(--accent); }
+.song-number { position: relative; text-align: center; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.song-number .hover-play { display: none; color: var(--text); }
+.song.playable:hover .number { display: none; }
+.song.playable:hover .hover-play { display: inline-flex; }
+.song-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.song-artist { display: block; color: var(--secondary); font-size: 13px; }
+.song-tempo { color: var(--tertiary); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+.song-end { text-align: right; }
+.song-duration { color: var(--secondary); font-variant-numeric: tabular-nums; }
+.song progress { width: 60px; accent-color: var(--accent); }
+.disc { padding: 18px 12px 6px; color: var(--secondary); font-size: 13px; font-weight: 600; }
+.bars { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; color: var(--accent); }
+.bars i { width: 3px; background: currentColor; border-radius: 1px; animation: bar 0.9s ease-in-out infinite; }
+.bars i:nth-child(2) { animation-delay: -0.3s; }
+.bars i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes bar { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+.album-footer { color: var(--secondary); font-size: 13px; line-height: 1.6; margin: 22px 12px 0; }
+
+/* Player */
+.player {
+  position: fixed; left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2); bottom: 16px; transform: translateX(-50%);
+  width: min(900px, calc(100% - var(--sidebar-width) - 32px)); z-index: 4;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 150px; align-items: center; gap: 18px;
+  padding: 8px 16px; border-radius: 14px; background: rgba(48, 48, 50, 0.82); backdrop-filter: blur(30px) saturate(1.6);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.player-controls { display: flex; align-items: center; gap: 4px; }
+.player-controls button { display: inline-flex; padding: 6px; border: none; background: none; border-radius: 6px; }
+.player-controls button:not(:disabled):hover { background: var(--surface); }
+.player-song {
+  position: relative; display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 10px;
+  height: 52px; padding: 4px 4px 0; border-radius: 8px; background: rgba(0, 0, 0, 0.22); overflow: hidden;
+}
+.player-art { width: 44px; height: 44px; border-radius: 4px; object-fit: cover; background: var(--surface-2); align-self: start; }
+.player-text { min-width: 0; text-align: center; padding: 0 56px 6px; }
+.player-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-artist { font-size: 12px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-artist a:hover { text-decoration: underline; }
+.player-time { position: absolute; bottom: 7px; font-size: 10px; color: var(--secondary); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity 0.15s; }
+.player-time.start { left: 58px; }
+.player-time.end { right: 8px; }
+.player-song:hover .player-time { opacity: 1; }
+.player-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; cursor: pointer; background: rgba(255, 255, 255, 0.1); }
+.player-progress::before { content: ""; position: absolute; inset: -8px 0 0; }
+.player-progress-fill { height: 100%; background: rgba(255, 255, 255, 0.7); }
+.player-song:hover .player-progress { height: 5px; }
+.player-volume { display: flex; align-items: center; gap: 8px; color: var(--secondary); }
+.player-volume input { flex: 1; min-width: 0; accent-color: #fff; }
+
+/* Lists: downloads, settings */
+.search input, .login input {
+  width: 100%; padding: 10px 14px; border: none; border-radius: 10px; background: var(--surface-2);
+  color: var(--text); font: inherit; font-size: 16px; outline: none;
+}
+.search { margin-bottom: 8px; }
+.login { display: grid; gap: 10px; max-width: 420px; }
+.login button, section > button {
+  justify-self: start; padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600;
+}
+.rows { list-style: none; margin: 0; padding: 0; border-radius: 12px; overflow: hidden; background: var(--surface); }
+.row { display: flex; gap: 12px; align-items: center; padding: 12px 16px; }
+.rows li + li { box-shadow: 0 -1px 0 var(--separator); }
+.row-text { flex: 1; min-width: 0; }
+.row-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { color: var(--secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-state { text-align: right; font-size: 13px; }
+.download progress { width: 100%; margin-top: 6px; accent-color: var(--accent); }
 .setting { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+section > h2 + button { margin-bottom: 8px; }
+.signin { display: grid; gap: 10px; justify-items: start; }
+.signin p { margin: 0; }
+.signin button, section button.link { border: none; background: none; color: var(--accent); font-weight: 600; padding: 0; }
+.signin button { padding: 8px 14px; border-radius: 8px; background: var(--accent); color: #fff; }
+section button.link { margin-right: 16px; margin-top: 8px; }
+
+.offline { max-width: 1480px; margin: 16px var(--gutter) 0; padding: 10px 14px; border-radius: 10px; background: rgba(250, 88, 106, 0.15); font-size: 14px; }
+.offline a { color: var(--accent); }
+.toast {
+  position: fixed; left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2); top: 24px; transform: translateX(-50%);
+  width: min(420px, calc(100% - 32px)); z-index: 5; padding: 16px; border-radius: 14px; background: #3a3a3c;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); text-align: center;
+}
+.toast p { margin: 0 0 12px; }
+.toast button { border: none; background: none; color: var(--accent); font-weight: 600; font-size: 16px; }
+
+/* Covers: the preview, pixelated, under the cover as it sharpens in. */
+.cover { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background-color: var(--surface);
+  background-size: cover; image-rendering: pixelated; }
+.cover img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: auto; }
+
+/* A phone's width: the sidebar's links as a tab bar, the player above it, the album header stacked. */
+@media (max-width: 760px) {
+  :root { --gutter: 16px; --sidebar-width: 0px; }
+  .only-narrow { display: block !important; }
+  .sidebar nav a.only-narrow { display: flex !important; }
+  .sidebar {
+    inset: auto 0 0 0; width: auto; height: calc(58px + env(safe-area-inset-bottom)); padding: 6px 8px env(safe-area-inset-bottom);
+    border-right: none; border-top: 1px solid rgba(0, 0, 0, 0.4); background: rgba(38, 38, 38, 0.92); backdrop-filter: blur(20px); overflow: visible;
+  }
+  .wordmark, .sidebar-search, .sidebar-heading { display: none; }
+  .sidebar nav { grid-auto-flow: column; grid-auto-columns: 1fr; height: 100%; }
+  .sidebar nav a { flex-direction: column; justify-content: center; gap: 2px; padding: 4px; font-size: 10px; position: relative; }
+  .sidebar nav a.active { background: none; color: var(--accent); }
+  .badge { position: absolute; top: 2px; left: 55%; }
+  main { padding: 20px var(--gutter) 170px; }
+  h1 { font-size: 28px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 22px 14px; }
+  .shelf-row { grid-auto-columns: 150px; gap: 14px; }
+  .album-header { flex-direction: column; align-items: center; text-align: center; gap: 18px; }
+  .cover.album-art { width: min(260px, 72vw); }
+  .album-meta, .album-actions { justify-content: center; }
+  .song { grid-template-columns: 28px minmax(0, 1fr) auto; padding: 8px 4px; }
+  .song-tempo { display: none; }
+  .player {
+    left: 8px; right: 8px; bottom: calc(66px + env(safe-area-inset-bottom)); transform: none; width: auto;
+    grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 6px 8px;
+  }
+  .player-controls { order: 2; }
+  .player-controls button:first-child { display: none; }
+  .player-volume { display: none; }
+  .player-text { text-align: left; padding: 0 0 6px; }
+  .player-time { display: none; }
+  .toast { left: 50%; }
+}

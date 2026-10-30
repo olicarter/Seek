@@ -5,6 +5,7 @@ import { Library } from "./pages/Library";
 import { Search } from "./pages/Search";
 import { Album } from "./pages/Album";
 import { Artist } from "./pages/Artist";
+import { Artists } from "./pages/Artists";
 import { Downloads } from "./pages/Downloads";
 import { Settings } from "./pages/Settings";
 import { TV } from "./pages/TV";
@@ -17,6 +18,7 @@ render(
       <Route path="/search" component={Search} />
       <Route path="/album" component={Album} />
       <Route path="/artist" component={Artist} />
+      <Route path="/artists" component={Artists} />
       <Route path="/downloads" component={Downloads} />
       <Route path="/settings" component={Settings} />
       <Route path="/tv" component={TV} />

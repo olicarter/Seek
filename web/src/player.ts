@@ -149,8 +149,32 @@ export function seek(seconds: number) {
   audio.currentTime = seconds;
 }
 
+const savedVolume = (() => {
+  try {
+    return Number(localStorage.getItem("seek.volume") ?? "1");
+  } catch {
+    return 1;
+  }
+})();
+const [volume, setVolumeSignal] = createSignal(Number.isFinite(savedVolume) ? Math.min(Math.max(savedVolume, 0), 1) : 1);
+audio.volume = volume();
+
+export function setVolume(value: number) {
+  const clamped = Math.min(Math.max(value, 0), 1);
+  setVolumeSignal(clamped);
+  audio.volume = clamped;
+  try {
+    localStorage.setItem("seek.volume", String(clamped));
+  } catch {
+    // Kept for this visit only.
+  }
+}
+
+/** Whether there's a song before or after this one, for the player's buttons. */
+export const hasNext = () => index() + 1 < queue().length;
+
 export const current = () => queue()[index()];
-export { playing, time, length, compressed, compressedForSpeed };
+export { playing, time, length, compressed, compressedForSpeed, volume, queue, index };
 
 if ("mediaSession" in navigator) {
   navigator.mediaSession.setActionHandler("play", () => void audio.play());

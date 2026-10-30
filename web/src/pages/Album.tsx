@@ -1,17 +1,24 @@
 import { A, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
-import { createEffect, For, onCleanup, Show } from "solid-js";
-import { api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { createMemo, For, Show } from "solid-js";
+import { albumHref, api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { Cover } from "../Cover";
+import { Icon } from "../Icons";
 import { Quality } from "../Quality";
-import { current, play, type QueueItem } from "../player";
+import { Shelf, type TileItem } from "../Tiles";
+import { current, play, playing, type QueueItem } from "../player";
 
-/** The album page, the same for albums in the library and ones that aren't (as in the app). */
+/**
+ * The album page, as Apple Music's on the web: the cover with the album's details and buttons
+ * beside it, the songs across the page, then more by the artist. The same for albums in the
+ * library and ones that aren't (as in the app), and tinted with the cover's colour.
+ */
 export function Album() {
   const [params] = useSearchParams<{ artist: string; title: string; release?: string }>();
   const ref = (): AlbumRef => ({ artist: params.artist ?? "", title: params.title ?? "", release: params.release });
   const [page, { mutate }] = live(() => [changes(), ref()] as const, ([, r]) => api.album(r));
+  const [artist] = live(() => page()?.artist, (name) => api.artist(name));
 
   const queue = (album: AlbumPage): QueueItem[] =>
     album.songs.filter((s) => s.file).map((s) => ({
@@ -35,79 +42,106 @@ export function Album() {
 
   const add = async () => mutate(await api.add(ref()));
 
-  // The page takes the cover's colour, as in the app (and Apple Music).
-  createEffect(() => {
-    const tint = page()?.tint;
-    document.body.style.background = tint
-      ? `linear-gradient(rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.28)) fixed, ${tint}`
-      : "";
+  // The artist's other albums and releases, this one left out.
+  const more = createMemo((): TileItem[] => {
+    const page = artist();
+    const album = ref();
+    if (!page) return [];
+    const same = (title: string) => title.toLowerCase() === album.title.toLowerCase();
+    const owned = page.albums.filter((a) => !same(a.title)).map((a) => ({
+      href: albumHref(a), title: a.title, subtitle: a.year ? String(a.year) : undefined, artwork: a.artwork, preview: a.preview,
+    }));
+    const seen = new Set(owned.map((o) => o.title.toLowerCase()));
+    const others = page.sections.flatMap((s) => s.releases)
+      .filter((r) => !same(r.title) && !seen.has(r.title.toLowerCase()))
+      .map((r) => ({ href: albumHref({ artist: page.name, title: r.title }), title: r.title, subtitle: String(r.year), artwork: r.artwork }));
+    return [...owned, ...others];
   });
-  onCleanup(() => (document.body.style.background = ""));
+
+  const isCurrent = (song: Song) => !!song.file && current()?.file === media(song.file);
+  const discs = (album: AlbumPage) => new Set(album.songs.map((s) => s.disc)).size > 1;
 
   return (
     <Show when={page()} fallback={<p class="empty">Loading…</p>}>
       {(album) => (
-        <section class="album">
+        <section class="album" style={album().tint ? { "--tint": album().tint } : {}}>
           <header class="album-header">
             <Cover class="album-art" src={album().artwork} preview={album().preview} />
-            <h1 class="album-title">{album().title}</h1>
-            <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
-            <Show when={album().year || album().quality}>
-              <div class="album-year">
+            <div class="album-info">
+              <h1 class="album-title">{album().title}</h1>
+              <A class="album-artist" href={artistHref(album().artist)}>{album().artist}</A>
+              <div class="album-meta">
                 <Show when={album().year}><span>{album().year}</span></Show>
                 <Quality quality={album().quality} detail={album().qualityDetail} />
               </div>
-            </Show>
-            <div class="album-actions">
-              <button class="round" aria-label="Shuffle" disabled={!queue(album()).length} onClick={() => shuffle(album())}>⤮</button>
-              <button class="play" disabled={!queue(album()).length} onClick={() => playFrom(album())}>▶ Play</button>
-              <Show
-                when={album().adding}
-                fallback={
-                  <button class="round" aria-label={album().inLibrary && !album().canAdd ? "In Library" : "Add to Library"}
-                          disabled={!album().canAdd} onClick={add}>
-                    {album().inLibrary && !album().canAdd ? "✓" : "+"}
-                  </button>
-                }
-              >
-                <span class="round spinner" aria-label="Adding" />
+              <Show when={!album().inLibrary && album().listed && !album().copies && !album().bandcamp?.owned}>
+                <p class="album-note">{album().lookingForCopies ? "Looking on Soulseek…" : "No copies on Soulseek right now."}</p>
               </Show>
-            </div>
-            <Show when={album().bandcamp}>
-              {(bandcamp) => (
+              <Show when={album().bandcamp?.owned}>
+                <p class="album-note">In your Bandcamp collection{album().bandcamp?.downloading !== undefined ? " · adding…" : ""}</p>
+              </Show>
+              <div class="album-actions">
+                <button class="pill primary" disabled={!queue(album()).length} onClick={() => playFrom(album())}>
+                  <Icon name="play" size={16} />Play
+                </button>
+                <button class="pill" disabled={!queue(album()).length} onClick={() => shuffle(album())}>
+                  <Icon name="shuffle" size={16} />Shuffle
+                </button>
                 <Show
-                  when={!bandcamp().owned}
-                  fallback={<p class="album-note">In your Bandcamp collection{bandcamp().downloading !== undefined ? " · adding…" : ""}</p>}
+                  when={album().adding}
+                  fallback={
+                    <button class="circle" disabled={!album().canAdd} onClick={add}
+                            aria-label={album().inLibrary && !album().canAdd ? "In Library" : "Add to Library"}
+                            title={album().inLibrary && !album().canAdd ? "In Library" : "Add to Library"}>
+                      <Icon name={album().inLibrary && !album().canAdd ? "check" : "plus"} size={18} />
+                    </button>
+                  }
                 >
-                  <a class="buy" href={bandcamp().page} target="_blank" rel="noopener" onClick={() => void api.buying()}>
-                    Buy on Bandcamp{bandcamp().price ? ` · ${bandcamp().price}` : ""}
+                  <span class="circle spinner" aria-label="Adding" />
+                </Show>
+                <Show when={album().bandcamp && !album().bandcamp!.owned}>
+                  <a class="pill bandcamp" href={album().bandcamp!.page} target="_blank" rel="noopener" onClick={() => void api.buying()}>
+                    Buy on Bandcamp{album().bandcamp!.price ? ` · ${album().bandcamp!.price}` : ""}
                   </a>
                 </Show>
-              )}
-            </Show>
-            <Show when={!album().inLibrary && album().listed && !album().copies && !album().bandcamp?.owned}>
-              <p class="album-note">{album().lookingForCopies ? "Looking on Soulseek…" : "No copies on Soulseek right now."}</p>
-            </Show>
+              </div>
+            </div>
           </header>
 
           <ol class="songs">
             <For each={album().songs}>
-              {(song) => (
-                <li
-                  classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: !!song.file && current()?.file === media(song.file) }}
-                  title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
-                  onClick={() => song.file && playFrom(album(), song)}
-                >
-                  <span class="song-number">{song.number ?? ""}</span>
-                  <span class="song-title">
-                    {song.title}
-                    <Show when={song.artist}><span class="song-artist">{song.artist}</span></Show>
-                  </span>
-                  <Show when={song.tempoAndKey}><span class="song-tempo">{song.tempoAndKey}</span></Show>
-                  <Show when={song.progress !== undefined} fallback={<span class="song-duration">{duration(song.duration)}</span>}>
-                    <progress value={song.progress} max="1" />
+              {(song, i) => (
+                <>
+                  <Show when={discs(album()) && (i() === 0 || album().songs[i() - 1].disc !== song.disc)}>
+                    <li class="disc">Disc {song.disc}</li>
                   </Show>
-                </li>
+                  <li
+                    classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: isCurrent(song) }}
+                    title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
+                    onClick={() => song.file && playFrom(album(), song)}
+                  >
+                    <span class="song-number">
+                      <Show when={isCurrent(song) && playing()} fallback={
+                        <>
+                          <span class="number">{song.number ?? ""}</span>
+                          <Show when={song.file}><span class="hover-play"><Icon name="play" size={13} /></span></Show>
+                        </>
+                      }>
+                        <span class="bars" aria-label="Playing"><i /><i /><i /></span>
+                      </Show>
+                    </span>
+                    <span class="song-title">
+                      {song.title}
+                      <Show when={song.artist}><span class="song-artist">{song.artist}</span></Show>
+                    </span>
+                    <span class="song-tempo">{song.tempoAndKey ?? ""}</span>
+                    <span class="song-end">
+                      <Show when={song.progress !== undefined} fallback={<span class="song-duration">{duration(song.duration)}</span>}>
+                        <progress value={song.progress} max="1" />
+                      </Show>
+                    </span>
+                  </li>
+                </>
               )}
             </For>
           </ol>
@@ -123,6 +157,7 @@ export function Album() {
               {album().copyright}
             </Show>
           </p>
+          <Shelf title={`More by ${album().artist}`} items={more()} />
         </section>
       )}
     </Show>

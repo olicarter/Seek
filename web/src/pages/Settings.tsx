@@ -23,8 +23,8 @@ export function Settings() {
 
 
   return (
-    <section>
-      <h1>Settings</h1>
+    <section class="narrow">
+      <div class="page-head"><h1>Settings</h1></div>
       <h2>Server</h2>
       <form class="login" onSubmit={(e) => { e.preventDefault(); setServerAddress(address()); }}>
         <input placeholder="This page's own address" value={address()} onInput={(e) => setAddress(e.currentTarget.value)} />
