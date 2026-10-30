@@ -1166,8 +1166,11 @@ final class LibraryStore {
     /// so until then the library didn't have them. They're listed now, with the Mac's details,
     /// and play from the Mac (see MacFiles) until their files arrive; the index finding them
     /// later leaves them be.
-    func takeMacAdditions() {
-        guard usesICloud, let macAdded, lastMacAdditions.map({ Date.now.timeIntervalSince($0) > 60 }) ?? true else { return }
+    /// `soon`: a download the Mac did just finished, so its song is asked for now (every few
+    /// seconds at most) rather than at the next minute.
+    func takeMacAdditions(soon: Bool = false) {
+        let wait: TimeInterval = soon ? 3 : 60
+        guard usesICloud, let macAdded, lastMacAdditions.map({ Date.now.timeIntervalSince($0) > wait }) ?? true else { return }
         lastMacAdditions = .now
         Task {
             guard let added = await macAdded(), !added.isEmpty else { return }

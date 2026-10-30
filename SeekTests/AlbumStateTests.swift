@@ -135,4 +135,15 @@ struct AlbumStateTests {
         #expect(state == .complete)
         #expect(songs.map(\.libraryPath) == library.map(\.path))
     }
+
+    @Test func aSongFinishedOnTheMacIsntOfferedAgain() {
+        // Downloaded on the Mac; this device's library doesn't have it yet.
+        let facts = AlbumFacts(tracklist: fairDinkum,
+                               library: Array(fairDinkum.dropFirst()).map { have($0.title, $0.number, fromMac: true) },
+                               downloads: [download("01 Volitant.flac", .completed, onItsWay: false)],
+                               copies: .found([RemoteFile(username: "u", path: "@@x\\Fair Dinkum\\01 Volitant.flac", size: 1)]))
+        let (state, songs) = AlbumState.derive(facts)
+        #expect(songs[0].state == .arriving(.importing))
+        #expect(!state.canAdd)
+    }
 }

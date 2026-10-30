@@ -1103,6 +1103,10 @@ final class SoulseekClient {
         return transfer
     }
 
+    /// A download the Mac did for this device finished: its song is in the Mac's library, and
+    /// this device lists it straight away (see LibraryStore.takeMacAdditions).
+    @ObservationIgnored var onMacFinished: (() -> Void)?
+
     /// The Mac's downloads as they are now, mirrored here.
     func mirror(_ wire: [MacLinkWire.Transfer]) {
         var seen = Set<UUID>()
@@ -1112,7 +1116,9 @@ final class SoulseekClient {
                 ?? transfers.first(where: { $0.onMac && $0.macID == nil && !$0.forStreaming && $0.file.id == item.file.id })
                 ?? mirrored(item.file)
             transfer.macID = item.id
-            transfer.state = MacLinkWire.decode(item.state, item.detail)
+            let state = MacLinkWire.decode(item.state, item.detail)
+            if state == .completed, transfer.state != .completed { onMacFinished?() }
+            transfer.state = state
             transfer.size = item.size
             transfer.bytesReceived = item.bytesReceived
             transfer.bytesPerSecond = item.bytesPerSecond

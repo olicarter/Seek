@@ -91,6 +91,13 @@ struct SeekApp: App {
                         guard client.usingMac, let mac = client.macLink else { return nil }
                         return await mac.added()
                     }
+                    client.onMacFinished = { [library] in
+                        // A moment for the Mac to file it, then listed here.
+                        Task {
+                            try? await Task.sleep(for: .seconds(2))
+                            library.takeMacAdditions(soon: true)
+                        }
+                    }
                     library.askMacForDetails()
                     library.takeMacAdditions()
                     #endif

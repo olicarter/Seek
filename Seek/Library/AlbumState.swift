@@ -334,7 +334,9 @@ extension AlbumFacts {
             .filter { transfer in
                 !transfer.forStreaming && transfer.state != .cancelled
                     && (AlbumRows.isFor(album, transfer) || folderIDs.contains("\(transfer.username)\u{0}\(transfer.file.folder)"))
-                    && (transfer.state != .completed || client.isDone(transfer))
+                    // Finished: while its song is in the library, or (one the Mac did) until this
+                    // device has the song too, iCloud being behind the Mac.
+                    && (transfer.state != .completed || client.isDone(transfer) || transfer.onMac)
             }
             .map { transfer in
                 Download(id: transfer.id, file: transfer.file, state: transfer.state, progress: transfer.ringProgress,
