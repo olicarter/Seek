@@ -1,17 +1,22 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import Observation
 
 /// Library songs played from the Mac while this device's copy hasn't come down from iCloud yet
 /// (just added there, say). Each is pulled into a cache here and played as it arrives (through
 /// ProgressiveLoader: a FLAC played straight from its address waits for most of the file), so
 /// it starts after the first part, and playing it again starts at once. Kept a few days.
 @MainActor
+@Observable
 final class MacFiles {
     static let shared = MacFiles()
 
-    private let directory = URL.cachesDirectory.appending(path: "Mac Files", directoryHint: .isDirectory)
-    private var pulls: [String: Pull] = [:]
+    @ObservationIgnored private let directory = URL.cachesDirectory.appending(path: "Mac Files", directoryHint: .isDirectory)
+    @ObservationIgnored private var pulls: [String: Pull] = [:]
+    /// How much of each song has come from the Mac (bytes so far, and in all), by library path:
+    /// for Now Playing's status. Total 0 until the Mac has answered.
+    private(set) var arrived: [String: (received: Int64, total: Int64)] = [:]
 
     private init() {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -36,7 +41,13 @@ final class MacFiles {
             return AVPlayerItem(url: cached)
         }
         let pull = pulls[path] ?? {
-            let pull = Pull(from: remote, to: cached) { [weak self] in self?.pulls[path] = nil }
+            arrived[path] = (0, 0)
+            let pull = Pull(from: remote, to: cached, progress: { [weak self] received, total in
+                self?.arrived[path] = (received, total)
+            }) { [weak self] in
+                self?.pulls[path] = nil
+                self?.arrived[path] = nil
+            }
             pulls[path] = pull
             return pull
         }()
@@ -52,6 +63,10 @@ final class MacFiles {
         private let partial: URL
         private let destination: URL
         private let finished: @MainActor () -> Void
+        private let progress: @MainActor (Int64, Int64) -> Void
+        private var received: Int64 = 0
+        private var total: Int64 = 0
+        private var lastReported = Date.distantPast
         private let lock = NSLock()
         private var handle: FileHandle?
         private var progressive: ProgressiveLoader?
@@ -60,10 +75,12 @@ final class MacFiles {
         private var session: URLSession?
 
         @MainActor
-        init(from remote: URL, to destination: URL, finished: @escaping @MainActor () -> Void) {
+        init(from remote: URL, to destination: URL, progress: @escaping @MainActor (Int64, Int64) -> Void,
+             finished: @escaping @MainActor () -> Void) {
             self.destination = destination
             partial = destination.appendingPathExtension("partial")
             self.finished = finished
+            self.progress = progress
             super.init()
             FileManager.default.createFile(atPath: partial.path, contents: nil)
             handle = try? FileHandle(forWritingTo: partial)
@@ -101,13 +118,24 @@ final class MacFiles {
             }
             let loader = ProgressiveLoader(fileURL: partial, totalSize: response.expectedContentLength,
                                            fileExtension: destination.pathExtension)
-            lock.withLock { progressive = loader }
+            lock.withLock {
+                progressive = loader
+                total = response.expectedContentLength
+            }
             answer(loader)
             completionHandler(.allow)
         }
 
         func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-            lock.withLock { try? handle?.write(contentsOf: data) }
+            // Reported a few times a second at most: each report redraws Now Playing.
+            let report: (Int64, Int64)? = lock.withLock {
+                try? handle?.write(contentsOf: data)
+                received += Int64(data.count)
+                guard Date.now.timeIntervalSince(lastReported) > 0.3 else { return nil }
+                lastReported = .now
+                return (received, total)
+            }
+            if let report { Task { @MainActor in self.progress(report.0, report.1) } }
         }
 
         func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {

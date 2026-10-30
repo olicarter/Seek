@@ -457,7 +457,8 @@ private struct PlayerScrubBar: View {
             position: player.currentTime,
             duration: player.duration,
             isLoading: player.isLoading,
-            fetchProgress: player.fetchProgress
+            fetchProgress: player.fetchProgress,
+            status: player.loadingStatus
         ) { player.seek(to: $0) }
     }
 }
@@ -468,6 +469,8 @@ private struct ScrubBar: View {
     let isLoading: Bool
     /// Set while a streamed song is still arriving.
     var fetchProgress: Double? = nil
+    /// What's happening while it loads or buffers (see Player.loadingStatus).
+    var status: String? = nil
     let onSeek: (Double) -> Void
     @State private var dragPosition: Double?
 
@@ -505,9 +508,9 @@ private struct ScrubBar: View {
             HStack {
                 Text(format(shown))
                 Spacer()
-                if let fetchProgress {
-                    Text("Fetching \(Int(fetchProgress * 100))%")
-                } else if isLoading {
+                if status == nil, let fetchProgress {
+                    Text("\(Int(fetchProgress * 100))%")
+                } else if isLoading || status != nil {
                     ProgressView().controlSize(.mini)
                 }
                 Spacer()
@@ -515,6 +518,17 @@ private struct ScrubBar: View {
             }
             .font(.caption.monospacedDigit().weight(.semibold))
             .foregroundStyle(.white.opacity(isDragging ? 0.9 : 0.55))
+            // Who it's coming from and how far along, while it loads or buffers.
+            if let status {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity)
+                    .contentTransition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: status)
+            }
         }
         .padding(.horizontal, isDragging ? -4 : 0)
     }

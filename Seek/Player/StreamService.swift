@@ -57,6 +57,45 @@ enum StreamingQuality: String, CaseIterable, Identifiable {
 final class StreamService {
     /// Download progress of songs being fetched, by track path.
     private(set) var progress: [String: Double] = [:]
+    /// What's happening with each song being fetched, in words, by track path: shown on Now
+    /// Playing while it waits ("In DJ-Pool's queue (place 12) · 3 more copies").
+    private(set) var status: [String: String] = [:]
+
+    /// A fetch's state in words: the copy furthest along first, then any others being asked,
+    /// then how many are left to try.
+    static func describe(_ asking: [Transfer], left: Int, startBytes: UInt64) -> String {
+        func phrase(_ transfer: Transfer) -> String {
+            let user = transfer.username
+            switch transfer.state {
+            case .connecting: return "Connecting to \(user)"
+            case .queued(let place): return "In \(user)'s queue" + (place.map { " (place \($0))" } ?? "")
+            case .starting: return "\(user) is about to send it"
+            case .downloading:
+                let received = ByteCountFormatter.string(fromByteCount: Int64(transfer.bytesReceived), countStyle: .file)
+                let total = ByteCountFormatter.string(fromByteCount: Int64(transfer.size), countStyle: .file)
+                let speed = transfer.bytesPerSecond > 0
+                    ? " · " + ByteCountFormatter.string(fromByteCount: Int64(transfer.bytesPerSecond), countStyle: .file) + "/s" : ""
+                let starting = transfer.bytesReceived < min(startBytes, transfer.size) ? " · starts at \(startBytes / 1024) KB" : ""
+                return "From \(user) · \(received) of \(total)\(speed)\(starting)"
+            case .importing, .completed: return "Got it from \(user)"
+            case .failed(let reason): return "\(user): \(reason)"
+            case .cancelled: return "Gave up on \(user)"
+            }
+        }
+        func rank(_ transfer: Transfer) -> Int {
+            switch transfer.state {
+            case .downloading, .importing, .completed: 0
+            case .starting: 1
+            case .queued: 2
+            case .connecting: 3
+            default: 4
+            }
+        }
+        let ordered = asking.sorted { rank($0) < rank($1) }
+        var parts = ordered.prefix(2).map(phrase)
+        if left > 0 { parts.append(left == 1 ? "1 more copy" : "\(left) more copies") }
+        return parts.isEmpty ? "Looking for a copy" : parts.joined(separator: " · ")
+    }
 
     @ObservationIgnored private let client: SoulseekClient
     @ObservationIgnored private var fetches: [String: Task<Playable?, Never>] = [:]
@@ -200,6 +239,7 @@ final class StreamService {
         let url = await task.value
         fetches[key] = nil
         progress[key] = nil
+        status[key] = nil
         return url
     }
 
@@ -222,6 +262,8 @@ final class StreamService {
             if asking.isEmpty { break }
             try? await Task.sleep(for: .milliseconds(200))
             progress[key] = asking.map(\.transfer.progress).max()
+            let described = Self.describe(asking.map(\.transfer), left: waiting.count, startBytes: Self.startBytes)
+            if status[key] != described { status[key] = described }
             for (file, transfer, _) in asking {
                 if transfer.state == .completed, let cached = cachedURL(for: file) {
                     stopAsking(asking, except: transfer)
@@ -251,6 +293,7 @@ final class StreamService {
                 return false
             }
         }
+        status[key] = "No Soulseek copy started; trying Bandcamp's stream"
         return await bandcampStream(source).map(Playable.remote)
     }
 

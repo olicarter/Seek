@@ -22,6 +22,10 @@ final class Player {
     private(set) var index = 0
     private(set) var isPlaying = false
     private(set) var isLoading = false
+    /// Played, then stopped to wait for more of the song.
+    private(set) var isBuffering = false
+    /// The step loading is at, in words, for Now Playing's status (see `loadingStatus`).
+    private(set) var stage: String?
     private(set) var currentTime: Double = 0
     private(set) var duration: Double = 0
     private(set) var shuffle = false
@@ -44,6 +48,26 @@ final class Player {
     @ObservationIgnored let levels = AudioLevels()
     /// Fetches songs that aren't in the library. Set by the app.
     @ObservationIgnored var streamer: StreamService?
+
+    /// What's happening while the current song loads or waits for more of itself, in words:
+    /// who it's coming from and how far along (Soulseek), how much has come from the Mac or
+    /// iCloud, or the step the player is at. Nil while it plays.
+    var loadingStatus: String? {
+        guard isLoading || isBuffering, let track = current else { return nil }
+        let prefix = isBuffering && !isLoading ? "Buffering · " : ""
+        if track.isStreamed, let status = streamer?.status[track.path] { return prefix + status }
+        if let arrived = MacFiles.shared.arrived[track.path] {
+            guard arrived.total > 0 else { return prefix + "Asking your Mac for it" }
+            let received = ByteCountFormatter.string(fromByteCount: arrived.received, countStyle: .file)
+            let total = ByteCountFormatter.string(fromByteCount: arrived.total, countStyle: .file)
+            return prefix + "From your Mac · \(received) of \(total)"
+        }
+        if !track.isStreamed, case .downloading(let progress) = library.availability(of: track) {
+            return prefix + "Downloading from iCloud · \(Int(progress * 100))%"
+        }
+        if isBuffering, !isLoading { return "Buffering" }
+        return stage
+    }
 
     /// How much of the current song has arrived, while a streamed song is being fetched.
     var fetchProgress: Double? {
@@ -75,7 +99,17 @@ final class Player {
         }
         setUpRemoteCommands()
         restore()
+        // Waiting for more of the song after it started (a slow peer, a weak signal).
+        bufferingObserver = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
+            let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                && player.reasonForWaitingToPlay == .toMinimizeStalls
+            Task { @MainActor in
+                if self?.isBuffering != waiting { self?.isBuffering = waiting }
+            }
+        }
     }
+
+    @ObservationIgnored private var bufferingObserver: NSKeyValueObservation?
 
     // MARK: - Queue
 
@@ -294,6 +328,8 @@ final class Player {
     @ObservationIgnored var fileOnMac: ((String) -> URL?)?
 
     private func playableItem(for track: Track) async -> AVPlayerItem? {
+        defer { stage = nil }
+        stage = track.isStreamed ? "Looking for a copy" : "Opening"
         guard track.isStreamed else {
             guard let url = library.url(for: track) else { return nil }
             // Not here yet (just added on the Mac, still coming through iCloud): played from the
@@ -302,6 +338,7 @@ final class Player {
                 Log.debug("player: \(track.title) isn't here yet; playing it from the Mac")
                 if let item = await MacFiles.shared.item(for: track.path, from: remote) { return item }
             }
+            if library.usesICloud, !LibraryStore.isDownloaded(url) { stage = "Downloading from iCloud" }
             guard await library.ensureLocal(url) else { return nil }
             return AVPlayerItem(url: url)
         }
@@ -309,12 +346,14 @@ final class Player {
         case .file(let url), .remote(let url):
             return AVPlayerItem(url: url)
         case .progressive(let loader, let file):
+            stage = "Starting from \(file.username)"
             let asset = AVURLAsset(url: loader.playerURL)
             asset.resourceLoader.setDelegate(loader, queue: loader.queue)
             if (try? await asset.load(.isPlayable)) == true {
                 return AVPlayerItem(asset: asset)
             }
             Log.debug("player: \(file.fileExtension) can't play while downloading; waiting for the whole file")
+            stage = "\(file.fileExtension.uppercased()) only plays once it's all here: waiting for \(file.username)"
             return await streamer?.waitForFile(file).map(AVPlayerItem.init(url:))
         case nil:
             return nil
