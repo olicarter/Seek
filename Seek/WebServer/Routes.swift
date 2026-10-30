@@ -234,6 +234,19 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
         }
     }
 
+    /// A library song as AAC, for browsers whose connection can't keep up with the file itself
+    /// (see CompressedAudio). `path` is the song's library path, as in /files/….
+    router.get("/api/compressed") { request, _ in
+        guard let path = request.uri.queryParameters.get("path"), let music = await core.musicFolder,
+              !path.split(separator: "/").contains(".."),
+              FileManager.default.fileExists(atPath: music.appending(path: path).path) else { throw HTTPError(.notFound) }
+        guard let url = await CompressedAudio.shared.copy(of: music.appending(path: path)) else { throw HTTPError(.notFound) }
+        let size = Int64((try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0)
+        return ranged(request, size: size, type: "audio/mp4") { offset, end in
+            ProgressiveLoader.read(url, from: offset, upTo: min(end, offset + 256 * 1024))
+        }
+    }
+
     /// The site opened an album's Bandcamp page to buy it there.
     router.post("/api/bandcamp/buying") { _, _ in
         await core.watchForPurchase()

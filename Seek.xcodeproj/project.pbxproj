@@ -49,6 +49,7 @@
 		50BB5C369EA6F77F03F7E4B2 /* AudioLevelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */; };
 		5209B83E27F3AD2ED94C43CB /* AppUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */; };
 		5264CCC7F63906EE896DCCAB /* SoulseekViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA253B9CAD1D454634531B9F /* SoulseekViews.swift */; };
+		5794BFB0FB62982E05922C06 /* CompressedAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41FED81D6B31E54B289DAD50 /* CompressedAudio.swift */; platformFilters = (maccatalyst, ); };
 		597B21D9B9C0806BBDD24AE5 /* ReleaseMatching.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48482135E9A3FFBE80AC32BF /* ReleaseMatching.swift */; };
 		5A6D49181AF28CBA380102A0 /* PerfHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5FD190F215D9287B4545F5E /* PerfHarness.swift */; };
 		5B58ABF76A91A668EED6FA11 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CC14CDFF8825F7D5C03612D /* LibraryStore.swift */; };
@@ -204,6 +205,7 @@
 		3740EE9CE56A2B039E64BBA0 /* ExternalAlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalAlbumView.swift; sourceTree = "<group>"; };
 		37FF443C36D614DD2D2D7E10 /* ProgressiveLoaderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressiveLoaderTests.swift; sourceTree = "<group>"; };
 		3BB5A35F73D4A3ADDF23CA97 /* RealSearchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealSearchTests.swift; sourceTree = "<group>"; };
+		41FED81D6B31E54B289DAD50 /* CompressedAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompressedAudio.swift; sourceTree = "<group>"; };
 		42141F89EEF6ADAD5B075812 /* Upload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Upload.swift; sourceTree = "<group>"; };
 		421D21AF39B3F2CDD11C7A75 /* SearchResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResults.swift; sourceTree = "<group>"; };
 		421E3E82F2CB956E8C76670F /* TVPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPlayer.swift; sourceTree = "<group>"; };
@@ -320,6 +322,7 @@
 			isa = PBXGroup;
 			children = (
 				875588F0BCE7DE68B3F929D2 /* AppAPI.swift */,
+				41FED81D6B31E54B289DAD50 /* CompressedAudio.swift */,
 				FF78412626A168685E2B1127 /* Covers.swift */,
 				0A5F1293D5D9C824B69492A5 /* PageBuilding.swift */,
 				BC028A35F78295B9D0FF93FB /* Pairing.swift */,
@@ -786,6 +789,7 @@
 				2B6B2C71B4F57BB37C71906A /* BandcampStoreView.swift in Sources */,
 				EE42F4A547FCCBB4E17FEE15 /* ClaudeTagFixer.swift in Sources */,
 				447EE4A535836E633DB3099B /* Components.swift in Sources */,
+				5794BFB0FB62982E05922C06 /* CompressedAudio.swift in Sources */,
 				6439C020EDBE678ACC3A3030 /* CopyFilter.swift in Sources */,
 				D5A71927EAAF8002D2535124 /* CopyFinder.swift in Sources */,
 				E9B45DF6EC74E8D33FA8F739 /* Covers.swift in Sources */,

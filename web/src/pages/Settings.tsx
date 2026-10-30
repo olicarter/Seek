@@ -3,6 +3,7 @@ import { api, changes, isPaired, serverAddress, setCredential, setServerAddress 
 import { addPasskey, canUsePasskeys, deviceName } from "../passkeys";
 import { For } from "solid-js";
 import { live } from "../live";
+import { compressed, compressedForSpeed, setCompressed } from "../player";
 
 export function Settings() {
   const [status] = live(changes, api.status);
@@ -66,6 +67,16 @@ export function Settings() {
         <button class="link" onClick={async () => { await api.signOutEverywhere(); setCredential(null); }}>Sign Out Everywhere</button>
       </Show>
 
+      <h2>Playback</h2>
+      <label class="setting">
+        <input type="checkbox" checked={compressed()} onChange={(e) => setCompressed(e.currentTarget.checked)} />
+        Play compressed copies (AAC)
+      </label>
+      <p class="empty">
+        <Show when={compressedForSpeed()} fallback="The files themselves (up to 24-bit, over a megabit a second) when off; about 128 kbit/s when on.">
+          On for now: songs kept stalling, so the rest of this visit plays compressed. Turn off to go back to the files themselves.
+        </Show>
+      </p>
       <h2>Soulseek and Bandcamp</h2>
       <p class="empty">
         {status()?.username ? `Soulseek: ${status()?.username}. ` : "Soulseek isn't signed in. "}
