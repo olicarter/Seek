@@ -1,13 +1,13 @@
-import { useSearchParams } from "@solidjs/router";
+import { useParams } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { albumHref, api, changes } from "../api";
+import { albumHref, api, changes, fromPath } from "../api";
 import { live } from "../live";
 import { Grid, Shelf } from "../Tiles";
 
 /** An artist's page, as in the app: their albums here, then what else they've released. */
 export function Artist() {
-  const [params] = useSearchParams<{ name: string }>();
-  const [page] = live(() => [changes(), params.name ?? ""] as const, ([, name]) => api.artist(name), ([, name]) => `artist|${name}`);
+  const params = useParams<{ artist: string }>();
+  const [page] = live(() => [changes(), fromPath(params.artist)] as const, ([, name]) => api.artist(name), ([, name]) => `artist|${name}`);
   return (
     <Show when={page()} fallback={<p class="empty">Loading…</p>}>
       {(artist) => (

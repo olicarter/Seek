@@ -225,12 +225,27 @@ export const api = {
   buying: () => post<{ ok: boolean }>("/api/bandcamp/buying"),
 };
 
-export function albumHref(ref: AlbumRef): string {
-  return `/album?${albumQuery(ref)}`;
+/** A part of the path as written, from the router (which leaves it encoded). */
+export function fromPath(part: string | undefined): string {
+  try {
+    return decodeURIComponent(part ?? "");
+  } catch {
+    return part ?? "";
+  }
 }
 
+/** One part of a path: "AC/DC" can't split it. */
+const segment = (text: string) => encodeURIComponent(text);
+
+/** `/artists/<artist>/albums/<title>`, and the search result it came from when there is one. */
+export function albumHref(ref: AlbumRef): string {
+  const path = `/artists/${segment(ref.artist)}/albums/${segment(ref.title)}`;
+  return ref.release ? `${path}?release=${encodeURIComponent(ref.release)}` : path;
+}
+
+/** `/artists/<name>`. */
 export function artistHref(name: string): string {
-  return `/artist?name=${encodeURIComponent(name)}`;
+  return `/artists/${segment(name)}`;
 }
 
 /**

@@ -1,7 +1,7 @@
-import { A, useSearchParams } from "@solidjs/router";
+import { A, useParams, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
 import { createMemo, For, Show } from "solid-js";
-import { albumHref, api, artistHref, changes, media, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { albumHref, api, artistHref, changes, fromPath, media, type AlbumPage, type AlbumRef, type Song } from "../api";
 import { duration } from "../format";
 import { Cover } from "../Cover";
 import { Icon } from "../Icons";
@@ -15,8 +15,9 @@ import { current, play, playing, type QueueItem } from "../player";
  * library and ones that aren't (as in the app), and tinted with the cover's colour.
  */
 export function Album() {
-  const [params] = useSearchParams<{ artist: string; title: string; release?: string }>();
-  const ref = (): AlbumRef => ({ artist: params.artist ?? "", title: params.title ?? "", release: params.release });
+  const params = useParams<{ artist: string; title: string }>();
+  const [search] = useSearchParams<{ release?: string }>();
+  const ref = (): AlbumRef => ({ artist: fromPath(params.artist), title: fromPath(params.title), release: search.release });
   const [page, { mutate }] = live(() => [changes(), ref()] as const, ([, r]) => api.album(r),
                                   ([, r]) => `album|${r.artist}|${r.title}|${r.release ?? ""}`);
   const [artist] = live(() => page()?.artist, (name) => api.artist(name), (name) => `artist|${name}`);

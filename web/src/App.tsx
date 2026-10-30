@@ -36,7 +36,7 @@ export function App(props: ParentProps) {
   return (
     <div class="app">
       <aside class="sidebar">
-        <A class="wordmark" href="/">Seek</A>
+        <A class="wordmark" href="/albums">Seek</A>
         <form class="sidebar-search" onSubmit={search}>
           <Icon name="search" size={15} />
           <input type="search" placeholder="Search" value={query()} onInput={(e) => setQuery(e.currentTarget.value)}
@@ -44,8 +44,8 @@ export function App(props: ParentProps) {
         </form>
         <nav>
           <p class="sidebar-heading">Library</p>
-          <A href="/" end><Icon name="albums" size={18} />Albums</A>
-          <A href="/artists"><Icon name="artists" size={18} />Artists</A>
+          <A href="/albums"><Icon name="albums" size={18} />Albums</A>
+          <A href="/artists" end><Icon name="artists" size={18} />Artists</A>
           <p class="sidebar-heading">Seek</p>
           <A href="/search" class="only-narrow"><Icon name="search" size={18} />Search</A>
           <A href="/downloads">
