@@ -382,6 +382,13 @@ struct AlbumDetailView: View {
                 }
             }
         } songs: {
+            if copyFinder.notLossless.contains(AlbumReferences.key(key)) {
+                Label("That lossless copy turned out to be MP3s named as FLAC, so the album was kept as it was.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+            }
             if let upgrade = upgradeCopy(album, copies: copies) {
                 UpgradeBanner(folder: upgrade, isUpgrading: copyFinder.upgrading.contains(AlbumReferences.key(key))) {
                     confirmingUpgrade = true
@@ -548,7 +555,7 @@ extension AlbumDetailView {
     func upgradeCopy(_ album: Album, copies: CopyFinder.Copies?) -> RemoteFolder? {
         guard !album.tracks.isEmpty, !album.tracks.contains(where: { AudioQuality($0).isLossless }),
               !AlbumRows.isBeingAdded(album, client: client) else { return nil }
-        return copies?.folders.first { $0.isLossless && $0.files.count >= album.tracks.count }
+        return copies?.folders.first { $0.isLossless && !copyFinder.isFakeLossless($0) && $0.files.count >= album.tracks.count }
     }
 
     /// The album's Bandcamp page when it came from there: the files' own link, or the purchase.

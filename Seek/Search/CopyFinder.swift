@@ -24,6 +24,19 @@ final class CopyFinder {
     private(set) var copies: [String: Copies] = [:]
     /// Albums being upgraded, by `AlbumReferences.key`.
     private(set) var upgrading: Set<String> = []
+    /// Albums whose upgrade turned out not to be lossless, by `AlbumReferences.key`: their pages say so.
+    private(set) var notLossless: Set<String> = []
+
+    /// Copies named lossless that came in lossy (MP3s named .flac), by folder name: a rip's
+    /// folder is named the same by everyone sharing it, so none of them is offered as lossless again.
+    private(set) var fakeLossless = Set(UserDefaults.standard.stringArray(forKey: "fakeLosslessFolders") ?? [])
+
+    func isFakeLossless(_ folder: RemoteFolder) -> Bool { fakeLossless.contains(folder.name.lowercased()) }
+
+    private func markFakeLossless(_ folder: RemoteFolder) {
+        fakeLossless.insert(folder.name.lowercased())
+        UserDefaults.standard.set(Array(fakeLossless), forKey: "fakeLosslessFolders")
+    }
 
     func copies(of album: AlbumKey) -> Copies? {
         copies[AlbumReferences.key(album)]
@@ -155,8 +168,18 @@ final class CopyFinder {
                 try? await Task.sleep(for: .seconds(3))
                 let transfers = client.transfers.filter { ids.contains($0.file.id) }
                 if transfers.count >= ids.count, transfers.allSatisfy({ !$0.state.isActive }) {
-                    let newPaths = transfers.compactMap(\.libraryPath)
-                    if !newPaths.isEmpty { library.replace(oldPaths, with: newPaths) }
+                    let newPaths = Set(transfers.compactMap(\.libraryPath))
+                    // What arrived is checked, not what it was called: some "FLAC" copies are MP3s.
+                    // Then the album stays as it was, the copy goes, and it isn't offered again.
+                    let arrived = library.allTracks.filter { newPaths.contains($0.path) }
+                    if arrived.contains(where: { !AudioQuality($0).isLossless }) {
+                        Log.debug("upgrade: \(folder.name) from \(folder.username) isn't lossless; keeping \(album.title) as it was")
+                        markFakeLossless(folder)
+                        notLossless.insert(key)
+                        library.delete(arrived)
+                        return
+                    }
+                    if !newPaths.isEmpty { library.replace(oldPaths, with: Array(newPaths)) }
                     return
                 }
             }

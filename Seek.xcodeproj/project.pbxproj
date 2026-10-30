@@ -13,6 +13,7 @@
 		05B0773123B512694364C2B3 /* ArtworkColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB8FD929A879EEB6DA61B688 /* ArtworkColor.swift */; };
 		0ACAB136DCB6343F593BF3EB /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFFA00AD3C61FFD6D27EB0D /* Player.swift */; };
 		0F06C67A69BE0172381C5CF4 /* Transfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2130BD31916369F34930FF89 /* Transfer.swift */; };
+		0FCA62B0F10ACB0D57802773 /* mp3-named-flac.flac in Resources */ = {isa = PBXBuildFile; fileRef = E6002671482127A70DD20678 /* mp3-named-flac.flac */; };
 		11FBBF9EF51ED5BCD2A950DF /* CopyFilterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBE6CAC6EB42D335728E3606 /* CopyFilterTests.swift */; };
 		175BFD50DBE93932071CA5D7 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD84B57FBC9AEDBAE8D71C69 /* SearchView.swift */; };
 		18FCAAEBD3EB73F0C8710879 /* ReleaseAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48F13D45366DFFE29E74386D /* ReleaseAction.swift */; };
@@ -286,6 +287,7 @@
 		E28C95C56ADE287ABD3379EC /* SharingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharingTests.swift; sourceTree = "<group>"; };
 		E4A7C40FD57A3C96816171BD /* Metadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Metadata.swift; sourceTree = "<group>"; };
 		E58F21093F066169F0B1C999 /* StreamingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamingTests.swift; sourceTree = "<group>"; };
+		E6002671482127A70DD20678 /* mp3-named-flac.flac */ = {isa = PBXFileReference; path = "mp3-named-flac.flac"; sourceTree = "<group>"; };
 		E69F0648EA94E744E6B03B99 /* SearchDump.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDump.swift; sourceTree = "<group>"; };
 		E7FDB5C53213D818261E3A4C /* Socket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Socket.swift; sourceTree = "<group>"; };
 		E9F6A3A21F66280E16B1B47D /* CopyFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyFinder.swift; sourceTree = "<group>"; };
@@ -337,6 +339,7 @@
 		18012CC19C00BEEA0C212905 /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
+				E6002671482127A70DD20678 /* mp3-named-flac.flac */,
 				241FF0A00903CFF2B6A6B658 /* search-peverelist.json */,
 				4D5CC2DCE45E51F6022FF8DE /* search-playboi-carti.json */,
 				7D7EB4B5DD82FC9DE0A39BD7 /* tone.flac */,
@@ -731,6 +734,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0FCA62B0F10ACB0D57802773 /* mp3-named-flac.flac in Resources */,
 				D50225FDC01C403EE17F8E3D /* search-peverelist.json in Resources */,
 				1F2827E7FC130228F0D9C16F /* search-playboi-carti.json in Resources */,
 				4B1064A44DFF8EDE21E4C565 /* tone.flac in Resources */,

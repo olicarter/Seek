@@ -39,3 +39,39 @@ struct RenamedFileTests {
         #expect(library.isFavorite(path: "Lemtom/Fair Dinkum (2023)/Lemtom - Fair Dinkum - 01 - Volitant.mp3"))
     }
 }
+
+/// A download that's an MP3 named .flac comes into the library as .mp3.
+@MainActor
+struct DisguisedImportTests {
+    @Test func anMP3NamedFLACIsImportedAsMP3() async throws {
+        let container = try ModelContainer(for: Track.self, TrackInfo.self, Playlist.self, Favorite.self,
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none))
+        let library = LibraryStore(container: container)
+        library.useFolder(URL.temporaryDirectory.appending(path: "disguised-\(UUID().uuidString)"))
+        let fixture = try #require(Bundle(for: BundleMarker.self).url(forResource: "mp3-named-flac", withExtension: "flac"))
+        let source = URL.temporaryDirectory.appending(path: "\(UUID().uuidString).flac")
+        try FileManager.default.copyItem(at: fixture, to: source)
+        let path = try await library.importDownload(at: source, remotePath: "@@x\\Lemtom-Fair_Dinkum\\01-lemtom-volitant_(original_mix).flac",
+                                                    plannedPath: library.reservePath(forRemotePath: "@@x\\Lemtom-Fair_Dinkum\\01-lemtom-volitant_(original_mix).flac"))
+        #expect(path.hasSuffix(".mp3"))
+    }
+}
+
+private final class BundleMarker {}
+
+@MainActor
+struct MisnamedTests {
+    @Test func formatAndExtensionDisagreeing() {
+        let mp3 = Track(path: "a/01 Song.flac")
+        mp3.codec = "MP3"
+        #expect(LibraryStore.isMisnamed(mp3))
+        let flac = Track(path: "a/01 Song.flac")
+        flac.codec = "FLAC"
+        #expect(!LibraryStore.isMisnamed(flac))
+        let aac = Track(path: "a/01 Song.m4a")
+        aac.codec = "AAC"
+        #expect(!LibraryStore.isMisnamed(aac))
+        let unread = Track(path: "a/01 Song.flac")
+        #expect(!LibraryStore.isMisnamed(unread))
+    }
+}

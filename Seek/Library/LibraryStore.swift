@@ -1133,7 +1133,13 @@ final class LibraryStore {
             let outdated = track.tagsVersion < Track.currentTagsVersion
             // Not read yet (an empty read counts as read: its details come from other devices).
             let unread = !track.hasTags && track.tagsVersion == 0
-            if file.isLocal, unread || changed || outdated, let url = root?.appending(path: path) {
+            #if targetEnvironment(macCatalyst)
+            // Read as one format, named another (an MP3 named .flac): read again, which renames it.
+            let misnamed = Self.isMisnamed(track) && misnamedChecked.insert(path).inserted
+            #else
+            let misnamed = false
+            #endif
+            if file.isLocal, unread || changed || outdated || misnamed, let url = root?.appending(path: path) {
                 Task { await readTags(for: track, at: url) }
             }
             // Kept for offline but removed by the system to save space: fetch it again.
@@ -1331,6 +1337,19 @@ final class LibraryStore {
         try? context.save()
         contentChanged(artwork: true)
         scheduleInfoSync()
+    }
+
+    /// Songs checked this launch for a name that doesn't match their format, so each is tried once.
+    @ObservationIgnored private var misnamedChecked: Set<String> = []
+
+    /// A song whose format, as read, isn't what its extension says.
+    static func isMisnamed(_ track: Track) -> Bool {
+        let extensions: [String: Set<String>] = [
+            "FLAC": ["flac"], "MP3": ["mp3"], "AAC": ["m4a", "mp4", "aac", "m4b"], "ALAC": ["m4a", "mp4", "alac"],
+            "WAV": ["wav"], "AIFF": ["aiff", "aif", "aifc"],
+        ]
+        guard let expected = extensions[track.codec] else { return false }
+        return AudioTags.audioExtensions.contains(track.fileExtension) && !expected.contains(track.fileExtension)
     }
 
     /// Renames a song's file whose extension is another format's (an MP3 named .flac, as some
