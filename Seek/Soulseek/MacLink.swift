@@ -126,6 +126,11 @@ final class MacLink {
         (try? await post("/api/app/song-details", ["paths": paths])) ?? [:]
     }
 
+    /// Songs the Mac added lately, with their details (see LibraryStore.takeMacAdditions).
+    func added(hours: Int = 48) async -> [String: MacLinkWire.SongDetails]? {
+        try? await get("/api/app/added?hours=\(hours)")
+    }
+
     /// A library song's file on the Mac, to play while this device's copy comes down from iCloud.
     /// The key goes in the address: the player can't send it as a header.
     func fileURL(forLibraryPath path: String) -> URL? {

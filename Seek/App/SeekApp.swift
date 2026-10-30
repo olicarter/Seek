@@ -80,7 +80,12 @@ struct SeekApp: App {
                         return await mac.details(for: paths)
                     }
                     player.fileOnMac = { [client] path in client.usingMac ? client.macLink?.fileURL(forLibraryPath: path) : nil }
+                    library.macAdded = { [client] in
+                        guard client.usingMac, let mac = client.macLink else { return nil }
+                        return await mac.added()
+                    }
                     library.askMacForDetails()
+                    library.takeMacAdditions()
                     #endif
                     #if targetEnvironment(macCatalyst)
                     // The Mac works out tempo and key for the library; the others read its results.

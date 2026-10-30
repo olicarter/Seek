@@ -129,6 +129,20 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
         return try json(["ok": true])
     }
 
+    // Songs added here lately, with their details: a device lists them at once, before their
+    // files have gone up to iCloud and come down to it (see LibraryStore.takeMacAdditions).
+    router.get("/api/app/added") { request, _ in
+        let hours = request.uri.queryParameters.get("hours").flatMap(Double.init) ?? 48
+        return try json(await MainActor.run {
+            let since = Date.now.addingTimeInterval(-hours * 3600)
+            var added: [String: MacLinkWire.SongDetails] = [:]
+            for track in core.library.allTracks where track.dateAdded > since && track.hasTags {
+                added[track.path] = MacLinkWire.SongDetails(track)
+            }
+            return added
+        })
+    }
+
     // A device's library songs whose files haven't come down from iCloud there yet.
     router.post("/api/app/song-details") { request, context in
         let body = try await request.decode(as: [String: [String]].self, context: context)
@@ -136,10 +150,7 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
         return try json(await MainActor.run {
             var details: [String: MacLinkWire.SongDetails] = [:]
             for track in core.library.allTracks where paths.contains(track.path) && track.hasTags {
-                details[track.path] = MacLinkWire.SongDetails(
-                    title: track.title, artist: track.artist, albumArtist: track.albumArtist, album: track.album, label: track.label,
-                    trackNumber: track.trackNumber, discNumber: track.discNumber, year: track.year, duration: track.duration,
-                    codec: track.codec, sampleRate: track.sampleRate, bitDepth: track.bitDepth, bitrate: track.bitrate)
+                details[track.path] = MacLinkWire.SongDetails(track)
             }
             return details
         })
@@ -205,5 +216,14 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
         return ranged(request, size: Int64(file.size), type: AudioTypes<BasicRequestContext>.type(of: file.fileExtension)) { offset, end in
             await loader.chunk(at: offset, upTo: end)
         }
+    }
+}
+
+extension MacLinkWire.SongDetails {
+    @MainActor
+    init(_ track: Track) {
+        self.init(title: track.title, artist: track.artist, albumArtist: track.albumArtist, album: track.album, label: track.label,
+                  trackNumber: track.trackNumber, discNumber: track.discNumber, year: track.year, duration: track.duration,
+                  codec: track.codec, sampleRate: track.sampleRate, bitDepth: track.bitDepth, bitrate: track.bitrate)
     }
 }

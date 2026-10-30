@@ -1150,7 +1150,38 @@ final class LibraryStore {
         try? context.save()
         scheduleInfoSync()
         askMacForDetails()
+        takeMacAdditions()
         onLibraryChanged?()
+    }
+
+    /// Songs the Mac added lately, by path (see takeMacAdditions): set when it's reachable.
+    @ObservationIgnored var macAdded: (() async -> [String: MacLinkWire.SongDetails]?)?
+    @ObservationIgnored private var lastMacAdditions: Date?
+
+    /// Songs the Mac added lately that this device doesn't know of yet: their files go up to
+    /// iCloud and come down here only after a while (an album of FLACs can take many minutes),
+    /// so until then the library didn't have them. They're listed now, with the Mac's details,
+    /// and play from the Mac (see MacFiles) until their files arrive; the index finding them
+    /// later leaves them be.
+    func takeMacAdditions() {
+        guard usesICloud, let macAdded, lastMacAdditions.map({ Date.now.timeIntervalSince($0) > 60 }) ?? true else { return }
+        lastMacAdditions = .now
+        Task {
+            guard let added = await macAdded(), !added.isEmpty else { return }
+            let known = Set(allTracks.map(\.path))
+            var listed = 0
+            for (path, details) in added where !known.contains(path) && existingTrack(path) == nil {
+                let track = insertTrack(path)
+                track.apply(details)
+                awaitingIndex[path] = .now
+                cloudOnly.insert(path)
+                listed += 1
+            }
+            guard listed > 0 else { return }
+            Log.debug("library: \(listed) songs the Mac added, listed before iCloud brings them")
+            try? context.save()
+            contentChanged(artwork: false)
+        }
     }
 
     /// The Mac's details for songs (see SoulseekClient's Mac link), by path: set when it's reachable.
