@@ -72,6 +72,16 @@ struct SeekApp: App {
                     }
                     await library.start()
                     await client.macLink?.check(force: true)
+                    #if !targetEnvironment(macCatalyst)
+                    // Songs the Mac added that haven't come down from iCloud yet: their details,
+                    // and played from the Mac meanwhile.
+                    library.macDetails = { [client] paths in
+                        guard client.usingMac, let mac = client.macLink else { return [:] }
+                        return await mac.details(for: paths)
+                    }
+                    player.fileOnMac = { [client] path in client.usingMac ? client.macLink?.fileURL(forLibraryPath: path) : nil }
+                    library.askMacForDetails()
+                    #endif
                     #if targetEnvironment(macCatalyst)
                     // The Mac works out tempo and key for the library; the others read its results.
                     analysis.run()

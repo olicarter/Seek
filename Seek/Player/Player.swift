@@ -290,9 +290,20 @@ final class Player {
 
     /// A library song's file (fetched from iCloud if needed), or a streamed song: played while
     /// it downloads where the format allows, otherwise once it's all here.
+    /// A library song's file on the Mac, when it's reachable (see MacLink.fileURL).
+    @ObservationIgnored var fileOnMac: ((String) -> URL?)?
+
     private func playableItem(for track: Track) async -> AVPlayerItem? {
         guard track.isStreamed else {
-            guard let url = library.url(for: track), await library.ensureLocal(url) else { return nil }
+            guard let url = library.url(for: track) else { return nil }
+            // Not here yet (just added on the Mac, still coming through iCloud): played from the
+            // Mac while this device's copy downloads, rather than waiting for it.
+            if library.usesICloud, !LibraryStore.isDownloaded(url), let remote = fileOnMac?(track.path) {
+                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+                Log.debug("player: \(track.title) isn't here yet; playing it from the Mac")
+                return AVPlayerItem(url: remote)
+            }
+            guard await library.ensureLocal(url) else { return nil }
             return AVPlayerItem(url: url)
         }
         switch await streamer?.fetch(track) {

@@ -120,6 +120,24 @@ final class MacLink {
         startMirroring()
     }
 
+    /// The Mac's details for library songs, by path: for songs whose files haven't come down
+    /// from iCloud here yet, which would otherwise show their file names.
+    func details(for paths: [String]) async -> [String: MacLinkWire.SongDetails] {
+        (try? await post("/api/app/song-details", ["paths": paths])) ?? [:]
+    }
+
+    /// A library song's file on the Mac, to play while this device's copy comes down from iCloud.
+    /// The key goes in the address: the player can't send it as a header.
+    func fileURL(forLibraryPath path: String) -> URL? {
+        guard let address, let key else { return nil }
+        let encoded = path.split(separator: "/", omittingEmptySubsequences: false)
+            .map { $0.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(CharacterSet(charactersIn: "?#"))) ?? String($0) }
+            .joined(separator: "/")
+        var components = URLComponents(string: address.absoluteString.trimmingCharacters(in: ["/"]) + "/files/" + encoded)
+        components?.queryItems = [URLQueryItem(name: "key", value: key)]
+        return components?.url
+    }
+
     func download(_ folder: RemoteFolder) async {
         let _: [String: Bool]? = try? await post("/api/app/download-folder", ["folder": folder])
         startMirroring()

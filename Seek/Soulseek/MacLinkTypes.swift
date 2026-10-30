@@ -53,6 +53,24 @@ enum MacLinkWire {
         var replacingExisting: Bool? = nil
     }
 
+    /// A library song's details as the Mac read them: for a device whose copy of the file hasn't
+    /// arrived from iCloud yet (see LibraryStore.askMacForDetails).
+    struct SongDetails: Codable, Sendable {
+        var title: String
+        var artist: String
+        var albumArtist: String
+        var album: String
+        var label: String
+        var trackNumber: Int
+        var discNumber: Int
+        var year: Int
+        var duration: Double
+        var codec: String
+        var sampleRate: Int
+        var bitDepth: Int
+        var bitrate: Int
+    }
+
     /// A transfer's state as words, and back.
     static func encode(_ state: Seek.Transfer.State) -> (String, String?) {
         switch state {

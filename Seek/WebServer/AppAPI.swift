@@ -129,6 +129,22 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
         return try json(["ok": true])
     }
 
+    // A device's library songs whose files haven't come down from iCloud there yet.
+    router.post("/api/app/song-details") { request, context in
+        let body = try await request.decode(as: [String: [String]].self, context: context)
+        let paths = Set(body["paths"] ?? [])
+        return try json(await MainActor.run {
+            var details: [String: MacLinkWire.SongDetails] = [:]
+            for track in core.library.allTracks where paths.contains(track.path) && track.hasTags {
+                details[track.path] = MacLinkWire.SongDetails(
+                    title: track.title, artist: track.artist, albumArtist: track.albumArtist, album: track.album, label: track.label,
+                    trackNumber: track.trackNumber, discNumber: track.discNumber, year: track.year, duration: track.duration,
+                    codec: track.codec, sampleRate: track.sampleRate, bitDepth: track.bitDepth, bitrate: track.bitrate)
+            }
+            return details
+        })
+    }
+
     router.post("/api/app/download-folder") { request, context in
         let body = try await request.decode(as: FolderBody.self, context: context)
         await client.connectIfNeeded()

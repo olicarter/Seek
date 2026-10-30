@@ -100,4 +100,18 @@ struct TagWritingTests {
         #expect(SoundQuality.detail(lossless: false, bitDepth: nil, sampleRate: nil, bitrate: 319) == "320 kbps")
         #expect(SoundQuality.low < .high && .high < .max)
     }
+
+    @Test func theFilesNumberDecidesBetweenSongsOfOneName() {
+        let reference = AlbumReference(source: .itunes, artist: "Flo Milli", title: "Fine Ho, Stay", tracks: [
+            ReferenceTrack(number: 5, disc: 1, title: "Never Lose Me (feat. SZA & Cardi B)", duration: 166),
+            ReferenceTrack(number: 14, disc: 1, title: "Never Lose Me", duration: 126),
+        ])
+        func song(_ name: String, duration: Int? = nil) -> Int? {
+            MissingTracks.song(for: RemoteFile(username: "u", path: "Flo Milli\\\(name)", size: 1, duration: duration), in: reference)?.number
+        }
+        #expect(song("Flo Milli - Fine Ho, Stay - 05 - Never Lose Me.flac") == 5)
+        #expect(song("Flo Milli - Fine Ho, Stay - 14 - Never Lose Me.flac") == 14)
+        // No number: the length.
+        #expect(song("Never Lose Me.flac", duration: 165) == 5)
+    }
 }

@@ -301,10 +301,18 @@ enum MissingTracks {
     }
 
     /// The song on a tracklist a downloaded file holds: the one song whose file it would be
-    /// picked as (two songs matching it, e.g. by number alone, is none).
+    /// picked as. When several could be ("Never Lose Me" is track 14, and with "(feat. SZA &
+    /// Cardi B)" track 5), the file's own number decides, then its length, then the exact title.
     static func song(for file: RemoteFile, in reference: AlbumReference) -> ReferenceTrack? {
         let songs = reference.tracks.filter { self.file(for: $0, in: [file]) != nil }
-        return songs.count == 1 ? songs[0] : songs.first { matchName(of: file) == ReferenceTitles.match($0.title) }
+        guard songs.count > 1 else { return songs.first }
+        if let number = leadingNumber(file.name), let numbered = songs.first(where: { $0.number == number }) { return numbered }
+        if let length = file.duration.map(Double.init),
+           let closest = songs.filter({ $0.duration != nil }).min(by: { abs($0.duration! - length) < abs($1.duration! - length) }),
+           abs(closest.duration! - length) <= 4 {
+            return closest
+        }
+        return songs.first { matchName(of: file) == ReferenceTitles.match($0.title) }
     }
 
     /// The download of a song among an album's downloads, wherever each came from: one going

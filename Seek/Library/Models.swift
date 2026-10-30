@@ -77,6 +77,23 @@ final class Track {
         if let value = metadata.key { musicalKey = value.camelot }
     }
 
+    /// The Mac's details, for a song whose file isn't here yet (see LibraryStore.askMacForDetails).
+    func apply(_ details: MacLinkWire.SongDetails) {
+        if !details.title.isEmpty { title = details.title }
+        if !details.artist.isEmpty { artist = details.artist }
+        albumArtist = details.albumArtist
+        if !details.album.isEmpty { album = details.album }
+        label = details.label
+        trackNumber = details.trackNumber
+        discNumber = details.discNumber
+        year = details.year
+        if details.duration > 0 { duration = details.duration }
+        codec = details.codec
+        sampleRate = details.sampleRate
+        bitDepth = details.bitDepth
+        bitrate = details.bitrate
+    }
+
     /// "128 · 8A", as song rows show it (nothing when neither is known).
     func tempoAndKey(_ notation: MusicalKey.Notation) -> String? {
         let parts = [bpm > 0 ? "\(Int(bpm.rounded()))" : nil, MusicalKey(musicalKey)?.shown(as: notation)].compactMap { $0 }

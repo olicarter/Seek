@@ -259,7 +259,7 @@ final class LibraryStore {
         return false
     }
 
-    private static func isDownloaded(_ url: URL) -> Bool {
+    static func isDownloaded(_ url: URL) -> Bool {
         let values = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
         let status = values?.ubiquitousItemDownloadingStatus
         return status == .current || status == .downloaded
@@ -1149,7 +1149,40 @@ final class LibraryStore {
         }
         try? context.save()
         scheduleInfoSync()
+        askMacForDetails()
         onLibraryChanged?()
+    }
+
+    /// The Mac's details for songs (see SoulseekClient's Mac link), by path: set when it's reachable.
+    @ObservationIgnored var macDetails: (([String]) async -> [String: MacLinkWire.SongDetails])?
+    @ObservationIgnored private var askedMac: Set<String> = []
+    @ObservationIgnored private var askingMac = false
+
+    /// Songs whose files haven't come down from iCloud yet, and whose details haven't come
+    /// through iCloud either, would show their file names, beside the album's tracklist as
+    /// though missing. The Mac, which added them, has their details: asked once each.
+    func askMacForDetails() {
+        guard let macDetails, !askingMac else { return }
+        let waiting = allTracks.filter { !$0.hasTags && $0.infoUpdated == nil && !$0.isDeleted && !askedMac.contains($0.path) }
+        guard !waiting.isEmpty else { return }
+        let paths = waiting.prefix(500).map(\.path)
+        askingMac = true
+        Task {
+            defer { askingMac = false }
+            let details = await macDetails(paths)
+            // Asked again on the next scan when the Mac didn't answer (not reachable just then).
+            if !details.isEmpty { askedMac.formUnion(paths) }
+            var applied = 0
+            for track in allTracks where !track.hasTags && track.infoUpdated == nil {
+                guard let found = details[track.path], track.modelContext != nil else { continue }
+                track.apply(found)
+                applied += 1
+            }
+            guard applied > 0 else { return }
+            Log.debug("library: details for \(applied) songs from the Mac")
+            try? context.save()
+            contentChanged(artwork: false)
+        }
     }
 
     // MARK: - Synced details
