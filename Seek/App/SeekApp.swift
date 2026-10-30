@@ -71,6 +71,10 @@ struct SeekApp: App {
                         exit(0)
                     }
                     await library.start()
+                    // Claude usage, a file per device beside the shared tempo and key (see ClaudeUsage).
+                    ClaudeUsage.shared.folder = library.usesICloud
+                        ? library.root?.deletingLastPathComponent().appending(path: "Seek/Claude Usage")
+                        : URL.applicationSupportDirectory.appending(path: "Claude Usage")
                     await client.macLink?.check(force: true)
                     #if !targetEnvironment(macCatalyst)
                     // Songs the Mac added that haven't come down from iCloud yet: their details,

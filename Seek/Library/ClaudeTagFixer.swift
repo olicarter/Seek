@@ -268,9 +268,15 @@ enum ClaudeTagFixer {
 
     /// Sends a Messages API request and returns the decoded response, turning API errors into
     /// `FixError.api` so callers can tell busy (retryable) from bad requests.
-    static func response(to request: URLRequest) async throws -> [String: Any] {
+    /// `purpose`: what it was for, as Settings' usage lists it ("Similar albums").
+    static func response(to request: URLRequest, purpose: String = "Tag fixing") async throws -> [String: Any] {
         let (data, response) = try await URLSession.shared.data(for: request)
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        // Counted whatever the answer: a refused request can still have used tokens.
+        if json["usage"] != nil {
+            let answer = UncheckedAnswer(json: json)
+            await MainActor.run { ClaudeUsage.shared.record(answer.json, purpose: purpose) }
+        }
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             let message = (json["error"] as? [String: Any])?["message"] as? String ?? "HTTP \(http.statusCode)"
             throw FixError.api(message, status: http.statusCode)
@@ -317,4 +323,9 @@ enum ClaudeTagFixer {
             artworkURL: (input["artwork_url"] as? String).flatMap(artworkURL)
         )
     }
+}
+
+/// The API's JSON isn't Sendable; it's only read once it's handed over.
+private struct UncheckedAnswer: @unchecked Sendable {
+    let json: [String: Any]
 }

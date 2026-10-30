@@ -306,7 +306,7 @@ final class DiscoveryService {
                 "tools": tools,
                 "messages": messages,
             ] as [String: Any])
-            let response = try await ClaudeTagFixer.response(to: request)
+            let response = try await ClaudeTagFixer.response(to: request, purpose: "Similar albums")
             let content = response["content"] as? [[String: Any]] ?? []
             if response["stop_reason"] as? String == "refusal" { throw ClaudeTagFixer.FixError.refused }
             if let call = content.first(where: { $0["type"] as? String == "tool_use" && $0["name"] as? String == "submit_suggestions" }),

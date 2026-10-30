@@ -77,7 +77,7 @@ final class AlbumAbout {
                 "tools": [["type": "web_search_20250305", "name": "web_search", "max_uses": 2]],
                 "messages": messages,
             ] as [String: Any])
-            let response = try await ClaudeTagFixer.response(to: request)
+            let response = try await ClaudeTagFixer.response(to: request, purpose: "Album descriptions")
             let content = response["content"] as? [[String: Any]] ?? []
             if response["stop_reason"] as? String == "pause_turn" {
                 messages.append(["role": "assistant", "content": content])

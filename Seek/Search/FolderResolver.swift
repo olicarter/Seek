@@ -115,9 +115,9 @@ final class FolderResolver {
         ] as [String: Any])
         var response: [String: Any]
         do {
-            response = try await ClaudeTagFixer.response(to: request)
+            response = try await ClaudeTagFixer.response(to: request, purpose: "Reading folder names")
         } catch let error as ClaudeTagFixer.FixError where error.isRetryable {
-            response = try await ClaudeTagFixer.response(to: request)
+            response = try await ClaudeTagFixer.response(to: request, purpose: "Reading folder names")
         }
         let content = response["content"] as? [[String: Any]] ?? []
         guard let input = content.first(where: { $0["type"] as? String == "tool_use" })?["input"] as? [String: Any] else {

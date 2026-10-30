@@ -547,8 +547,10 @@ struct SettingsView: View {
                 } header: {
                     Text("Claude")
                 } footer: {
-                    Text("Used by Fix with Claude in an album's Edit Info. Create a key at platform.claude.com. It's kept in iCloud Keychain; album details are sent to Anthropic only when you use the button.")
+                    Text("Used for similar albums and artists, album descriptions, reading Soulseek folder names, and Fix with Claude in an album's Edit Info (with the model chosen here). Create a key at platform.claude.com. It's kept in iCloud Keychain.")
                 }
+
+                ClaudeUsageSection()
 
                 Section {
                     Picker("Keys", selection: $notation) {
@@ -713,3 +715,49 @@ private struct WebAccessSection: View {
 }
 #endif
 
+/// What Seek's requests to Claude have used, on every device, and roughly what they cost.
+struct ClaudeUsageSection: View {
+    @State private var month = ClaudeUsage.month()
+    private var usage: ClaudeUsage { .shared }
+
+    var body: some View {
+        let thisMonth = usage.total(month: month)
+        let allTime = usage.total()
+        Section {
+            LabeledContent("This Month", value: Self.summary(thisMonth))
+            LabeledContent("All Time", value: Self.summary(allTime))
+            ForEach(usage.byPurpose(), id: \.purpose) { item in
+                LabeledContent(item.purpose) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(Self.cost(item.tally.cost))
+                        Text("\(item.tally.requests == 1 ? "1 request" : "\(item.tally.requests) requests") · \(Self.tokens(item.tally.tokens)) tokens")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        } header: {
+            Text("Claude Usage")
+        } footer: {
+            Text("From every device signed in to your iCloud. Estimated: Haiku at $1 in and $5 out per million tokens, Sonnet $3 and $15, Opus $15 and $75, plus $10 per 1,000 web searches. Your Anthropic console has the exact bill."
+                + (usage.byModel.isEmpty ? "" : "\n\nBy model: " + usage.byModel.map { "\(Self.modelName($0.model)) \(Self.cost($0.tally.cost))" }.joined(separator: ", ")))
+        }
+        .onAppear { usage.load() }
+    }
+
+    static func summary(_ tally: ClaudeUsage.Tally) -> String {
+        tally.requests == 0 ? "None" : "\(cost(tally.cost)) · \(tokens(tally.tokens)) tokens"
+    }
+
+    static func cost(_ dollars: Double) -> String {
+        dollars < 0.01 && dollars > 0 ? "< $0.01" : String(format: "~$%.2f", dollars)
+    }
+
+    static func tokens(_ count: Int) -> String {
+        count >= 1_000_000 ? String(format: "%.1fM", Double(count) / 1_000_000)
+            : count >= 1000 ? String(format: "%.0fk", Double(count) / 1000) : "\(count)"
+    }
+
+    static func modelName(_ id: String) -> String {
+        ClaudeTagFixer.Model(rawValue: id)?.name ?? id
+    }
+}

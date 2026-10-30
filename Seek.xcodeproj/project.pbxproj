@@ -23,6 +23,7 @@
 		1F2827E7FC130228F0D9C16F /* search-playboi-carti.json in Resources */ = {isa = PBXBuildFile; fileRef = 4D5CC2DCE45E51F6022FF8DE /* search-playboi-carti.json */; };
 		1F6D0D1B6568BAA96495EC1C /* AlbumReferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52B8607FB89916F603D8762B /* AlbumReferences.swift */; };
 		1FA6A5E1E8D3FFD08D5FE81A /* Upload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42141F89EEF6ADAD5B075812 /* Upload.swift */; };
+		22596DEF276513F1F044738D /* ClaudeUsage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 816FE481DB6C9B0A904BBE89 /* ClaudeUsage.swift */; };
 		233963AC38C6A3AFFA0F94A4 /* MacLinkTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06478C019EE161D759B6F10A /* MacLinkTypes.swift */; };
 		24434B919F312CF09CEDC605 /* SongAnalysisStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D0B5059299532B9CDDBE34 /* SongAnalysisStore.swift */; };
 		29F1F9576D6A80E7DA3DD988 /* BackgroundWork.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86654379C73349786A952AD6 /* BackgroundWork.swift */; };
@@ -74,6 +75,7 @@
 		7481309C45E19A3544BD20F7 /* NewPlaylistPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C0E309A8E488487F7CC7D27 /* NewPlaylistPrompt.swift */; };
 		74F2D9ADDB10D503C179ADDD /* Router.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63E0A4CC586BC109FC84CAFE /* Router.swift */; };
 		76E19F07CF0CC6BAB0D3DF1B /* SearchResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 421D21AF39B3F2CDD11C7A75 /* SearchResults.swift */; };
+		790B47A2F1626D7CEEA37764 /* ClaudeUsageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC604633BDD0D73F36DFA2E0 /* ClaudeUsageTests.swift */; };
 		7918555FD0392AE55BF06AA2 /* EditAlbumView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABE0976C16CBAC17D5F2A90E /* EditAlbumView.swift */; };
 		798EDB0341BC3D4836026EF4 /* SameRipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163D1994128F9FA7736C4D9F /* SameRipTests.swift */; };
 		7AA0B6BE963E36B16A42BE37 /* SearchModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEAA46FCE077F9A73A5167F /* SearchModel.swift */; };
@@ -249,6 +251,7 @@
 		7CD2A2D1464C8BA2F4367671 /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
 		7D7EB4B5DD82FC9DE0A39BD7 /* tone.flac */ = {isa = PBXFileReference; path = tone.flac; sourceTree = "<group>"; };
 		800B8ED5E9A6B506800497E1 /* MusicalKey.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicalKey.swift; sourceTree = "<group>"; };
+		816FE481DB6C9B0A904BBE89 /* ClaudeUsage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsage.swift; sourceTree = "<group>"; };
 		832927A227E2E6F4B4D0CD15 /* SeekApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekApp.swift; sourceTree = "<group>"; };
 		86654379C73349786A952AD6 /* BackgroundWork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundWork.swift; sourceTree = "<group>"; };
 		86D78AA71D4B4FA186E16E1F /* AppUpdater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdater.swift; sourceTree = "<group>"; };
@@ -283,6 +286,7 @@
 		C2B8B42E9C138DB367F70588 /* AudioLevels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioLevels.swift; sourceTree = "<group>"; };
 		CB8FD929A879EEB6DA61B688 /* ArtworkColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkColor.swift; sourceTree = "<group>"; };
 		CBE6CAC6EB42D335728E3606 /* CopyFilterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyFilterTests.swift; sourceTree = "<group>"; };
+		CC604633BDD0D73F36DFA2E0 /* ClaudeUsageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageTests.swift; sourceTree = "<group>"; };
 		CD84B57FBC9AEDBAE8D71C69 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		CED2ABC59E062D278FAE3C08 /* ArtistPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtistPage.swift; sourceTree = "<group>"; };
 		D7415D95463F6BC217019DA7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -390,6 +394,7 @@
 				51380A967FDDF4202A4427AA /* ArtworkColorTests.swift */,
 				B4D0ADC076576BD3891A8731 /* AudioLevelsTests.swift */,
 				95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */,
+				CC604633BDD0D73F36DFA2E0 /* ClaudeUsageTests.swift */,
 				CBE6CAC6EB42D335728E3606 /* CopyFilterTests.swift */,
 				20CC9811E43E6250AF81358F /* DiscoveryTests.swift */,
 				87A14E0838000537490B2FF2 /* LooseSingleTests.swift */,
@@ -441,6 +446,7 @@
 				CED2ABC59E062D278FAE3C08 /* ArtistPage.swift */,
 				CB8FD929A879EEB6DA61B688 /* ArtworkColor.swift */,
 				7B272034F5BEB6DBBDE46D47 /* ClaudeTagFixer.swift */,
+				816FE481DB6C9B0A904BBE89 /* ClaudeUsage.swift */,
 				36B1509F6C49447AC817CDB6 /* Discovery.swift */,
 				FC90C27FBC72E24B9BA5C2A0 /* FLACWriter.swift */,
 				4384D1076035E9C7DDDACCA7 /* ID3Writer.swift */,
@@ -801,6 +807,7 @@
 				3B11EEFFDC713698BB3C4930 /* BandcampLoginView.swift in Sources */,
 				2B6B2C71B4F57BB37C71906A /* BandcampStoreView.swift in Sources */,
 				EE42F4A547FCCBB4E17FEE15 /* ClaudeTagFixer.swift in Sources */,
+				22596DEF276513F1F044738D /* ClaudeUsage.swift in Sources */,
 				447EE4A535836E633DB3099B /* Components.swift in Sources */,
 				5794BFB0FB62982E05922C06 /* CompressedAudio.swift in Sources */,
 				6439C020EDBE678ACC3A3030 /* CopyFilter.swift in Sources */,
@@ -883,6 +890,7 @@
 				BEFA9FAA4CDB268FA9920DE1 /* ArtworkColorTests.swift in Sources */,
 				50BB5C369EA6F77F03F7E4B2 /* AudioLevelsTests.swift in Sources */,
 				1CE12F46D5A2B81B5BFC0297 /* BandcampTests.swift in Sources */,
+				790B47A2F1626D7CEEA37764 /* ClaudeUsageTests.swift in Sources */,
 				11FBBF9EF51ED5BCD2A950DF /* CopyFilterTests.swift in Sources */,
 				6AE7EA235904D91D7E725560 /* DiscoveryTests.swift in Sources */,
 				6BCC6C171C25953C0945336E /* LooseSingleTests.swift in Sources */,
