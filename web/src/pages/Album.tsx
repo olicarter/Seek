@@ -117,7 +117,7 @@ export function Album() {
                     <li class="disc">Disc {song.disc}</li>
                   </Show>
                   <li
-                    classList={{ song: true, missing: song.kind !== "have", playable: !!song.file, current: isCurrent(song) }}
+                    classList={{ song: true, missing: !song.file, playable: !!song.file, current: isCurrent(song) }}
                     title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
                     onClick={() => song.file && playFrom(album(), song)}
                   >
