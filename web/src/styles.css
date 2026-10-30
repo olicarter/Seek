@@ -111,18 +111,19 @@ main { max-width: 1480px; margin: 0 auto; padding: 32px var(--gutter) 140px; }
 .album-note { color: var(--secondary); font-size: 14px; margin: 10px 0 0; }
 .album-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 20px; }
 .pill {
-  display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 20px; border: none; border-radius: 8px;
-  background: var(--surface-2); color: var(--text); font-weight: 600; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 46px; padding: 0 24px; border: none;
+  border-radius: 999px; background: var(--surface-2); color: var(--text); font-weight: 600; font-size: 16px;
 }
-.pill.primary { background: var(--accent); color: #fff; }
+/* The app's Play: a wide white capsule. */
+.pill.play { min-width: 180px; background: #fff; color: #000; }
 .pill.bandcamp { background: rgba(29, 160, 195, 0.2); color: #5cc8e5; }
 .pill:not(:disabled):hover { filter: brightness(1.12); }
 .circle {
-  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
-  background: var(--surface-2); color: var(--accent);
+  width: 46px; height: 46px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%;
+  background: var(--surface-2); color: var(--text);
 }
 .spinner::after {
-  content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--tertiary);
+  content: ""; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--tertiary);
   border-top-color: var(--text); animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

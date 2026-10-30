@@ -5,7 +5,7 @@ import { Grid } from "../Tiles";
 
 /** The library's albums, as Apple Music's Albums: covers filling the page, sorted as chosen. */
 export function Library() {
-  const [albums] = live(changes, api.library);
+  const [albums] = live(changes, api.library, () => "library");
   const [sort, setSort] = createSignal<"title" | "artist" | "year">("artist");
   const sorted = createMemo(() => {
     const list = [...(albums() ?? [])];

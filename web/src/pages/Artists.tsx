@@ -5,7 +5,7 @@ import { Grid } from "../Tiles";
 
 /** The library's artists, each shown with the cover of their newest album. */
 export function Artists() {
-  const [albums] = live(changes, api.library);
+  const [albums] = live(changes, api.library, () => "library");
   const artists = createMemo(() => {
     const byArtist = new Map<string, { name: string; artwork?: string; preview?: string; year: number; count: number }>();
     for (const album of albums() ?? []) {

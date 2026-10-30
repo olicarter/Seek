@@ -17,8 +17,9 @@ import { current, play, playing, type QueueItem } from "../player";
 export function Album() {
   const [params] = useSearchParams<{ artist: string; title: string; release?: string }>();
   const ref = (): AlbumRef => ({ artist: params.artist ?? "", title: params.title ?? "", release: params.release });
-  const [page, { mutate }] = live(() => [changes(), ref()] as const, ([, r]) => api.album(r));
-  const [artist] = live(() => page()?.artist, (name) => api.artist(name));
+  const [page, { mutate }] = live(() => [changes(), ref()] as const, ([, r]) => api.album(r),
+                                  ([, r]) => `album|${r.artist}|${r.title}|${r.release ?? ""}`);
+  const [artist] = live(() => page()?.artist, (name) => api.artist(name), (name) => `artist|${name}`);
 
   const queue = (album: AlbumPage): QueueItem[] =>
     album.songs.filter((s) => s.file).map((s) => ({
@@ -81,11 +82,12 @@ export function Album() {
                 <p class="album-note">In your Bandcamp collection{album().bandcamp?.downloading !== undefined ? " · adding…" : ""}</p>
               </Show>
               <div class="album-actions">
-                <button class="pill primary" disabled={!queue(album()).length} onClick={() => playFrom(album())}>
-                  <Icon name="play" size={16} />Play
+                {/* As in the app: a round shuffle button, a wide white Play, then round buttons. */}
+                <button class="circle" aria-label="Shuffle" title="Shuffle" disabled={!queue(album()).length} onClick={() => shuffle(album())}>
+                  <Icon name="shuffle" size={20} />
                 </button>
-                <button class="pill" disabled={!queue(album()).length} onClick={() => shuffle(album())}>
-                  <Icon name="shuffle" size={16} />Shuffle
+                <button class="pill play" disabled={!queue(album()).length} onClick={() => playFrom(album())}>
+                  <Icon name="play" size={18} />Play
                 </button>
                 <Show
                   when={album().adding}
