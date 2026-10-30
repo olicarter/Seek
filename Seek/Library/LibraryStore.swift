@@ -1085,6 +1085,7 @@ final class LibraryStore {
     private func reconcile(with files: [String: FileState], gatheredAt: Date = .distantFuture) {
         // Imported songs the index has now seen are on their own from here.
         for path in awaitingIndex.keys where files[path] != nil { awaitingIndex[path] = nil }
+        if !fromMac.isEmpty { fromMac.subtract(files.keys.filter { fromMac.contains($0) }) }
         let tracks = (try? context.fetch(FetchDescriptor<Track>())) ?? []
         // New files named as a missing song's but for the extension: the same song, renamed for
         // what it holds (an MP3 named .flac, see fixExtension). It keeps its details, rather than
@@ -1157,6 +1158,8 @@ final class LibraryStore {
     /// Songs the Mac added lately, by path (see takeMacAdditions): set when it's reachable.
     @ObservationIgnored var macAdded: (() async -> [String: MacLinkWire.SongDetails]?)?
     @ObservationIgnored private var lastMacAdditions: Date?
+    /// Songs listed from the Mac whose files haven't come down from iCloud here yet (see takeMacAdditions).
+    private(set) var fromMac: Set<String> = []
 
     /// Songs the Mac added lately that this device doesn't know of yet: their files go up to
     /// iCloud and come down here only after a while (an album of FLACs can take many minutes),
@@ -1175,6 +1178,7 @@ final class LibraryStore {
                 track.apply(details)
                 awaitingIndex[path] = .now
                 cloudOnly.insert(path)
+                fromMac.insert(path)
                 listed += 1
             }
             guard listed > 0 else { return }

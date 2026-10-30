@@ -50,9 +50,13 @@ extension Core {
         let streams = streamQueue(key, album: album, missing: missing, folders: folders,
                                   bandcampPage: store?.url ?? owned?.itemURL ?? page, artwork: found?.artworkURL ?? reference?.artworkURL)
         let replacing = AlbumRows.replacing(album, client: client)
-        let songs = AlbumRows.rows(album, missing: missing, arriving: AlbumRows.arriving(album, missing: missing, client: client)).map { row in
-            switch row {
-            case .have(_, let track):
+        // Each song in exactly one state, as in the app (see AlbumState).
+        let searching = found == nil && copyFinder.copies(of: key)?.status == .searching
+        let derived = AlbumState.derive(AlbumFacts.current(for: key, library: library, client: client, references: references,
+                                                           adder: adder, folders: folders, searching: searching))
+        let tracksByPath = Dictionary(album.tracks.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        let songs = derived.songs.map { song -> Pages.Song in
+            if let track = song.libraryPath.flatMap({ tracksByPath[$0] }) {
                 return Pages.Song(kind: "have", number: track.trackNumber > 0 ? track.trackNumber : nil, disc: max(track.discNumber, 1),
                                   title: track.title.isEmpty ? (track.path as NSString).lastPathComponent : track.title,
                                   artist: track.artist == album.artist ? nil : track.artist, duration: track.duration,
@@ -60,19 +64,15 @@ extension Core {
                                   available: true, progress: replacing[track.persistentModelID]?.ringProgress,
                                   lossless: AudioQuality(track).isLossless,
                                   quality: AudioQuality(track).soundQuality, tempoAndKey: track.tempoAndKey(.camelot))
-            case .missing(let track):
-                let download = MissingTracks.download(for: track, in: downloads)
-                let streamable = streams.contains { $0.reference == track }
-                return Pages.Song(kind: "missing", number: track.number > 0 ? track.number : nil, disc: track.disc, title: track.title,
-                                  artist: nil, duration: track.duration,
-                                  file: streamable ? Self.streamPath(key, release: id, track: track) : nil,
-                                  available: download != nil || MissingTracks.file(for: track, in: files) != nil,
-                                  progress: download.flatMap { $0.state.isActive ? $0.ringProgress : nil }, lossless: nil)
-            case .arriving(let transfer):
-                return Pages.Song(kind: "arriving", number: ReleaseText.songNumber(transfer.file.name), disc: 1,
-                                  title: ReleaseText.songTitle(transfer.file.name), artist: nil, duration: nil, file: nil,
-                                  available: true, progress: transfer.ringProgress, lossless: nil)
             }
+            let reference = ReferenceTrack(number: song.number ?? 0, disc: song.disc, title: song.title, duration: song.duration)
+            let streamable = song.isPlayable && streams.contains { $0.reference.number == reference.number && $0.reference.disc == reference.disc
+                && $0.reference.title == reference.title }
+            let arriving = if case .arriving = song.state { true } else { false }
+            return Pages.Song(kind: arriving ? "arriving" : "missing", number: song.number, disc: song.disc, title: song.title,
+                              artist: song.artist, duration: song.duration,
+                              file: streamable ? Self.streamPath(key, release: id, track: reference) : nil,
+                              available: song.isPlayable || arriving, progress: arriving ? song.progress ?? 0 : nil, lossless: nil)
         }
         let duration = album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) }
         let count = songs.count
@@ -83,7 +83,7 @@ extension Core {
             : coverPath(key)
         let remoteArtwork = album.tracks.isEmpty ? (found?.artworkURL ?? reference?.artworkURL).map(BandcampAPI.largeArtwork) : nil
         let tint = await Self.tint(artwork: album.tracks.isEmpty ? nil : album.artwork, url: remoteArtwork)
-        let adding = adder.isChecking(key) || AlbumRows.isBeingAdded(album, client: client)
+        let adding = adder.isChecking(key) || derived.state.isAdding
             || owned.flatMap { bandcamp.download(for: $0) }?.state.isActive == true
         return Pages.Album(
             artist: key.artist, title: key.title,
@@ -96,9 +96,9 @@ extension Core {
             quality: album.tracks.isEmpty ? folders.first?.soundQuality : AudioQuality.summary(of: album.tracks)?.quality,
             qualityDetail: album.tracks.isEmpty ? folders.first?.qualityDetail : AudioQuality.summary(of: album.tracks)?.detail,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
-            canAdd: (!folders.isEmpty || owned?.redownloadURL != nil) && (album.tracks.isEmpty || !missing.isEmpty) && !adding,
+            canAdd: (derived.state.canAdd || owned?.redownloadURL != nil && album.tracks.isEmpty) && !adding,
             adding: adding,
-            lookingForCopies: found == nil && copyFinder.copies(of: key)?.status == .searching,
+            lookingForCopies: derived.state.isLooking,
             copies: folders.count,
             bandcamp: owned != nil || store != nil
                 ? Pages.Bandcamp(owned: owned != nil, page: (owned?.itemURL ?? store?.url)?.absoluteString,

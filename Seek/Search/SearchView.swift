@@ -516,6 +516,8 @@ struct ReleaseDetailView: View {
     }
     @Environment(SoulseekClient.self) private var client
     @Environment(BandcampClient.self) private var bandcamp
+    @Environment(LibraryStore.self) private var library
+    @Environment(AlbumAdder.self) private var adder
     @State private var loadingFolder: String?
     @State private var showingCopies = false
     @Environment(\.openArtist) private var openArtist
@@ -535,6 +537,15 @@ struct ReleaseDetailView: View {
         release.folders = ReleaseGrouper.sortedBest(release.folders.map(client.complete), quality: quality,
                                                     expectedTracks: expectedTracks)
         return release
+    }
+
+    /// Adds one song, from the copy that has it, filed under the release's name.
+    private func addSong(_ song: AlbumSong, release: SearchRelease) {
+        let track = ReferenceTrack(number: song.number ?? 0, disc: song.disc, title: song.title, duration: song.duration)
+        let folders = release.folders.map(client.complete)
+        guard let folder = folders.first(where: { MissingTracks.file(for: track, in: $0.files) != nil }),
+              let file = MissingTracks.file(for: track, in: folder.files) else { return }
+        client.download([file], in: folder, album: AlbumKey(artist: release.artist, title: release.title), others: release.folders)
     }
 
     /// Each song with somewhere to play it from, as streamed tracks.
@@ -599,25 +610,22 @@ struct ReleaseDetailView: View {
                     }
                 }
             } songs: {
-                if let reference {
-                    // The real tracklist, each song downloadable from whichever copy has it.
-                    let files = release.folders.map(client.complete).flatMap(\.files)
-                    // Adding the album may take each song from a different copy than the one
-                    // listed first, so a song's download from any of the copies counts.
-                    let folderIDs = Set(release.folders.map(\.id))
-                    let downloads = client.transfers.filter {
-                        !$0.forStreaming && $0.state != .cancelled && folderIDs.contains("\($0.file.username)\u{0}\($0.file.folder)")
+                if reference != nil {
+                    // The real tracklist, each song in exactly one state (see AlbumState).
+                    let derived = AlbumState.derive(AlbumFacts.current(
+                        for: inLibrary ?? key, library: library, client: client, references: references, adder: adder,
+                        folders: release.folders, searching: soulseekStatus == .searching))
+                    let streams = Dictionary(queue.enumerated().map { ("\($0.element.reference.disc)-\($0.element.reference.number)-\($0.element.reference.title)", $0.offset) },
+                                             uniquingKeysWith: { first, _ in first })
+                    if case .addFailed(let reason) = derived.state {
+                        Label(reason, systemImage: "exclamationmark.triangle")
+                            .font(.subheadline).foregroundStyle(.secondary).listRowSeparator(.hidden)
                     }
-                    ForEach(reference.tracks, id: \.self) { track in
-                        let stream = queue.firstIndex { $0.reference == track }
-                        MissingTrackRow(track: track,
-                                        file: MissingTracks.download(for: track, in: downloads)?.file
-                                            ?? MissingTracks.file(for: track, in: files),
-                                        isSearching: false,
-                                        playing: stream.map { queue[$0].track })
-                            .contentShape(.rect)
+                    ForEach(derived.songs) { song in
+                        let stream = streams[song.id]
+                        AlbumSongRow(song: song, playing: stream.map { queue[$0].track }, onAdd: { addSong(song, release: release) })
                             .onTapGesture {
-                                if let stream { player.play(queue.map(\.track), startingAt: stream) }
+                                if song.isPlayable, let stream { player.play(queue.map(\.track), startingAt: stream) }
                             }
                     }
                 } else if let folder = release.bestFolder {
@@ -883,10 +891,19 @@ struct ReleaseAccessory: View {
     @Environment(BandcampClient.self) private var bandcamp
     @Environment(AlbumAdder.self) private var adder
     @Environment(AlbumReferences.self) private var references
+    @Environment(LibraryStore.self) private var library
+
+    /// The album's state (see AlbumState): Add only when it allows it, never while it's being added.
+    private var state: AlbumState {
+        let key = inLibrary ?? AlbumKey(artist: release.artist, title: release.title)
+        return AlbumState.derive(AlbumFacts.current(for: key, library: library, client: client, references: references,
+                                                    adder: adder, folders: release.folders, searching: isPreparing)).state
+    }
 
     var body: some View {
+        let state = state
         switch ReleaseAction(release: release, inLibrary: inLibrary, client: client, bandcamp: bandcamp).kind {
-        case .inLibrary(let key):
+        case .inLibrary(let key) where !state.isAdding:
             NavigationLink(value: key) {
                 Image(systemName: "checkmark")
                     .font(.title3.weight(.semibold))
@@ -895,7 +912,7 @@ struct ReleaseAccessory: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("In Library")
-        case .downloadingBandcamp, .downloadingSoulseek:
+        case .inLibrary, .downloadingBandcamp, .downloadingSoulseek:
             // Added, as in Apple Music: the songs below show how their downloads are going.
             Image(systemName: "checkmark")
                 .font(.title3.weight(.semibold))
@@ -906,7 +923,13 @@ struct ReleaseAccessory: View {
             RoundButton(systemImage: "plus", label: "Add from Bandcamp") {
                 if let existing = bandcamp.download(for: item) { bandcamp.retry(existing) } else { bandcamp.download(item) }
             }
-        case .downloadSoulseek:
+        case .downloadSoulseek where state.isAdding:
+            Image(systemName: "checkmark")
+                .font(.title3.weight(.semibold))
+                .frame(width: 50, height: 50)
+                .background(.fill.secondary, in: .circle)
+                .accessibilityLabel("Added to Library")
+        case .downloadSoulseek where state.canAdd || adder.isChecking(AlbumKey(artist: release.artist, title: release.title)):
             let key = AlbumKey(artist: release.artist, title: release.title)
             if adder.isChecking(key) {
                 ProgressView()
@@ -914,14 +937,14 @@ struct ReleaseAccessory: View {
                     .background(.fill.secondary, in: .circle)
                     .accessibilityLabel("Checking copies")
             } else {
-                RoundButton(systemImage: "plus", label: "Add to Library") {
+                RoundButton(systemImage: "plus", label: state == .available ? "Add to Library" : "Try Adding Again") {
                     adder.add(key, from: release.folders, client: client, references: references)
                 }
             }
-        case .buy, .none:
+        case .downloadSoulseek, .buy, .none:
             // Buying has its own button beside this one. A spinner while sources are found (not
             // a ring: nothing is downloading yet), otherwise a plus with nothing to add.
-            if isPreparing {
+            if isPreparing || state.isLooking {
                 ProgressView()
                     .frame(width: 50, height: 50)
                     .background(.fill.secondary, in: .circle)

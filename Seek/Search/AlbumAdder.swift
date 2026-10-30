@@ -13,7 +13,15 @@ final class AlbumAdder {
     /// Albums whose tracklist and copies' full folders are being checked, by `AlbumReferences.key`.
     private(set) var checking: Set<String> = []
     /// The last album with a song no copy had: nothing was added.
-    var failure: (album: AlbumKey, songs: Int)?
+    var failure: (album: AlbumKey, songs: Int)? {
+        didSet { if let failure { stopped[AlbumReferences.key(failure.album)] = Self.stoppedReason } }
+    }
+    /// Albums whose add stopped, by `AlbumReferences.key`, until they're added again: their pages
+    /// say so (see AlbumState.addFailed).
+    private(set) var stopped: [String: String] = [:]
+    static let stoppedReason = "A song couldn't be had from any copy, so the album wasn't added."
+
+    func stopReason(_ album: AlbumKey) -> String? { stopped[AlbumReferences.key(album)] }
 
     /// Copies whose full folders are fetched at once while looking for every song.
     static let checkedAtOnce = 6
@@ -24,6 +32,7 @@ final class AlbumAdder {
     func add(_ album: AlbumKey, from folders: [RemoteFolder], client: SoulseekClient, references: AlbumReferences) {
         let key = AlbumReferences.key(album)
         guard !folders.isEmpty, checking.insert(key).inserted else { return }
+        stopped[key] = nil
         Task {
             defer { checking.remove(key) }
             guard let reference = await references.reference(for: album), !reference.tracks.isEmpty else {

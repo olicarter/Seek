@@ -310,6 +310,7 @@ struct AlbumDetailView: View {
     @Environment(StoreVerifier.self) private var storeVerifier
     @Environment(StreamService.self) private var streamer
     @Environment(AlbumAbout.self) private var about
+    @Environment(AlbumAdder.self) private var adder
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @AppStorage(QualityPreference.defaultsKey) private var quality = QualityPreference.cd
@@ -339,20 +340,22 @@ struct AlbumDetailView: View {
             artist: key.artist, album: key.title, folders: missing.isEmpty ? [] : (copies?.folders ?? []),
             bandcampPage: bandcampRelease?.url, artworkURL: nil, artwork: album.artwork
         ).map { ($0.reference, $0.track) }, uniquingKeysWith: { first, _ in first })
-        let rows = AlbumRows.rows(album, missing: missing, arriving: AlbumRows.arriving(album, missing: missing, client: client))
+        // Each song in exactly one state (see AlbumState): the rows below only draw it.
+        let derived = AlbumState.derive(AlbumFacts.current(
+            for: key, library: library, client: client, references: references, adder: adder,
+            folders: copies?.folders, searching: copies?.status == .searching))
+        let tracksByPath = Dictionary(album.tracks.map { ($0.path, $0) }, uniquingKeysWith: { first, _ in first })
+        let streamsByID = Dictionary(streams.map { ("\($0.key.disc)-\($0.key.number)-\($0.key.title)", $0.value) },
+                                     uniquingKeysWith: { first, _ in first })
         // The whole album, with songs not in the library streamed when their turn comes.
-        let queue: [Track] = rows.compactMap { row in
-            switch row {
-            case .have(_, let track): track
-            case .missing(let reference): streams[reference]
-            case .arriving: nil
-            }
+        let queue: [Track] = derived.songs.compactMap { song in
+            song.libraryPath.flatMap { tracksByPath[$0] } ?? (song.isPlayable ? streamsByID[song.id] : nil)
         }
         let listed = catalog.flatMap { CatalogRelease.release(of: key.title, in: $0) }
         AlbumPage(
             artist: key.artist, title: key.title,
             // The artist's catalogue first, then the tracklist's own (when the artist isn't found).
-            footer: AlbumFooter(released: listed?.released ?? references.cached(key)?.released, year: album.year, songs: rows.count,
+            footer: AlbumFooter(released: listed?.released ?? references.cached(key)?.released, year: album.year, songs: derived.songs.count,
                                 duration: album.tracks.reduce(0) { $0 + $1.duration } + missing.reduce(0) { $0 + ($1.duration ?? 0) },
                                 copyright: listed?.copyright ?? references.cached(key)?.copyright, label: album.label),
             versions: catalog.map { CatalogRelease.otherVersions(of: key.title, in: $0) } ?? [],
@@ -397,24 +400,20 @@ struct AlbumDetailView: View {
             }
 
             let replacing = AlbumRows.replacing(album, client: client)
-            ForEach(rows) { row in
-                switch row {
-                case .have(_, let track):
+            if case .addFailed(let reason) = derived.state {
+                Label(reason, systemImage: "exclamationmark.triangle")
+                    .font(.subheadline).foregroundStyle(.secondary).listRowSeparator(.hidden)
+            }
+            ForEach(derived.songs) { song in
+                if let track = song.libraryPath.flatMap({ tracksByPath[$0] }) {
                     TrackRow(track: track, showNumber: true, replacement: replacing[track.persistentModelID])
                         .onTapGesture { player.play(queue, startingAt: queue.firstIndex { $0 === track } ?? 0) }
                         .contextMenu { TrackMenu(track: track) }
-                case .arriving(let transfer):
-                    ArrivingTrackRow(transfer: transfer)
-                case .missing(let reference):
-                    // A download of the song from any copy counts, not just the copy listed first.
-                    MissingTrackRow(track: reference,
-                                    file: MissingTracks.download(for: reference, in: AlbumRows.downloads(for: album, client: client))?.file
-                                        ?? copies?.folders.lazy.compactMap { MissingTracks.file(for: reference, in: $0.files) }.first,
-                                    isSearching: copies?.status == .searching,
-                                    playing: streams[reference])
-                        .contentShape(.rect)
+                } else {
+                    let stream = streamsByID[song.id]
+                    AlbumSongRow(song: song, playing: stream, onAdd: { addSong(song, copies: copies) })
                         .onTapGesture {
-                            if let stream = streams[reference], let start = queue.firstIndex(where: { $0 === stream }) {
+                            if song.isPlayable, let stream, let start = queue.firstIndex(where: { $0 === stream }) {
                                 player.play(queue, startingAt: start)
                             }
                         }
@@ -551,6 +550,14 @@ private func duplicatesTitle(_ tracks: [Track]) -> String {
 }
 
 extension AlbumDetailView {
+    /// Adds one song the library doesn't have, from the copy that has it, filed under this album.
+    func addSong(_ song: AlbumSong, copies: CopyFinder.Copies?) {
+        let track = ReferenceTrack(number: song.number ?? 0, disc: song.disc, title: song.title, duration: song.duration)
+        guard let folder = copies?.folders.first(where: { MissingTracks.file(for: track, in: client.complete($0).files) != nil }),
+              let file = MissingTracks.file(for: track, in: client.complete(folder).files) else { return }
+        client.download([file], in: folder, album: key, others: copies?.folders ?? [])
+    }
+
     /// A lossless Soulseek copy, for an album that isn't lossless yet.
     func upgradeCopy(_ album: Album, copies: CopyFinder.Copies?) -> RemoteFolder? {
         guard !album.tracks.isEmpty, !album.tracks.contains(where: { AudioQuality($0).isLossless }),
