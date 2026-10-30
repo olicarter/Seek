@@ -297,11 +297,10 @@ final class Player {
         guard track.isStreamed else {
             guard let url = library.url(for: track) else { return nil }
             // Not here yet (just added on the Mac, still coming through iCloud): played from the
-            // Mac while this device's copy downloads, rather than waiting for it.
+            // Mac as it arrives and kept for next time (see MacFiles), rather than waiting for iCloud.
             if library.usesICloud, !LibraryStore.isDownloaded(url), let remote = fileOnMac?(track.path) {
-                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
                 Log.debug("player: \(track.title) isn't here yet; playing it from the Mac")
-                return AVPlayerItem(url: remote)
+                if let item = await MacFiles.shared.item(for: track.path, from: remote) { return item }
             }
             guard await library.ensureLocal(url) else { return nil }
             return AVPlayerItem(url: url)

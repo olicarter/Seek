@@ -77,6 +77,7 @@
 		798EDB0341BC3D4836026EF4 /* SameRipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163D1994128F9FA7736C4D9F /* SameRipTests.swift */; };
 		7AA0B6BE963E36B16A42BE37 /* SearchModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEAA46FCE077F9A73A5167F /* SearchModel.swift */; };
 		7BB0A6B5FA1D69D3D4B33C7D /* ReleaseMatchingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7643ED3950B6BAC3E1083BA7 /* ReleaseMatchingTests.swift */; };
+		7BF1D090A40B31E59D9AF14A /* MacFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C1A4310E32183256C57D20F /* MacFiles.swift */; };
 		7D0EB2219DDC7C707FCC2A7A /* tone.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = E1A2F117CAF713E2654F0ACA /* tone.mp3 */; };
 		7D457550312BDA99A1121085 /* ID3Writer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4384D1076035E9C7DDDACCA7 /* ID3Writer.swift */; };
 		7FF0A4E8F725CBA2AE49BB0C /* ArtistCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77D4CE9A07C1084D08B3F891 /* ArtistCatalogTests.swift */; };
@@ -253,6 +254,7 @@
 		888CA4AAAF1AA5D2659CDF73 /* SyncReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncReport.swift; sourceTree = "<group>"; };
 		8DC462038046EC3F2D2BCB33 /* AlbumAddFailureAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumAddFailureAlert.swift; sourceTree = "<group>"; };
 		95417AE5AE8B6B68B3B472A1 /* BandcampTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BandcampTests.swift; sourceTree = "<group>"; };
+		9C1A4310E32183256C57D20F /* MacFiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacFiles.swift; sourceTree = "<group>"; };
 		9EA4953C44E8DD74B463CA20 /* AlbumView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumView.swift; sourceTree = "<group>"; };
 		9F5017006373FDFDF0E03624 /* LibraryMemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryMemo.swift; sourceTree = "<group>"; };
 		A1086F5B093A28F9203769F1 /* AddGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGroupTests.swift; sourceTree = "<group>"; };
@@ -454,6 +456,7 @@
 			isa = PBXGroup;
 			children = (
 				C2B8B42E9C138DB367F70588 /* AudioLevels.swift */,
+				9C1A4310E32183256C57D20F /* MacFiles.swift */,
 				DAFFA00AD3C61FFD6D27EB0D /* Player.swift */,
 				2BEB9FE8921267E64A76AFCF /* ProgressiveLoader.swift */,
 				239F3848E265086704591140 /* StreamService.swift */,
@@ -810,6 +813,7 @@
 				5B58ABF76A91A668EED6FA11 /* LibraryStore.swift in Sources */,
 				80B832ADD9D497578B42A3BC /* LibraryViews.swift in Sources */,
 				A244D4623C875AB09091A92B /* Log.swift in Sources */,
+				7BF1D090A40B31E59D9AF14A /* MacFiles.swift in Sources */,
 				7028C881A89E3DC45295CBFD /* MacLink.swift in Sources */,
 				233963AC38C6A3AFFA0F94A4 /* MacLinkTypes.swift in Sources */,
 				B6F1A0111E20532F829C43C7 /* Messages.swift in Sources */,
