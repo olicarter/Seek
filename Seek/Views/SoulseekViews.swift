@@ -292,7 +292,7 @@ struct TransferSourcesView: View {
             } header: {
                 Text(SongSourcesSummary.text(sources))
             } footer: {
-                Text("Users found with this song: the copy it was added from, the album's other copies, and any a search for another copy turned up. Seek moves a song to another copy when its user is offline, refuses, keeps failing or has kept it queued for a while.")
+                Text("Users found with this song: the copy it was added from, the album's other copies, and any a search for another copy turned up. Seek moves a song to another copy when its user is offline, refuses or keeps failing, and looks for one once it has waited 5 minutes in a queue (sooner when it's 50th or further back), then every 15 minutes.")
             }
         }
         .navigationTitle(ReleaseText.songTitle(transfer.file.name))
@@ -371,6 +371,21 @@ struct RetryingStatus: View {
     }
 }
 
+/// A song waiting in a queue, and when Seek next looks for another copy of it.
+struct NextCopyStatus: View {
+    let status: String
+    let at: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let left = at.timeIntervalSince(context.date)
+            let seconds = Int(left.rounded())
+            Text(seconds > 1 ? "\(status) · other copies tried in \(seconds < 60 ? "\(seconds)s" : "\(seconds / 60 + 1) min")"
+                             : "\(status) · looking for another copy")
+        }
+    }
+}
+
 struct TransferRow: View {
     let transfer: Transfer
     /// Within its release: the song's number and title rather than the file's whole name.
@@ -393,7 +408,11 @@ struct TransferRow: View {
                 ProgressView(value: transfer.progress)
             }
             HStack {
-                RetryingStatus(status: statusText, retryAt: transfer.retryAt)
+                if let at = client.lookElsewhereAt(transfer) {
+                    NextCopyStatus(status: statusText, at: at)
+                } else {
+                    RetryingStatus(status: statusText, retryAt: transfer.retryAt)
+                }
                 Spacer()
                 Text(transfer.username)
             }

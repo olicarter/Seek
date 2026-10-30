@@ -23,6 +23,7 @@ enum MacLinkWire {
         var libraryPath: String?
         var retryAt: Date?
         var sources: SongSources? = nil
+        var lookElsewhereAt: Date? = nil
     }
 
     /// An album added as one that couldn't be (see SoulseekClient.checkAddGroups).

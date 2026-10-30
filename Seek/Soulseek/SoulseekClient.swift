@@ -871,6 +871,19 @@ final class SoulseekClient {
     /// When each folder's songs were last looked for elsewhere, so a hopeless one isn't searched
     /// for again every minute.
     @ObservationIgnored private var lookedElsewhere: [String: Date] = [:]
+
+    /// When a song waiting in a queue is next looked for elsewhere: 5 minutes after it was
+    /// queued (at the next check, once it's 50th or further back), and no sooner than 15
+    /// minutes after its folder last was. For the Mac's downloads, as the Mac said.
+    func lookElsewhereAt(_ transfer: Transfer) -> Date? {
+        if transfer.onMac { return transfer.macLookElsewhereAt }
+        guard !transfer.forStreaming, case .queued(let place) = transfer.state, let since = transfer.queuedSince else { return nil }
+        var at = (place ?? 0) >= 50 ? Date.now : since.addingTimeInterval(5 * 60)
+        if let last = lookedElsewhere["\(transfer.username)\u{0}\(transfer.file.folder)"] {
+            at = max(at, last.addingTimeInterval(15 * 60))
+        }
+        return at
+    }
     @ObservationIgnored private var queueWatch: Task<Void, Never>?
 
     private func lookElsewhere(for transfer: Transfer) {
@@ -1125,6 +1138,7 @@ final class SoulseekClient {
             transfer.album = item.album ?? transfer.album
             transfer.addGroup = item.addGroup ?? transfer.addGroup
             if transfer.macSources != item.sources { transfer.macSources = item.sources }
+            if transfer.macLookElsewhereAt != item.lookElsewhereAt { transfer.macLookElsewhereAt = item.lookElsewhereAt }
             transfer.plannedPath = item.plannedPath
             transfer.libraryPath = item.libraryPath
             transfer.retryAt = item.retryAt

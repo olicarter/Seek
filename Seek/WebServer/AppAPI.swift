@@ -179,7 +179,8 @@ func addAppRoutes(to router: Hummingbird.Router<BasicRequestContext>, core: Core
                         id: transfer.id, file: transfer.file, state: state, detail: detail, size: transfer.size,
                         bytesReceived: transfer.bytesReceived, bytesPerSecond: transfer.bytesPerSecond, album: transfer.album,
                         addGroup: transfer.addGroup, plannedPath: transfer.plannedPath, libraryPath: transfer.libraryPath,
-                        retryAt: transfer.retryAt, sources: client.sources(of: transfer))
+                        retryAt: transfer.retryAt, sources: client.sources(of: transfer),
+                        lookElsewhereAt: client.lookElsewhereAt(transfer))
                 },
                 failedAdds: client.failedAdds)
         })
