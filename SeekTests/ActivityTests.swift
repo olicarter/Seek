@@ -38,3 +38,15 @@ struct ActivityTests {
         #expect(SoulseekClient.songKey(first) == SoulseekClient.songKey(second))
     }
 }
+
+/// Counting copies goes by the song's name: a track number alone is a different song.
+@MainActor
+struct CopyCountTests {
+    @Test func aNumberAloneIsntTheSameSong() {
+        let stuck = ReleaseText.fold(ReleaseText.trackName("01-storm_mollison-delirious_girl_(original_mix).flac"))
+        let other = ReleaseText.fold(ReleaseText.trackName("1. U KNEW.mp3"))
+        #expect(stuck != other)
+        #expect(ReleaseText.fold(ReleaseText.trackName("01 - Delirious Girl (Original Mix).flac"))
+                    == ReleaseText.fold(ReleaseText.trackName("Delirious Girl (Original Mix).mp3")))
+    }
+}

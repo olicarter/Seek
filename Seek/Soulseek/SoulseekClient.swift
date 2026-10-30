@@ -924,11 +924,15 @@ final class SoulseekClient {
         songSources[Self.songKey(transfer), default: SongSources()].found.insert(user)
     }
 
-    /// Users with copies of these songs among `folders` (counterparts by name, then number).
+    /// Users with copies of these songs among `folders`, by name: a track number alone ("1. U
+    /// KNEW.mp3" for "01 Delirious Girl") isn't the same song, so it isn't counted.
     private func noteCopies(of songs: [Transfer], in folders: [RemoteFolder]) {
         for folder in folders {
-            let matches = Self.counterparts(of: songs.map(\.file), in: complete(folder).files)
-            for song in songs where matches[song.file.id] != nil { noteFound(folder.username, for: song) }
+            let names = Set(complete(folder).files.filter { AudioFormats.playable.contains($0.fileExtension) }
+                .map { ReleaseText.fold(ReleaseText.trackName($0.name)) })
+            for song in songs where names.contains(ReleaseText.fold(ReleaseText.trackName(song.file.name))) {
+                noteFound(folder.username, for: song)
+            }
         }
     }
 
