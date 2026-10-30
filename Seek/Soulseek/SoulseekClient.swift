@@ -957,22 +957,37 @@ final class SoulseekClient {
             let all = transfers.filter { !$0.forStreaming && $0.username == failed.username && $0.file.folder == folderPath }
             let original = RemoteFolder(username: failed.username, path: folderPath, files: all.map(\.file),
                                         hasFreeSlot: true, averageSpeed: 0, queueLength: 0)
+            // The album it was added as, when it's known: the stuck user's folder name may say
+            // much more ("BabyFace Ray x Flo Milli x Rico Nasty You Still Here Ho"), and Soulseek
+            // only finds folders with every word searched for.
             let parsed = FolderParser.parse(original)
-            let query = [parsed.artist, ReleaseText.cleanTitle(parsed.title)].compactMap { $0 }.joined(separator: " ")
+            let target = stalled.lazy.compactMap(\.album).first
+            let artist = target?.artist ?? parsed.artist
+            let title = target?.title ?? parsed.title
+            let query = target.map(CopyFinder.query(for:))
+                ?? [parsed.artist, ReleaseText.cleanTitle(parsed.title)].compactMap { $0 }.joined(separator: " ")
             let album = ReleaseText.fold(query)
             lostUsers[album, default: []].insert(failed.username)
             SoulseekEvents.record("\(failed.username) stalled on \(stalled.count) songs of \(query); looking for another copy")
 
-            guard let found = await quietSearch(query) else { return }
-            let releases = ReleaseGrouper.group(query: query, owned: [], store: [], folders: found).releases
             let lost = lostUsers[album] ?? []
-            let candidates = releases
-                .filter { release in
-                    ReleaseText.titlesMatch(release.title, parsed.title)
-                        && (parsed.artist.map { ReleaseText.artistsMatch(release.artist, $0) } ?? true)
-                }
-                .flatMap(\.folders)
-                .filter { !lost.contains($0.username) }
+            func copies(for query: String) async -> [RemoteFolder]? {
+                guard let found = await quietSearch(query) else { return nil }
+                return ReleaseGrouper.group(query: query, owned: [], store: [], folders: found).releases
+                    .filter { release in
+                        ReleaseText.titlesMatch(release.title, title)
+                            && (artist.map { ReleaseText.artistsMatch(release.artist, $0) } ?? true)
+                    }
+                    .flatMap(\.folders)
+                    .filter { !lost.contains($0.username) }
+            }
+            guard var candidates = await copies(for: query) else { return }
+            // Nothing by the artist and title together: the title alone (when it says enough).
+            let titleOnly = CopyFinder.query(for: AlbumKey(artist: "", title: title)).trimmingCharacters(in: .whitespaces)
+            if candidates.isEmpty, titleOnly != query, titleOnly.split(separator: " ").count >= 2 || titleOnly.count >= 6 {
+                SoulseekEvents.record("nothing for \(query); trying \(titleOnly)")
+                candidates = await copies(for: titleOnly) ?? []
+            }
             noteCopies(of: stalled, in: candidates)
             // The whole album, free to send now, best first.
             let ranked = ReleaseGrouper.sortedBest(candidates.filter(\.hasFreeSlot) + candidates.filter { !$0.hasFreeSlot },
