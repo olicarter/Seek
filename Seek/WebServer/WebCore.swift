@@ -14,6 +14,8 @@ final class Core {
     let resolver: FolderResolver
     let adder: AlbumAdder
     let streamer: StreamService
+    /// Album and artist descriptions (with their similar music), set by the app.
+    var about: AlbumAbout?
     /// The web's search, apart from the app's Search tab (both use the one Soulseek client).
     let search = SearchModel()
     /// Searches run for an iPhone or iPad using this Mac (see AppAPI).

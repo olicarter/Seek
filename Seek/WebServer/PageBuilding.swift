@@ -92,6 +92,7 @@ extension Core {
             released: (reference?.released).map { $0.ISO8601Format(.iso8601.year().month().day().dateSeparator(.dash)) },
             copyright: reference?.copyright,
             tint: tint,
+            about: albumAbout(key, year: album.year > 0 ? album.year : (found?.year ?? reference?.year), label: album.label),
             quality: album.tracks.isEmpty ? folders.first?.soundQuality : AudioQuality.summary(of: album.tracks)?.quality,
             qualityDetail: album.tracks.isEmpty ? folders.first?.qualityDetail : AudioQuality.summary(of: album.tracks)?.detail,
             listed: reference != nil, inLibrary: !album.tracks.isEmpty,
@@ -175,8 +176,11 @@ extension Core {
         let tracks = ArtistPage.tracks(of: name, in: library.allTracks)
         let albums = LibraryGrouping.albums(tracks).sorted { $0.year > $1.year }
         let catalog = await ArtistCatalog.releases(for: name)
+        let shownName = albums.first?.artist ?? catalog.first?.artist ?? name
+        about?.load(artist: shownName)
         return Pages.Artist(
-            name: albums.first?.artist ?? catalog.first?.artist ?? name,
+            name: shownName,
+            about: about?.text(forArtist: shownName),
             albums: albums.map { Pages.LibraryAlbum(artist: $0.artist, title: $0.title, year: $0.year > 0 ? $0.year : nil,
                                                     artwork: coverPath($0.key, size: Covers.tile), preview: coverPreview($0.key), songs: $0.tracks.count) },
             // Everything they've released, the library's albums among the rest (see ArtistPage.sections).
@@ -247,5 +251,14 @@ extension Core {
               let hex = await Task.detached(operation: { ArtworkColor.color(of: data)?.hex }).value else { return nil }
         tints[url] = hex
         return hex
+    }
+
+    /// The album's description, asked for (with its similar albums) the first time its page is shown.
+    func albumAbout(_ key: AlbumKey, year: Int?, label: String) -> String? {
+        guard let about else { return nil }
+        if let text = about.text(for: key) { return text }
+        about.load(key, details: [year.map { "Released \($0)" }, label.isEmpty ? nil : "Label: \(label)"]
+            .compactMap { $0 }.joined(separator: "\n"))
+        return nil
     }
 }

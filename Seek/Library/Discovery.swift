@@ -78,20 +78,39 @@ final class DiscoveryService {
 
     // MARK: - Asking Claude
 
-    /// Fetches suggestions unless they're cached or already being fetched. Without an API key it
-    /// does nothing, and the page just has no suggestions.
-    func load(_ subject: Subject, refresh: Bool = false) {
+    /// Where a page's description is kept: an album's as AlbumAbout keeps it, an artist's beside.
+    static func aboutKey(_ subject: Subject) -> String {
+        switch subject {
+        case .album(let artist, let title): AlbumAbout.key(AlbumKey(artist: artist, title: title))
+        case .artist: "about-" + subject.key
+        }
+    }
+
+    /// Fetches suggestions, with the page's description in the same request (one set of web
+    /// searches for both), unless they're cached or already being fetched. `details`: more about
+    /// the subject than the library knows (a search result's year and label). Without an API key
+    /// it does nothing, and the page just has no suggestions.
+    func load(_ subject: Subject, refresh: Bool = false, details: String = "") {
         let key = subject.key
         guard states[key] != .loading, refresh || cached(subject) == nil,
               let apiKey = ClaudeTagFixer.apiKey else { return }
         states[key] = .loading
         remember(subject)
-        let library = libraryContext(for: subject)
+        var library = libraryContext(for: subject)
+        if !details.isEmpty { library.details = [library.details, details].filter { !$0.isEmpty }.joined(separator: "\n") }
+        let aboutKey = Self.aboutKey(subject)
         let work = beginBackgroundWork()
         Task {
             defer { endBackgroundWork(work) }
             do {
-                var suggestions = try await Self.ask(about: subject, library: library, apiKey: apiKey)
+                var (suggestions, description) = try await Self.ask(about: subject, library: library, apiKey: apiKey)
+                // The page's description, unless one's already there.
+                let about = AlbumAbout.cleaned(description)
+                if !about.isEmpty,
+                   ((try? self.context.fetchCount(FetchDescriptor<Discovery>(predicate: #Predicate { $0.key == aboutKey }))) ?? 0) == 0 {
+                    self.context.insert(Discovery(key: aboutKey, payload: Data(about.utf8)))
+                    try? self.context.save()
+                }
                 // An empty answer never replaces suggestions already there.
                 guard !suggestions.isEmpty else { throw DiscoveryError.nothingFound }
                 suggestions = await Self.addArtwork(to: suggestions)
@@ -225,8 +244,13 @@ final class DiscoveryService {
         sound or labels, mixing a few well-known names with lesser-known ones. Only suggest artists and \
         releases that really exist; if the subject is obscure, use web_search to learn its scene first. \
         Never suggest anything listed as already in the library, or the subject itself. Keep each reason under \
-        12 words, about the sound or connection (shared label, collaborators, scene). Finish by calling \
-        submit_suggestions once.
+        12 words, about the sound or connection (shared label, collaborators, scene). \
+        Also write the description shown at the top of the subject's page, like Apple Music's editorial notes: two or \
+        three sentences, about 60 words. For an album: its context, its sound, and one notable fact (how it was made, \
+        its reception or influence). For an artist: who they are and where they're from, their sound, and one notable \
+        fact. Plain prose: no markdown, no lists, no quoted reviews, no hype words. If you can't find anything reliable, \
+        describe only what the details given say. Search the web only when you don't already know the subject well. \
+        Finish by calling submit_suggestions once.
         """
 
     static func tool(for subject: Subject) -> [String: Any] {
@@ -242,12 +266,13 @@ final class DiscoveryService {
         return [
             "name": "submit_suggestions",
             "strict": true,
-            "description": "Submit 8 suggestions, best first.",
+            "description": "Submit the page's description and 8 suggestions, best first.",
             "input_schema": [
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["suggestions"],
+                "required": ["description", "suggestions"],
                 "properties": [
+                    "description": ["type": "string", "description": "The subject's description: two or three sentences, about 60 words."],
                     "suggestions": [
                         "type": "array",
                         "items": [
@@ -278,7 +303,7 @@ final class DiscoveryService {
         return lines.joined(separator: "\n")
     }
 
-    private static func ask(about subject: Subject, library: LibraryContext, apiKey: String) async throws -> [Suggestion] {
+    private static func ask(about subject: Subject, library: LibraryContext, apiKey: String) async throws -> ([Suggestion], String) {
         do {
             return try await attempt(subject, library: library, apiKey: apiKey)
         } catch let error as ClaudeTagFixer.FixError where error.isRetryable {
@@ -287,7 +312,7 @@ final class DiscoveryService {
         }
     }
 
-    private static func attempt(_ subject: Subject, library: LibraryContext, apiKey: String) async throws -> [Suggestion] {
+    private static func attempt(_ subject: Subject, library: LibraryContext, apiKey: String) async throws -> ([Suggestion], String) {
         var messages: [[String: Any]] = [["role": "user", "content": prompt(for: subject, library: library)]]
         var nudged = false
         var retriedSubmission = false
@@ -306,13 +331,15 @@ final class DiscoveryService {
                 "tools": tools,
                 "messages": messages,
             ] as [String: Any])
-            let response = try await ClaudeTagFixer.response(to: request, purpose: "Similar albums")
+            let purpose = if case .artist = subject { "Artist pages" } else { "Album pages" }
+            let response = try await ClaudeTagFixer.response(to: request, purpose: purpose)
             let content = response["content"] as? [[String: Any]] ?? []
             if response["stop_reason"] as? String == "refusal" { throw ClaudeTagFixer.FixError.refused }
             if let call = content.first(where: { $0["type"] as? String == "tool_use" && $0["name"] as? String == "submit_suggestions" }),
                let input = call["input"] as? [String: Any] {
                 let suggestions = parse(input)
-                if suggestions.count >= 3 || retriedSubmission { return suggestions }
+                let description = input["description"] as? String ?? ""
+                if suggestions.count >= 3 || retriedSubmission { return (suggestions, description) }
                 // Too few usable entries (e.g. missing artists): say what was wrong and ask again.
                 Log.debug("discovery: only \(suggestions.count) usable suggestions in \(input)")
                 retriedSubmission = true

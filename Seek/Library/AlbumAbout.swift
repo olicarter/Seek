@@ -2,8 +2,10 @@ import Foundation
 import Observation
 import SwiftData
 
-/// A few sentences about an album, like Apple Music's, written by Claude Haiku once per album
-/// and kept in the synced store (as a `Discovery` entry keyed "about:…") for every device.
+/// A few sentences about an album or artist, like Apple Music's, written by Claude Haiku once
+/// and kept in the synced store (as a `Discovery` entry keyed "about:…") for every device. It
+/// comes with the page's similar albums or artists, in one request (see DiscoveryService.load),
+/// so one set of web searches serves both.
 @MainActor
 @Observable
 final class AlbumAbout {
@@ -11,16 +13,19 @@ final class AlbumAbout {
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private var failed: Set<String> = []
 
+    /// Asks for descriptions along with similar music (set by the app).
+    @ObservationIgnored weak var discovery: DiscoveryService?
+
     init(container: ModelContainer) {
         context = container.mainContext
     }
 
-    static func key(_ album: AlbumKey) -> String {
-        "about:" + DiscoveryService.Subject.album(artist: album.artist, title: album.title).key.dropFirst("album:".count)
+    /// An artist's description, which comes with their similar artists.
+    func text(forArtist name: String) -> String? {
+        stored(DiscoveryService.aboutKey(.artist(name)))
     }
 
-    func text(for album: AlbumKey) -> String? {
-        let key = Self.key(album)
+    private func stored(_ key: String) -> String? {
         var descriptor = FetchDescriptor<Discovery>(predicate: #Predicate { $0.key == key })
         descriptor.fetchLimit = 1
         guard let entry = try? context.fetch(descriptor).first else { return nil }
@@ -28,12 +33,42 @@ final class AlbumAbout {
         return text.isEmpty ? nil : text
     }
 
-    /// Asks Haiku the first time an album is shown. Does nothing without a Claude key, and
-    /// doesn't retry a failure until the next launch.
+    /// Being written: on its own, or with the page's similar music.
+    func isLoading(_ album: AlbumKey) -> Bool {
+        loading.contains(Self.key(album))
+            || discovery?.states[DiscoveryService.Subject.album(artist: album.artist, title: album.title).key] == .loading
+    }
+
+    func isLoading(artist name: String) -> Bool {
+        discovery?.states[DiscoveryService.Subject.artist(name).key] == .loading
+    }
+
+    /// An artist's description, with their similar artists, the first time their page is shown.
+    func load(artist name: String) {
+        guard text(forArtist: name) == nil else { return }
+        discovery?.load(.artist(name))
+    }
+
+    static func key(_ album: AlbumKey) -> String {
+        "about:" + DiscoveryService.Subject.album(artist: album.artist, title: album.title).key.dropFirst("album:".count)
+    }
+
+    func text(for album: AlbumKey) -> String? {
+        stored(Self.key(album))
+    }
+
+    /// Asks the first time an album is shown: with its similar albums, in one request, unless
+    /// they were found before descriptions came with them (then on its own). Does nothing without
+    /// a Claude key, and doesn't retry a failure until the next launch.
     func load(_ album: AlbumKey, details: String) {
         let key = Self.key(album)
         guard text(for: album) == nil, !loading.contains(key), !failed.contains(key),
               let apiKey = ClaudeTagFixer.apiKey else { return }
+        let subject = DiscoveryService.Subject.album(artist: album.artist, title: album.title)
+        if let discovery, discovery.cached(subject) == nil {
+            discovery.load(subject, details: details)
+            return
+        }
         loading.insert(key)
         Task {
             defer { loading.remove(key) }
@@ -74,7 +109,7 @@ final class AlbumAbout {
                 "model": ClaudeTagFixer.Model.haiku.rawValue,
                 "max_tokens": 600,
                 "system": system,
-                "tools": [["type": "web_search_20250305", "name": "web_search", "max_uses": 2]],
+                "tools": [["type": "web_search_20250305", "name": "web_search", "max_uses": 1]],
                 "messages": messages,
             ] as [String: Any])
             let response = try await ClaudeTagFixer.response(to: request, purpose: "Album descriptions")

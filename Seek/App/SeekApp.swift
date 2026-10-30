@@ -32,8 +32,11 @@ struct SeekApp: App {
         self.container = container
         _library = State(initialValue: library)
         _player = State(initialValue: Player(library: library))
-        _discovery = State(initialValue: DiscoveryService(container: container))
-        _about = State(initialValue: AlbumAbout(container: container))
+        let discovery = DiscoveryService(container: container)
+        _discovery = State(initialValue: discovery)
+        let about = AlbumAbout(container: container)
+        about.discovery = discovery
+        _about = State(initialValue: about)
         let client = SoulseekClient()
         _client = State(initialValue: client)
         _streamer = State(initialValue: StreamService(client: client))
@@ -135,10 +138,12 @@ struct SeekApp: App {
                     #endif
                     #if targetEnvironment(macCatalyst)
                     if web == nil {
-                        let server = WebServer(core: Core(
+                        let core = Core(
                             library: library, client: client, bandcamp: bandcamp, references: albumReferences,
                             copyFinder: copyFinder, storeVerifier: storeVerifier, resolver: folderResolver,
-                            adder: albumAdder, streamer: streamer))
+                            adder: albumAdder, streamer: streamer)
+                        core.about = about
+                        let server = WebServer(core: core)
                         web = server
                         server.start()
                     }

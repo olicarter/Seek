@@ -136,6 +136,9 @@ struct ArtistView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     Text(artist.name).font(.largeTitle.bold())
+                    if let about = artist.about {
+                        Text(about).font(.callout).foregroundStyle(.secondary).lineLimit(4).frame(maxWidth: 1200, alignment: .leading)
+                    }
                     // Everything they've released, the library's albums among the rest, marked.
                     ForEach(artist.sections, id: \.title) { section in
                         Text(section.title).font(.title2.bold())

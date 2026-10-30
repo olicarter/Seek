@@ -60,6 +60,8 @@ export type AlbumPage = {
   copyright?: string;
   /** The page's colour from the cover, "#1e3f6e". */
   tint?: string;
+  /** A few sentences about the album, once written. */
+  about?: string;
   quality?: SoundQuality;
   /** "24-bit, 96 kHz". */
   qualityDetail?: string;
@@ -74,6 +76,8 @@ export type AlbumPage = {
 
 export type ArtistPage = {
   name: string;
+  /** A few sentences about them, once written. */
+  about?: string;
   albums: LibraryAlbum[];
   sections: {
     title: string;

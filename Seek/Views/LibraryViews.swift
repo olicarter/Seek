@@ -362,7 +362,7 @@ struct AlbumDetailView: View {
                 title: album.title, artist: album.artist, onArtist: { openArtistPage() }, year: album.year,
                 quality: AudioQuality.summary(of: album.tracks)?.quality,
                 qualityDetail: AudioQuality.summary(of: album.tracks)?.detail, description: about.text(for: key),
-                isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
+                isDescribing: about.isLoading(key), canPlay: !queue.isEmpty,
                 isPreparing: copies?.status == .searching,
                 onPlay: { player.play(queue, startingAt: 0) },
                 onShuffle: { player.playShuffled(queue) }
@@ -750,6 +750,7 @@ struct ArtistDetailView: View {
     @Environment(LibraryStore.self) private var library
     @Environment(Player.self) private var player
     @Environment(\.dismiss) private var dismiss
+    @Environment(AlbumAbout.self) private var about
     @State private var deleting: PendingDelete?
     /// Everything they've released, from Apple Music, to show what the library doesn't have.
     @State private var catalog: [CatalogRelease] = []
@@ -759,6 +760,12 @@ struct ArtistDetailView: View {
         let albums = LibraryGrouping.albums(artistTracks).sorted { $0.year > $1.year }
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // A few sentences about them, as Apple Music's artist pages have.
+                if let text = about.text(forArtist: name) {
+                    ExpandableText(text: text)
+                } else if about.isLoading(artist: name) {
+                    Text("Finding out about \(name)…").font(.subheadline).foregroundStyle(.secondary)
+                }
                 PlayShuffleButtons(tracks: albums.flatMap(\.tracks))
                 // Everything they've released, the library's albums among the rest, marked.
                 ForEach(ArtistPage.sections(catalog: catalog, owned: albums), id: \.section) { section in
@@ -772,7 +779,10 @@ struct ArtistDetailView: View {
                 .padding(.vertical)
         }
         .navigationTitle(name)
-        .task(id: name) { catalog = await ArtistCatalog.releases(for: name) }
+        .task(id: name) {
+            about.load(artist: name)
+            catalog = await ArtistCatalog.releases(for: name)
+        }
         .toolbar {
             Menu("More", systemImage: "ellipsis") {
                 DownloadMenuItems(tracks: artistTracks)

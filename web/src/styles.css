@@ -178,6 +178,19 @@ main { max-width: 1480px; margin: 0 auto; padding: 32px var(--gutter) 140px; }
 @keyframes bar { 0%, 100% { height: 3px; } 50% { height: 12px; } }
 .album-footer { color: var(--secondary); font-size: 13px; line-height: 1.6; margin: 22px 12px 0; }
 
+/* About an album or artist: three lines, then MORE. */
+.about {
+  position: relative; max-width: 720px; margin: 12px 0 0; color: var(--secondary); font-size: 14px; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.about.open { display: block; }
+.about .more {
+  position: absolute; right: 0; bottom: 0; padding-left: 24px; border: none; color: var(--text); font-size: 12px; font-weight: 700;
+  background: linear-gradient(to right, transparent, var(--bg) 22px);
+}
+.album .about .more { background: none; }
+.artist-about { margin: -12px 0 8px; }
+
 /* Player */
 .player {
   position: fixed; left: calc(var(--sidebar-width) + (100% - var(--sidebar-width)) / 2); bottom: 16px; transform: translateX(-50%);

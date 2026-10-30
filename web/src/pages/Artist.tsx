@@ -3,6 +3,7 @@ import { For, Show } from "solid-js";
 import { albumHref, api, changes, fromPath, type ArtistPage } from "../api";
 import { live } from "../live";
 import { Grid, type TileItem } from "../Tiles";
+import { About } from "../About";
 
 /**
  * An artist's page, as in the app: everything they've released under Apple Music's headings,
@@ -25,6 +26,7 @@ export function Artist() {
       {(artist) => (
         <section>
           <div class="page-head"><h1 class="artist-name">{artist().name}</h1></div>
+          <div class="artist-about"><About text={artist().about} /></div>
           <For each={artist().sections}>
             {(section) => (
               <>

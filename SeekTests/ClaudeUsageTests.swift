@@ -27,3 +27,22 @@ struct ClaudeUsageTests {
         #expect(ClaudeUsageSection.cost(0.004) == "< $0.01")
     }
 }
+
+/// Album and artist pages ask once for their description and similar music.
+@MainActor
+struct CombinedPageRequestTests {
+    @Test func theAnswerHoldsADescriptionAndSuggestions() throws {
+        for subject in [DiscoveryService.Subject.album(artist: "Flo Milli", title: "Fine Ho, Stay"), .artist("Flo Milli")] {
+            let schema = try #require(DiscoveryService.tool(for: subject)["input_schema"] as? [String: Any])
+            let required = try #require(schema["required"] as? [String])
+            #expect(required.contains("description"))
+            #expect(required.contains("suggestions"))
+        }
+    }
+
+    @Test func descriptionsAreKeptWhereEachPageLooks() {
+        let album = AlbumKey(artist: "Flo Milli", title: "Fine Ho, Stay")
+        #expect(DiscoveryService.aboutKey(.album(artist: album.artist, title: album.title)) == AlbumAbout.key(album))
+        #expect(DiscoveryService.aboutKey(.artist("Flo Milli")) == "about-artist:flo milli")
+    }
+}

@@ -69,6 +69,8 @@ enum Pages {
         var copyright: String?
         /// The page's colour from the cover, "#1e3f6e" (see ArtworkColor).
         var tint: String? = nil
+        /// A few sentences about the album, once Claude has written them.
+        var about: String? = nil
         /// The album's tier (its lowest song's, or its best copy's) and "24-bit, 96 kHz".
         var quality: SoundQuality? = nil
         var qualityDetail: String? = nil
@@ -108,6 +110,8 @@ enum Pages {
 
     struct Artist: Codable, Sendable {
         var name: String
+        /// A few sentences about them, once Claude has written them.
+        var about: String? = nil
         var albums: [LibraryAlbum]
         var sections: [ArtistSection]
     }

@@ -576,7 +576,7 @@ struct ReleaseDetailView: View {
                     year: release.year ?? reference?.year,
                     quality: release.soundQuality,
                     qualityDetail: release.bestFolder?.qualityDetail, description: about.text(for: key),
-                    isDescribing: about.loading.contains(AlbumAbout.key(key)), canPlay: !queue.isEmpty,
+                    isDescribing: about.isLoading(key), canPlay: !queue.isEmpty,
                     isPreparing: soulseekStatus == .searching || client.currentSearch != nil && release.folders.isEmpty,
                     // Played without adding to the library: songs are fetched as they come up.
                     onPlay: { player.play(queue.map(\.track), startingAt: 0) },

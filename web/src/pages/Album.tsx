@@ -6,6 +6,7 @@ import { duration } from "../format";
 import { Cover } from "../Cover";
 import { Icon } from "../Icons";
 import { Quality } from "../Quality";
+import { About } from "../About";
 import { Shelf, type TileItem } from "../Tiles";
 import { current, play, playing, type QueueItem } from "../player";
 
@@ -74,6 +75,7 @@ export function Album() {
                 <Show when={album().year}><span>{album().year}</span></Show>
                 <Quality quality={album().quality} detail={album().qualityDetail} />
               </div>
+              <About text={album().about} />
               <Show when={!album().inLibrary && album().listed && !album().copies && !album().bandcamp?.owned}>
                 <p class="album-note">{album().lookingForCopies ? "Looking on Soulseek…" : "No copies on Soulseek right now."}</p>
               </Show>

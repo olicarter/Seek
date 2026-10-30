@@ -49,6 +49,9 @@ struct AlbumView: View {
                     if let year = album.year { Text(String(year)).font(.callout).foregroundStyle(.secondary) }
                     if let quality = album.quality { SoundQualityBadge(quality: quality, detail: album.qualityDetail) }
                 }
+                if let about = album.about {
+                    Text(about).font(.caption).foregroundStyle(.secondary).lineLimit(6)
+                }
             }
             HStack(spacing: 24) {
                 Button("Play", systemImage: "play.fill") { play(album) }
