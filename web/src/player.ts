@@ -99,14 +99,18 @@ audio.addEventListener("timeupdate", () => setTime(audio.currentTime));
 audio.addEventListener("durationchange", () => setLength(isFinite(audio.duration) ? audio.duration : 0));
 audio.addEventListener("ended", () => next());
 
-function load(i: number) {
+/** `at`: where in the song to start; `autoplay` false leaves it paused there. */
+function load(i: number, { at = 0, autoplay = true }: { at?: number; autoplay?: boolean } = {}) {
   const item = queue()[i];
   if (!item) return;
   setIndex(i);
   started = false;
   waitingSince = 0;
   audio.src = address(item);
-  void audio.play();
+  if (at > 0) audio.addEventListener("loadedmetadata", () => (audio.currentTime = at), { once: true });
+  // Browsers refuse sound that starts without a click (after a reload, say): then it waits, paused.
+  if (autoplay) void audio.play().catch(() => setPlaying(false));
+  save();
   // The next song's compressed copy is made while this one plays.
   const following = queue()[i + 1];
   if (compressed() && following) void fetch(compressedAddress(following.file), { headers: { Range: "bytes=0-0" } }).catch(() => {});
@@ -119,6 +123,38 @@ function load(i: number) {
     });
   }
 }
+
+// What's playing, kept so a reload carries on from the same place in the same song.
+const STATE = "seek.playing";
+let lastSaved = 0;
+function save() {
+  lastSaved = Date.now();
+  try {
+    if (!queue().length) localStorage.removeItem(STATE);
+    else localStorage.setItem(STATE, JSON.stringify({ queue: queue(), index: index(), time: audio.currentTime, playing: !audio.paused }));
+  } catch {
+    // Storage off: a reload starts afresh.
+  }
+}
+audio.addEventListener("timeupdate", () => Date.now() - lastSaved > 2000 && save());
+audio.addEventListener("play", save);
+audio.addEventListener("pause", () => {
+  // A page being closed pauses its audio first: that pause isn't the listener's.
+  if (document.visibilityState !== "hidden") save();
+});
+window.addEventListener("pagehide", save);
+
+(() => {
+  let state: { queue: QueueItem[]; index: number; time: number; playing: boolean } | undefined;
+  try {
+    state = JSON.parse(localStorage.getItem(STATE) ?? "null") ?? undefined;
+  } catch {
+    state = undefined;
+  }
+  if (!state?.queue?.length || !state.queue[state.index]) return;
+  setQueue(state.queue);
+  load(state.index, { at: state.time, autoplay: state.playing });
+})();
 
 export function play(items: QueueItem[], start = 0) {
   setQueue(items);
