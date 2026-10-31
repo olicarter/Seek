@@ -58,7 +58,7 @@ final class AlbumReferences {
         // v5: the album itself before an EP or single sharing its name.
         // v6: remasters, remixes and live albums keep their own tracklists.
         // v7: kept by AlbumIdentity's recording key.
-        URL.applicationSupportDirectory.appending(path: "album-references-v7.json")
+        URL.applicationSupportDirectory.appending(path: "album-references-v8.json")
     }
 
     init() {

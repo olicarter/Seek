@@ -471,3 +471,19 @@ struct BandcampArtworkTests {
         #expect(BandcampAPI.repaired(fine) == fine)
     }
 }
+
+struct SplitReleaseTitleTests {
+    @Test func theArtistInFrontComesOff() {
+        let split = BandcampAPI.songTitle("MIKE & SURF GANG - The Fall", artist: "MIKE & SURF GANG")
+        #expect(split.title == "The Fall")
+        #expect(split.artist == "MIKE & SURF GANG")
+        #expect(BandcampAPI.songTitle("Earl Sweatshirt & SURF GANG - Don't Worry!", artist: "Earl Sweatshirt & SURF GANG").title == "Don't Worry!")
+    }
+
+    @Test func otherNamesStay() {
+        #expect(BandcampAPI.songTitle("The Fall", artist: "MIKE").title == "The Fall")
+        #expect(BandcampAPI.songTitle("Pressure - Dub", artist: "Burial").title == "Pressure - Dub")
+        #expect(BandcampAPI.songTitle("MIKE - ", artist: "MIKE").title == "MIKE - ")
+        #expect(BandcampAPI.songTitle("Archangel", artist: nil).artist == nil)
+    }
+}

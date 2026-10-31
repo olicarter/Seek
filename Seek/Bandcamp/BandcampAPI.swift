@@ -326,16 +326,31 @@ enum BandcampAPI {
                 if let number = track["track_num"] as? Int, let artist = track["artist"] as? String, !artist.isEmpty {
                     info.trackArtists[number] = artist
                 }
-                if let title = track["title"] as? String {
+                if let listed = track["title"] as? String {
+                    let (title, artist) = songTitle(listed, artist: track["artist"] as? String)
                     info.tracks.append(ReferenceTrack(
                         number: track["track_num"] as? Int ?? index + 1, disc: 1, title: title,
                         duration: (track["duration"] as? NSNumber)?.doubleValue,
-                        streamURL: ((track["file"] as? [String: Any])?["mp3-128"] as? String).flatMap(URL.init(string:))
+                        streamURL: ((track["file"] as? [String: Any])?["mp3-128"] as? String).flatMap(URL.init(string:)),
+                        artist: artist
                     ))
                 }
             }
         }
         return found ? info : nil
+    }
+
+    /// A song's name without its artist, which split releases put in front ("MIKE & SURF GANG -
+    /// The Fall", with MIKE & SURF GANG as its artist): the name, and the artist when it was there.
+    static func songTitle(_ listed: String, artist: String?) -> (title: String, artist: String?) {
+        guard let artist, !artist.isEmpty else { return (listed, nil) }
+        for separator in [" - ", " – ", " — "] {
+            let prefix = artist + separator
+            if listed.count > prefix.count, listed.lowercased().hasPrefix(prefix.lowercased()) {
+                return (String(listed.dropFirst(prefix.count)).trimmingCharacters(in: .whitespaces), artist)
+            }
+        }
+        return (listed, nil)
     }
 
     /// The release's selling currency: on the band data, or failing that on the sole seller in the
