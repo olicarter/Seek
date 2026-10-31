@@ -146,4 +146,19 @@ struct AlbumStateTests {
         #expect(songs[0].state == .arriving(.importing))
         #expect(!state.canAdd)
     }
+
+    @Test func aFinishedSongInTheLibraryIsShownOnce() {
+        // Finished on the Mac, and now in this device's library too.
+        let facts = AlbumFacts(tracklist: fairDinkum,
+                               library: fairDinkum.map { have($0.title, $0.number, fromMac: true) },
+                               downloads: [download("01 Volitant.flac", .completed, onItsWay: false),
+                                           download("05 Bonus Track.flac", .completed, onItsWay: false)],
+                               copies: .found([]))
+        let (state, songs) = AlbumState.derive(facts)
+        #expect(songs.count == fairDinkum.count + 1)
+        #expect(songs.filter { $0.title == "Volitant" }.count == 1)
+        #expect(songs.last?.title == "Bonus Track")
+        #expect(songs.last?.state == .arriving(.importing))
+        #expect(state == .adding(arrived: 4, total: 5))
+    }
 }

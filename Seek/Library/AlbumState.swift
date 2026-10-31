@@ -182,6 +182,10 @@ extension AlbumState {
                                      state: .unavailable)
                 if let have = matched[position] {
                     song.state = libraryState(have)
+                    // Its download, finished, is the song already here: not another one.
+                    if let index = Self.downloadMatch(for: track, in: downloads), !downloads[index].onItsWay {
+                        downloads.remove(at: index)
+                    }
                 } else if let index = Self.downloadMatch(for: track, in: downloads) {
                     let found = downloads.remove(at: index)
                     song.state = Self.arrivalState(found) ?? Self.copyState(track, files: files, copies: facts.copies)
@@ -205,6 +209,7 @@ extension AlbumState {
         }
         // Downloads on their way that no song above is (a bonus track, or no tracklist).
         for download in downloads where !download.replacesExisting {
+            if !download.onItsWay, facts.library.contains(where: { Self.sameSong($0, download.file) }) { continue }
             guard let state = Self.arrivalState(download), case .arriving = state else { continue }
             songs.append(AlbumSong(id: "download-\(download.id)", number: ReleaseText.songNumber(download.file.name), disc: 1,
                                    title: ReleaseText.songTitle(download.file.name), duration: download.file.duration.map(Double.init),
