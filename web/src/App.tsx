@@ -1,6 +1,8 @@
 import { A, useLocation, useNavigate } from "@solidjs/router";
 import { createEffect, createResource, createSignal, type ParentProps, Show } from "solid-js";
-import { api, changes, NotPaired, serverAddress } from "./api";
+import { api, changes, isGuest, NotPaired, serverAddress } from "./api";
+import { JamBar } from "./JamBar";
+import { notice, useJam } from "./jam";
 import { Icon } from "./Icons";
 import { PlayerBar } from "./PlayerBar";
 import { SignIn } from "./SignIn";
@@ -11,7 +13,56 @@ import { SignIn } from "./SignIn";
  * sidebar becomes a tab bar.
  */
 export function App(props: ParentProps) {
+  return isGuest ? <GuestApp>{props.children}</GuestApp> : <OwnerApp>{props.children}</OwnerApp>;
+}
+
+/** A guest in a Jam: the Jam, and the library and search to pick songs from. Nothing else of the owner's. */
+function GuestApp(props: ParentProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [query, setQuery] = createSignal("");
+  const search = (e: SubmitEvent) => {
+    e.preventDefault();
+    const q = query().trim();
+    if (q) navigate(`/search?q=${encodeURIComponent(q)}`);
+  };
+  return (
+    <div class="app">
+      <aside class="sidebar">
+        <A class="wordmark" href="/jam">Seek</A>
+        <form class="sidebar-search" onSubmit={search}>
+          <Icon name="search" size={15} />
+          <input type="search" placeholder="Search" value={query()} onInput={(e) => setQuery(e.currentTarget.value)}
+                 onFocus={() => location.pathname !== "/search" && !query() && navigate("/search")} />
+        </form>
+        <nav>
+          <A href="/jam"><Icon name="jam" size={18} />Jam</A>
+          <p class="sidebar-heading">Library</p>
+          <A href="/albums"><Icon name="albums" size={18} />Albums</A>
+          <A href="/artists" end><Icon name="artists" size={18} />Artists</A>
+          <A href="/search" class="only-narrow"><Icon name="search" size={18} />Search</A>
+        </nav>
+      </aside>
+      <div class="content">
+        <main>{props.children}</main>
+      </div>
+      <JamBar />
+      <Notice />
+    </div>
+  );
+}
+
+function Notice() {
+  return (
+    <Show when={notice()}>
+      <div class="notice" role="status">{notice()}</div>
+    </Show>
+  );
+}
+
+function OwnerApp(props: ParentProps) {
   const [status] = createResource(changes, api.status);
+  const [jam] = useJam();
   // Reading a resource that failed throws: the server's status only while it's answering.
   const reached = () => (status.error ? undefined : status());
   const [failure, setFailure] = createSignal<string>();
@@ -52,6 +103,9 @@ export function App(props: ParentProps) {
             <Icon name="downloads" size={18} />Downloads
             <Show when={downloading() > 0}><span class="badge">{downloading()}</span></Show>
           </A>
+          <Show when={jam()}>
+            <A href="/jam"><Icon name="jam" size={18} />Jam</A>
+          </Show>
           <A href="/settings"><Icon name="settings" size={18} />Settings</A>
         </nav>
       </aside>
@@ -68,6 +122,7 @@ export function App(props: ParentProps) {
         <main>{props.children}</main>
       </div>
       <PlayerBar />
+      <Notice />
       <Show when={failure()}>
         <div class="toast" role="alert">
           <p>{failure()}</p>

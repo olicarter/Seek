@@ -144,6 +144,12 @@ extension Core {
 
     /// Something to play for a song that isn't in the library, as the app's player gets it.
     func stream(artist: String, title: String, release id: String?, disc: Int, number: Int, song: String) async -> StreamService.Playable? {
+        guard let track = await streamedTrack(artist: artist, title: title, release: id, disc: disc, number: number, song: song) else { return nil }
+        return await streamer.fetch(track)
+    }
+
+    /// A song that isn't in the library, as the app's player has it (with the copies it plays from).
+    func streamedTrack(artist: String, title: String, release id: String?, disc: Int, number: Int, song: String) async -> Track? {
         let found = id.flatMap(search.results.release)
         var key = AlbumKey(artist: artist, title: title)
         if let owned = found?.inLibrary ?? library.index.album(artist: artist, title: title, named: true) { key = owned }
@@ -156,7 +162,7 @@ extension Core {
                                 bandcampPage: found?.store?.url ?? owned?.itemURL, artwork: found?.artworkURL ?? reference.artworkURL)
         guard let entry = queue.first(where: { $0.reference.disc == disc && $0.reference.number == number && $0.reference.title == song })
                 ?? queue.first(where: { $0.reference.title == song }) else { return nil }
-        return await streamer.fetch(entry.track)
+        return entry.track
     }
 
     static func streamPath(_ key: AlbumKey, release: String?, track: ReferenceTrack) -> String {

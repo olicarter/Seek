@@ -1,7 +1,8 @@
 import { A, useParams, useSearchParams } from "@solidjs/router";
 import { live } from "../live";
 import { createMemo, For, Show } from "solid-js";
-import { albumHref, api, artistHref, changes, fromPath, media, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { albumHref, api, artistHref, changes, fromPath, isGuest, media, type AlbumPage, type AlbumRef, type Song } from "../api";
+import { tell } from "../jam";
 import { duration } from "../format";
 import { Cover } from "../Cover";
 import { Icon } from "../Icons";
@@ -45,6 +46,16 @@ export function Album() {
 
   const add = async () => mutate(await api.add(ref()));
 
+  // A guest in a Jam picks songs for its queue rather than playing them here.
+  const addToJam = async (song: Song) => {
+    try {
+      await api.addToJam(song.file!);
+      tell(`Added “${song.title}” to the Jam`);
+    } catch {
+      tell(`“${song.title}” can't be added right now`);
+    }
+  };
+
   // The artist's other albums and releases, this one left out.
   const more = createMemo((): TileItem[] => {
     const page = artist();
@@ -82,7 +93,10 @@ export function Album() {
               <Show when={album().bandcamp?.owned}>
                 <p class="album-note">In your Bandcamp collection{album().bandcamp?.downloading !== undefined ? " · adding…" : ""}</p>
               </Show>
-              <div class="album-actions">
+              <Show when={isGuest}>
+                <p class="album-note">Pick a song to add it to the Jam.</p>
+              </Show>
+              <div class="album-actions" hidden={isGuest}>
                 {/* As in the app: a round shuffle button, a wide white Play, then round buttons. */}
                 <button class="circle" aria-label="Shuffle" title="Shuffle" disabled={!queue(album()).length} onClick={() => shuffle(album())}>
                   <Icon name="shuffle" size={20} />
@@ -120,14 +134,15 @@ export function Album() {
                   </Show>
                   <li
                     classList={{ song: true, missing: !song.file, playable: !!song.file, current: isCurrent(song) }}
-                    title={song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
-                    onClick={() => song.file && playFrom(album(), song)}
+                    title={isGuest ? (song.file ? "Add to the Jam" : undefined)
+                      : song.kind === "missing" && song.file ? "Not in your library: plays from Soulseek" : undefined}
+                    onClick={() => song.file && (isGuest ? addToJam(song) : playFrom(album(), song))}
                   >
                     <span class="song-number">
                       <Show when={isCurrent(song) && playing()} fallback={
                         <>
                           <span class="number">{song.number ?? ""}</span>
-                          <Show when={song.file}><span class="hover-play"><Icon name="play" size={13} /></span></Show>
+                          <Show when={song.file}><span class="hover-play"><Icon name={isGuest ? "plus" : "play"} size={13} /></span></Show>
                         </>
                       }>
                         <span class="bars" aria-label="Playing"><i /><i /><i /></span>

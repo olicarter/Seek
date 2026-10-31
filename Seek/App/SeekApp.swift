@@ -20,6 +20,7 @@ struct SeekApp: App {
     @State private var streamer: StreamService
     @State private var sharing: SharingService
     @State private var analysis: SongAnalysisStore
+    @State private var jam: JamSpeaker
     #if targetEnvironment(macCatalyst)
     /// Seek on the web, served from this Mac (see WebServer).
     @State private var web: WebServer?
@@ -31,7 +32,9 @@ struct SeekApp: App {
         let library = LibraryStore(container: container)
         self.container = container
         _library = State(initialValue: library)
-        _player = State(initialValue: Player(library: library))
+        let player = Player(library: library)
+        _player = State(initialValue: player)
+        _jam = State(initialValue: JamSpeaker(player: player, library: library))
         let discovery = DiscoveryService(container: container)
         _discovery = State(initialValue: discovery)
         let about = AlbumAbout(container: container)
@@ -98,6 +101,8 @@ struct SeekApp: App {
                             library.takeMacAdditions(soon: true)
                         }
                     }
+                    // A Jam played here goes through the Mac, which guests join.
+                    jam.link = client.macLink.map(MacJamLink.init)
                     library.askMacForDetails()
                     library.takeMacAdditions()
                     #endif
@@ -150,6 +155,7 @@ struct SeekApp: App {
                             copyFinder: copyFinder, storeVerifier: storeVerifier, resolver: folderResolver,
                             adder: albumAdder, streamer: streamer)
                         core.about = about
+                        jam.link = LocalJamLink(host: core.jam)
                         let server = WebServer(core: core)
                         web = server
                         server.start()
@@ -178,6 +184,7 @@ struct SeekApp: App {
         .environment(sharing)
         .environment(analysis)
         .environment(albumAdder)
+        .environment(jam)
         #if targetEnvironment(macCatalyst)
         .environment(web)
         #endif

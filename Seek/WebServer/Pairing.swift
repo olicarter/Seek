@@ -71,7 +71,10 @@ struct RequireKey<Context: RequestContext>: RouterMiddleware {
         let open = path == "/api/auth" || path.hasPrefix("/api/auth/signin/")
             || path == "/api/auth/device/begin" || path == "/api/auth/device/poll"
         if guarded, !open, !(await Access.isTrusted(request)) {
-            throw HTTPError(.unauthorized, message: "Sign in with a passkey.")
+            // A guest in a Jam, with its key: only what guests may use (see JamRoutes).
+            let given = Access.credential(request)
+            let guestKey = await MainActor.run { JamHost.shared?.isGuestKey(given) ?? false }
+            if !(JamRoutes.guestMayUse(path) && guestKey) { throw HTTPError(.unauthorized, message: "Sign in with a passkey.") }
         }
         return try await next(request, context)
     }

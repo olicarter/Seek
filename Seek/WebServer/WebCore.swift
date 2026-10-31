@@ -21,6 +21,8 @@ final class Core {
     /// Searches run for an iPhone or iPad using this Mac (see AppAPI).
     let appSearches = AppSearches()
     let quality = QualityPreference.cd
+    /// Listening together: the session, kept here.
+    private(set) lazy var jam = JamHost(core: self)
     /// Bumped whenever anything a page shows may have changed; pages refetch when it does.
     private(set) var version = 0
     private var watching: Task<Void, Never>?
@@ -117,7 +119,7 @@ final class Core {
             "\(references.references.count)", "\(AppleCovers.shared.version)",
             bandcamp.username ?? "", "\(bandcamp.items.count)", "\(bandcamp.prices.count)",
             bandcamp.downloads.map { "\($0.state)\(Int(($0.ringProgress ?? 0) * 50))" }.joined(separator: ","),
-            "\(streamer.progress.count)",
+            "\(streamer.progress.count)", "\(jam.jam?.version ?? -1)",
         ]
     }
 

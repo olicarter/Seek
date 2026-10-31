@@ -586,6 +586,7 @@ final class LibraryStore {
     func isReserved(_ path: String) -> Bool { reservedPaths.contains(path) }
 
     func hasTrack(path: String) -> Bool { existingTrack(path) != nil }
+    func track(atPath path: String) -> Track? { existingTrack(path) }
 
     /// Whether the folder `plannedPath` is in already has a song of that name (by its title:
     /// "Artist - Album - 05 - Song.flac" and "5. Song.flac" are the same), from any copy.

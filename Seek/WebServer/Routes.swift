@@ -42,6 +42,7 @@ func makeRouter(core: Core, site: String) -> Hummingbird.Router<BasicRequestCont
     router.middlewares.add(FileMiddleware(site, searchForIndexHtml: true))
 
     addAppRoutes(to: router, core: core)
+    JamRoutes.add(to: router, core: core)
 
     router.get("/api/status") { _, _ in try json(await core.status) }
 
@@ -342,7 +343,7 @@ struct SiteOrigins<Context: RequestContext>: RouterMiddleware {
         var headers: HTTPFields = [
             .accessControlAllowOrigin: origin,
             .accessControlAllowMethods: "GET, POST, OPTIONS",
-            .accessControlAllowHeaders: "Content-Type, Range, X-Seek-Key",
+            .accessControlAllowHeaders: "Content-Type, Range, X-Seek-Key, X-Seek-Guest",
             .accessControlExposeHeaders: "Content-Range, Content-Length, Accept-Ranges",
             .vary: "Origin",
         ]

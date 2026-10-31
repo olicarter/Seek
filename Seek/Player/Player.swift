@@ -27,6 +27,8 @@ final class Player {
     /// The step loading is at, in words, for Now Playing's status (see `loadingStatus`).
     private(set) var stage: String?
     private(set) var currentTime: Double = 0
+    /// The last song played to the end, with nothing after it.
+    private(set) var reachedEnd = false
     private(set) var duration: Double = 0
     private(set) var shuffle = false
     var repeatMode: RepeatMode = .off {
@@ -113,8 +115,15 @@ final class Player {
 
     // MARK: - Queue
 
+    // In a Jam, songs queued here go into the session (see JamSpeaker): true when it took them.
+    @ObservationIgnored var jamTakes: ((Track) -> Bool)?
+    @ObservationIgnored var jamRemoves: ((Track) -> Bool)?
+    @ObservationIgnored var jamMoves: ((Track, Int) -> Bool)?
+
     func play(_ tracks: [Track], startingAt start: Int = 0) {
         guard tracks.indices.contains(start) else { return }
+        // In a Jam, the song chosen is added to its queue.
+        if jamTakes?(tracks[start]) == true { return }
         originalQueue = tracks
         if shuffle {
             var rest = tracks
@@ -135,6 +144,7 @@ final class Player {
     }
 
     func playNext(_ track: Track) {
+        if jamTakes?(track) == true { return }
         if queue.isEmpty { return play([track]) }
         queue.insert(track, at: index + 1)
         originalQueue.append(track)
@@ -142,6 +152,7 @@ final class Player {
     }
 
     func addToQueue(_ track: Track) {
+        if jamTakes?(track) == true { return }
         if queue.isEmpty { return play([track]) }
         queue.append(track)
         originalQueue.append(track)
@@ -155,12 +166,19 @@ final class Player {
     }
 
     func removeFromQueue(at offsets: IndexSet) {
+        let removing = offsets.compactMap { upNext.dropFirst($0).first }
+        if let first = removing.first, jamRemoves?(first) == true {
+            removing.dropFirst().forEach { _ = jamRemoves?($0) }
+            return
+        }
         let absolute = IndexSet(offsets.map { $0 + index + 1 })
         queue.remove(atOffsets: absolute)
         remember()
     }
 
     func moveInQueue(from source: IndexSet, to destination: Int) {
+        if let from = source.first, let track = upNext.dropFirst(from).first,
+           jamMoves?(track, destination > from ? destination - 1 : destination) == true { return }
         var rest = Array(upNext)
         rest.move(fromOffsets: source, toOffset: destination)
         queue = Array(queue[...index]) + rest
@@ -188,6 +206,7 @@ final class Player {
 
     func resume() {
         guard current != nil else { return }
+        reachedEnd = false
         activateSession()
         if player.currentItem == nil { return load(autoplay: true, from: resumeAt ?? 0) }
         player.play()
@@ -211,9 +230,45 @@ final class Player {
         } else {
             pause()
             seek(to: 0)
+            reachedEnd = true
             return
         }
         load(autoplay: true)
+    }
+
+    /// A Jam's queue and what it's playing (see JamSpeaker). The song playing carries on
+    /// unless it's another one, or `restart`.
+    func follow(_ tracks: [Track], at position: Int?, playing: Bool, restart: Bool) {
+        guard let position, tracks.indices.contains(position) else {
+            if isPlaying { pause() }
+            return
+        }
+        let same = current === tracks[position]
+        shuffle = false
+        repeatMode = .off
+        queue = tracks
+        originalQueue = tracks
+        index = position
+        if !same {
+            reachedEnd = false
+            return load(autoplay: playing)
+        }
+        if restart {
+            reachedEnd = false
+            seek(to: 0)
+        }
+        if playing, !isPlaying { resume() } else if !playing, isPlaying { pause() }
+        remember()
+    }
+
+    /// A Jam's queue changed (songs added, taken out, moved): the song playing carries on.
+    func followQueue(_ tracks: [Track]) {
+        guard let current, let position = tracks.firstIndex(where: { $0 === current }) else { return }
+        guard tracks.count != queue.count || zip(tracks, queue).contains(where: { $0 !== $1 }) else { return }
+        queue = tracks
+        originalQueue = tracks
+        index = position
+        remember()
     }
 
     /// What `next()` would play.
@@ -269,6 +324,7 @@ final class Player {
         player.replaceCurrentItem(with: nil)
         currentTime = start
         duration = track.duration
+        reachedEnd = false
         isLoading = true
         isPlaying = autoplay
         updateNowPlaying()

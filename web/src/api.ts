@@ -123,7 +123,37 @@ if (pairing) {
   }
   history.replaceState(null, "", location.pathname + location.search);
 }
-const key = pairing ?? stored(PAIRING_KEY);
+// A Jam's link ends #jam=…: this browser is a guest in it, with only what guests can see.
+const JAM_KEY = "seek.jam";
+const GUEST_KEY = "seek.guest";
+const joining = new URLSearchParams(location.hash.slice(1)).get("jam");
+if (joining) {
+  try {
+    if (joining !== localStorage.getItem(JAM_KEY)) localStorage.removeItem(GUEST_KEY);
+    localStorage.setItem(JAM_KEY, joining);
+  } catch {
+    // Not kept: a guest until the page closes.
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+const jamKey = joining ?? stored(JAM_KEY);
+/** This browser is a guest in someone's Jam, rather than Seek's owner. */
+export const isGuest = jamKey !== null;
+let guest = isGuest ? stored(GUEST_KEY) : null;
+export const guestID = () => guest;
+
+/** Out of the Jam (it ended, or leaving it): back to Seek as before. */
+export function leaveJam() {
+  try {
+    localStorage.removeItem(JAM_KEY);
+    localStorage.removeItem(GUEST_KEY);
+  } catch {
+    // Nothing kept.
+  }
+  location.replace(import.meta.env.BASE_URL);
+}
+
+const key = jamKey ?? pairing ?? stored(PAIRING_KEY);
 
 /**
  * Keeps what lets this browser in: its session after signing in with a passkey (or nothing,
@@ -175,10 +205,15 @@ export function media(path?: string): string | undefined {
 export class NotPaired extends Error {}
 
 function headers(extra: Record<string, string> = {}): Record<string, string> {
-  return key ? { ...extra, "X-Seek-Key": key } : extra;
+  const withKey = key ? { ...extra, "X-Seek-Key": key } : extra;
+  return guest ? { ...withKey, "X-Seek-Guest": guest } : withKey;
 }
 
+/** The Jam this browser is a guest in has ended. */
+export class JamEnded extends Error {}
+
 function check(response: Response, path: string) {
+  if (isGuest && (response.status === 401 || (response.status === 404 && path.startsWith("/api/jam")))) throw new JamEnded();
   if (response.status === 401) throw new NotPaired();
   if (!response.ok) throw new Error(`${path}: ${response.status}`);
 }
@@ -207,6 +242,33 @@ function albumQuery(ref: AlbumRef): string {
   return params.toString().replaceAll("+", "%20");
 }
 
+export type JamItem = {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  albumArtist: string;
+  cover?: string;
+  duration: number;
+  addedBy: string;
+  mine: boolean;
+};
+
+export type JamPage = {
+  me?: string;
+  isHost: boolean;
+  canControl: boolean;
+  guestsCanControl: boolean;
+  people: string[];
+  nowPlaying?: JamItem;
+  playing: boolean;
+  finished: boolean;
+  position: number;
+  upNext: JamItem[];
+  played: JamItem[];
+  link?: string;
+};
+
 export type AuthInfo = { passkeys: boolean; signedIn: boolean; local: boolean };
 export type Passkey = { id: string; name: string; created: string; lastUsed?: string };
 
@@ -221,7 +283,25 @@ export const api = {
   finishSignIn: (answer: object) => post<{ session: string }>("/api/auth/signin/finish", answer),
   beginRegister: () => post<{ challenge: string; userID: string; site: string }>("/api/auth/register/begin"),
   finishRegister: (answer: object) => post<{ session: string }>("/api/auth/register/finish", answer),
-  status: () => get<Status>("/api/status"),
+  // Guests don't see the Mac's accounts: Soulseek is just there for them.
+  status: () => isGuest ? Promise.resolve<Status>({ soulseek: "", signedIn: true, downloading: 0 }) : get<Status>("/api/status"),
+  jam: () => get<JamPage>("/api/jam"),
+  joinJam: async (name: string) => {
+    const joined = await post<{ guest: string }>("/api/jam/join", { name });
+    guest = joined.guest;
+    try {
+      localStorage.setItem(GUEST_KEY, joined.guest);
+    } catch {
+      // A guest until the page closes.
+    }
+    return joined;
+  },
+  addToJam: (file: string) => post<JamPage>("/api/jam/add", { file }),
+  removeFromJam: (id: string) => post<JamPage>("/api/jam/remove", { id }),
+  controlJam: (action: "play" | "pause" | "next" | "previous") => post<JamPage>("/api/jam/control", { action }),
+  jamSettings: (guestsCanControl: boolean) => post<JamPage>("/api/jam/settings", { guestsCanControl }),
+  moveInJam: (id: string, place: number) => post<JamPage>("/api/jam/move", { id, place }),
+  endJam: () => post<{ ok: boolean }>("/api/jam/end"),
   search: (query: string) => post<SearchPage>("/api/search", { query }),
   searchPage: () => get<SearchPage>("/api/search"),
   album: (ref: AlbumRef) => get<AlbumPage>(`/api/album?${albumQuery(ref)}`),

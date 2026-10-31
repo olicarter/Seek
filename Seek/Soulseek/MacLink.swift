@@ -255,6 +255,20 @@ final class MacLink {
         return try decoder.decode(T.self, from: data)
     }
 
+    /// A request to the Mac's Jam (see JamHost): its answer, or the status it refused with
+    /// (nil when the Mac didn't answer).
+    func jamRequest<T: Decodable>(_ path: String, _ body: some Encodable) async -> (answer: T?, status: Int?) {
+        guard var request = request(path, timeout: 10) else { return (nil, nil) }
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONEncoder().encode(body)
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let status = (response as? HTTPURLResponse)?.statusCode else { return (nil, nil) }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return ((200..<300).contains(status) ? try? decoder.decode(T.self, from: data) : nil, status)
+    }
+
     static func base64url(_ data: Data) -> String {
         data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")

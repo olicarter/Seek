@@ -458,6 +458,8 @@ struct SettingsView: View {
     @State private var password = ""
     @AppStorage(MusicalKey.Notation.defaultsKey) private var notation = MusicalKey.Notation.camelot
     @Environment(SongAnalysisStore.self) private var analysis
+    @Environment(JamSpeaker.self) private var jam
+    @State private var showingJam = false
     #if targetEnvironment(macCatalyst)
     @Environment(WebServer.self) private var web: WebServer?
     #endif
@@ -513,6 +515,14 @@ struct SettingsView: View {
                         : client.savedUsername == nil
                         ? "Signing in with a new username creates the account. Your login is saved in iCloud Keychain, so your other devices can use it too."
                         : "Seek connects only while you're using the Soulseek tab or downloading, and disconnects when you leave the app with nothing downloading. Soulseek allows one connection per account, so the device you're using takes over.")
+                }
+
+                Section {
+                    Button(jam.isActive ? "Jam" : "Start a Jam", systemImage: "person.2.wave.2") { showingJam = true }
+                } header: {
+                    Text("Listen Together")
+                } footer: {
+                    Text(jam.isActive ? "Friends are adding to what this device plays." : "Friends add songs to what this device plays, from a link.")
                 }
 
                 #if targetEnvironment(macCatalyst)
@@ -646,6 +656,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showingBandcampLogin) { BandcampLoginView() }
+            .sheet(isPresented: $showingJam) { JamView() }
             .onAppear {
                 if username.isEmpty { username = Credentials.load()?.username ?? "" }
             }

@@ -10,6 +10,8 @@ import { Artists } from "./pages/Artists";
 import { Downloads } from "./pages/Downloads";
 import { Settings } from "./pages/Settings";
 import { TV } from "./pages/TV";
+import { Jam } from "./pages/Jam";
+import { isGuest } from "./api";
 import "./styles.css";
 
 function OldAlbumLink() {
@@ -25,7 +27,8 @@ function OldArtistLink() {
 render(
   () => (
     <Router root={App} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-      <Route path="/" component={() => <Navigate href="/albums" />} />
+      <Route path="/" component={() => <Navigate href={isGuest ? "/jam" : "/albums"} />} />
+      <Route path="/jam" component={Jam} />
       <Route path="/albums" component={Library} />
       <Route path="/artists" component={Artists} />
       <Route path="/artists/:artist" component={Artist} />

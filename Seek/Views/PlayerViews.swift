@@ -131,6 +131,8 @@ struct NowPlayingView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Namespace private var artworkSpace
     @State private var showingQueue = false
+    @State private var showingJam = false
+    @Environment(JamSpeaker.self) private var jam
     /// How far the player has been pulled down to close it.
     @State private var dragOffset: CGFloat = 0
     @State private var height: CGFloat = 900
@@ -156,6 +158,7 @@ struct NowPlayingView: View {
         .presentationBackground(.clear)
         .newPlaylistPrompt()
         .environment(newPlaylist)
+        .sheet(isPresented: $showingJam) { JamView() }
     }
 
     /// Pulling down anywhere outside the scrubber and volume closes the player.
@@ -366,6 +369,8 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var trackActions: some View {
+        Button(jam.isActive ? "Jam" : "Start a Jam", systemImage: "person.2.wave.2") { showingJam = true }
+        Divider()
         if let track = player.current, let source = track.stream {
             streamedAddActions(track, source: source)
             Button("Go to Album", systemImage: "square.stack") {
