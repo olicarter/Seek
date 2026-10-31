@@ -122,6 +122,11 @@ struct NowPlayingView: View {
     @Environment(Player.self) private var player
     @Environment(Router.self) private var router
     @Environment(LibraryStore.self) private var library
+    @Environment(SoulseekClient.self) private var client
+    @Environment(AlbumAdder.self) private var adder
+    @Environment(AlbumReferences.self) private var references
+    @Environment(StreamService.self) private var streamer
+    @Environment(CopyFinder.self) private var copyFinder
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Namespace private var artworkSpace
@@ -361,7 +366,8 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var trackActions: some View {
-        if let track = player.current, track.isStreamed {
+        if let track = player.current, let source = track.stream {
+            streamedAddActions(track, source: source)
             Button("Go to Album", systemImage: "square.stack") {
                 dismiss()
                 router.show(ExternalAlbum(artist: track.albumArtist, title: track.album, artworkURL: track.stream?.artworkURL))
@@ -378,6 +384,42 @@ struct NowPlayingView: View {
                 router.show(ArtistKey(name: track.albumKey.artist))
             }
         }
+    }
+
+    /// The album's copies: the ones the streamed song plays from, and any others found for it.
+    private func folders(_ source: StreamSource, album: AlbumKey) -> [RemoteFolder] {
+        let playing = source.candidates.map { file in
+            client.complete(RemoteFolder(username: file.username, path: file.folder, files: [file],
+                                         hasFreeSlot: true, averageSpeed: 0, queueLength: 0))
+        }
+        let ids = Set(playing.map(\.id))
+        return playing + (copyFinder.copies(of: album)?.folders ?? []).filter { !ids.contains($0.id) }.map(client.complete)
+    }
+
+    /// Adding a streamed song, or its album, to the library: offered as the album page offers them.
+    @ViewBuilder private func streamedAddActions(_ track: Track, source: StreamSource) -> some View {
+        let key = AlbumKey(artist: track.albumArtist, title: track.album)
+        let folders = folders(source, album: key)
+        let facts = AlbumFacts.current(for: key, library: library, client: client, references: references,
+                                       adder: adder, folders: folders, searching: false)
+        let (state, songs) = AlbumState.derive(facts)
+        let song = songs.first { $0.disc == track.discNumber && $0.number == track.trackNumber && $0.title == track.title }
+            ?? songs.first { ReleaseText.fold($0.title) == ReleaseText.fold(track.title) }
+        if song?.state == .available || (song == nil && facts.tracklist == nil) {
+            Button("Add Song to Library", systemImage: "plus") { addSong(source, album: key, folders: folders) }
+        }
+        if state.canAdd {
+            Button("Add Album to Library", systemImage: "plus.square.on.square") {
+                adder.add(key, from: folders, client: client, references: references)
+            }
+        }
+    }
+
+    /// Downloads the streamed song into the library: the copy already played, when there is one.
+    private func addSong(_ source: StreamSource, album: AlbumKey, folders: [RemoteFolder]) {
+        guard let file = source.candidates.first(where: { streamer.cachedURL(for: $0) != nil }) ?? source.candidates.first,
+              let folder = folders.first(where: { $0.username == file.username && $0.path == file.folder }) else { return }
+        client.download([file], in: folder, album: album, others: folders)
     }
 
     private var transportControls: some View {
